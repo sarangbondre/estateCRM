@@ -1,5 +1,5 @@
 Current stage: 4 — Low-Level Design (LLD)
-State: IN PROGRESS
+State: IN PROGRESS (waiting on CR-006: align PRD with the real extractor file)
 
 | Stage | Status | Approved on | Artifacts |
 |---|---|---|---|
@@ -11,7 +11,7 @@ State: IN PROGRESS
 | 6 — Implementation Rules | NOT STARTED | — | — |
 | 7 — Execution | NOT STARTED | — | — |
 
-Inputs: docs/inputs/CRM-01-brd-v0.5.pdf, docs/inputs/CRM-01-brd-v0.6.pdf (client BRDs by Vinit), docs/inputs/vinit-journeys-artifact.md
+Inputs: docs/inputs/extractor-master-profile.md (PII-free profile of crm_master.xlsx; file not stored), docs/inputs/CRM-01-brd-v0.5.pdf, docs/inputs/CRM-01-brd-v0.6.pdf (client BRDs by Vinit), docs/inputs/vinit-journeys-artifact.md
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)
@@ -19,5 +19,6 @@ Change requests:
 - CR-003: APPROVED 2026-09-24 (BRD v0.6 adopted; recommendations Y-1…Y-9 accepted)
 - CR-004: APPROVED 2026-09-24 (BRD A-10 clarified)
 - CR-005: APPROVED 2026-09-24 (PRD §8.4 pilot on free plans + paid-plan gate)
+- CR-006 (align PRD with the real extractor master file): AWAITING APPROVAL
 
-Open change requests: none
+Open change requests: CR-006

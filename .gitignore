@@ -1,0 +1,9 @@
+# Client data files may contain personal data (DPDP). Never commit them.
+*.xlsx
+*.xls
+*.csv
+!contracts/**/*.csv
+.env
+.env.*
+node_modules/
+.DS_Store
