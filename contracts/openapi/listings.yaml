@@ -1,0 +1,1062 @@
+# listings — Publishing and Listings API (S5). LLD: docs/04-lld/listings.md
+# Rules: docs/04-lld/conventions.md. Shared components: ./_common.yaml
+openapi: 3.1.0
+info:
+  title: 11 Estates CRM — listings (Publishing and Listings API)
+  version: 0.1.0
+  description: |
+    Owns the Publication axis (level + computed ceiling), privacy-scan results, the sanitised public projection of
+    offers, projects and anonymous demand posts, the change feed, website API keys and the RERA publication settings.
+
+    Two audiences:
+    - **Staff** (via web, `staffViaWeb`): publication cards C-12 / C-11 toggle, Settings (API keys, RERA number).
+    - **Website client** (11 Estates website and project microsites, `websiteApiKey`): read-only public API on the
+      listings Vercel domain (`https://api.11estates.in`), not routed through web. Responses carry only the PRD §8.3
+      fields. Never: building/society name, wing, unit, exact floor, street address, contacts, sources, internal notes,
+      owners, side_evidence, needs_review data. Non-property scopes are never served.
+
+    Public API caching: `Cache-Control: public, s-maxage=20, stale-while-revalidate=10` and `Vary: X-Api-Key` on
+    GET list/detail responses (max staleness 30 s; NFR-10 ≤ 1 min end to end). `/v1/changes` is `s-maxage=5`.
+    Errors are never cached.
+servers:
+  - url: https://api.11estates.in
+    description: Public website API (listings Vercel project, bom1)
+  - url: https://listings.internal.11estates.in
+    description: Staff routes reached only through web; /internal routes reached only by pg_cron/pg_net
+tags:
+  - name: publication
+    description: Staff publication control (C-12, C-11)
+  - name: settings
+    description: Admin settings owned by listings (RERA agent number, API keys)
+  - name: public
+    description: Website client API (US-33)
+  - name: internal
+    description: Scheduler endpoints (relay, drain, jobs)
+  - name: health
+security: []
+paths:
+  # ------------------------------------------------------------------ staff: publication
+  /v1/offers/{idOrCode}/publication:
+    parameters:
+      - $ref: './_common.yaml#/components/parameters/IdOrCode'
+      - $ref: './_common.yaml#/components/parameters/CorrelationId'
+    get:
+      operationId: getOfferPublication
+      tags: [publication]
+      summary: Publication state of an offer with the computed ceiling and the reasons (C-12, P-02 Overview)
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      responses:
+        '200':
+          description: Current state
+          headers: { ETag: { schema: { type: string }, description: 'Row version; use as If-Match on PUT' } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OfferPublicationState' } } }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './_common.yaml#/components/responses/NotFound' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+    put:
+      operationId: setOfferPublication
+      tags: [publication]
+      summary: Set the publication level (at or below the ceiling), optionally with an edited public description
+      description: |
+        Runs the blocking privacy scan on the effective public text (generated or staff-edited) and the RERA check
+        before Anonymous or Public. Photos come from the offer's `selectedPhotoIds` (chosen in records). Photos with
+        detected text are a **warning only** (conventions R-8, PRD A-17): they're flagged in `photos[].warnings` and
+        `lastScan`, nothing is excluded automatically. Lowering a level never needs a scan. Emits
+        `publication.changed.v1` when the level changes and `audit.recorded.v1` (action `publication.set`) always.
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin, Manager, Supply agent]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: PUT is idempotent by design (same body → same state, no second event). Optional If-Match → 412 on version mismatch.
+      x-emits: [publication.changed.v1, audit.recorded.v1]
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SetPublicationRequest' } } }
+      responses:
+        '200':
+          description: Level applied (or unchanged)
+          content: { application/json: { schema: { $ref: '#/components/schemas/OfferPublicationState' } } }
+        '400': { $ref: './_common.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './_common.yaml#/components/responses/NotFound' }
+        '409': { description: 'level-above-ceiling or subject-not-publishable', content: { application/problem+json: { schema: { $ref: './_common.yaml#/components/schemas/Problem' } } } }
+        '412': { $ref: './_common.yaml#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/PublicationBlocked' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /v1/offers/{idOrCode}/privacy-scan:
+    parameters:
+      - $ref: './_common.yaml#/components/parameters/IdOrCode'
+      - $ref: './_common.yaml#/components/parameters/CorrelationId'
+    post:
+      operationId: scanOfferText
+      tags: [publication]
+      summary: Dry-run privacy scan of a proposed public description (and the offer's photos) without changing the level
+      description: Stores the scan result (latest per offer is shown on C-12). Findings return kinds and character offsets only, never the matched text.
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin, Manager, Supply agent]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key accepted (24 h, per user+route); replay returns the stored scan result
+      x-emits: []
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PrivacyScanRequest' } } }
+      responses:
+        '200':
+          description: Scan result (pass, warning or blocked)
+          content: { application/json: { schema: { $ref: '#/components/schemas/PrivacyScanResult' } } }
+        '400': { $ref: './_common.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './_common.yaml#/components/responses/NotFound' }
+        '409': { $ref: './_common.yaml#/components/responses/Conflict' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /v1/projects/{idOrCode}/publication:
+    parameters:
+      - $ref: './_common.yaml#/components/parameters/IdOrCode'
+      - $ref: './_common.yaml#/components/parameters/CorrelationId'
+    get:
+      operationId: getProjectPublication
+      tags: [publication]
+      summary: Publication state of a project (P-05) with ceiling and reasons
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      responses:
+        '200':
+          description: Current state
+          headers: { ETag: { schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ProjectPublicationState' } } }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './_common.yaml#/components/responses/NotFound' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+    put:
+      operationId: setProjectPublication
+      tags: [publication]
+      summary: Set a project's level (Private or Public; projects have no Anonymous level)
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin, Manager, Supply agent]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: PUT is idempotent by design. Optional If-Match → 412.
+      x-emits: [publication.changed.v1, audit.recorded.v1]
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SetPublicationRequest' } } }
+      responses:
+        '200':
+          description: Level applied
+          content: { application/json: { schema: { $ref: '#/components/schemas/ProjectPublicationState' } } }
+        '400': { $ref: './_common.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './_common.yaml#/components/responses/NotFound' }
+        '409': { description: level-above-ceiling, content: { application/problem+json: { schema: { $ref: './_common.yaml#/components/schemas/Problem' } } } }
+        '412': { $ref: './_common.yaml#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/PublicationBlocked' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /v1/demands/{idOrCode}/demand-post:
+    parameters:
+      - $ref: './_common.yaml#/components/parameters/IdOrCode'
+      - $ref: './_common.yaml#/components/parameters/CorrelationId'
+    get:
+      operationId: getDemandPost
+      tags: [publication]
+      summary: Anonymous demand post state for a demand (P-03 Sourcing tab)
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      responses:
+        '200':
+          description: Current state
+          headers: { ETag: { schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/DemandPostState' } } }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './_common.yaml#/components/responses/NotFound' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+    put:
+      operationId: setDemandPost
+      tags: [publication]
+      summary: Post (Anonymous) or take down (Private) the anonymous demand post; allowed only while the demand is in Sourcing and Fresh/Ageing
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: PUT is idempotent by design. Optional If-Match → 412.
+      x-emits: [publication.changed.v1, audit.recorded.v1]
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [level]
+              properties:
+                level: { type: string, enum: [Private, Anonymous] }
+      responses:
+        '200':
+          description: Applied
+          content: { application/json: { schema: { $ref: '#/components/schemas/DemandPostState' } } }
+        '400': { $ref: './_common.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './_common.yaml#/components/responses/NotFound' }
+        '409': { description: 'level-above-ceiling (demand not in Sourcing, Stale/Expired or exited)', content: { application/problem+json: { schema: { $ref: './_common.yaml#/components/schemas/Problem' } } } }
+        '412': { $ref: './_common.yaml#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/PublicationBlocked' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /v1/publications:
+    get:
+      operationId: listPublications
+      tags: [publication]
+      summary: Staff list of publication states (e.g. "Stale Public offers", everything Public), stored-field filters
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/CorrelationId'
+        - $ref: './_common.yaml#/components/parameters/Limit'
+        - $ref: './_common.yaml#/components/parameters/Cursor'
+        - { name: subjectType, in: query, schema: { type: string, enum: [offer, project, demand_post] } }
+        - { name: level, in: query, schema: { $ref: './_common.yaml#/components/schemas/PublicationLevel' } }
+        - { name: lifeStage, in: query, schema: { $ref: './_common.yaml#/components/schemas/LifeStage' } }
+        - { name: ceilingBelowLevel, in: query, description: Only items whose ceiling is below the current level (should be empty; health check), schema: { type: boolean } }
+      responses:
+        '200':
+          description: Page sorted by updatedAt desc, id
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/PublicationSummary' } }
+                  nextCursor: { type: [string, 'null'] }
+        '400': { $ref: './_common.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  # ------------------------------------------------------------------ staff: settings
+  /v1/publication-settings:
+    parameters:
+      - $ref: './_common.yaml#/components/parameters/CorrelationId'
+    get:
+      operationId: getPublicationSettings
+      tags: [settings]
+      summary: RERA agent number and listing notes shown on every item
+      security: [{ staffViaWeb: [] }, { serviceToken: [] }]  # journeys reads the MahaRERA number for proposal PDFs
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      responses:
+        '200':
+          description: Settings
+          headers: { ETag: { schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PublicationSettings' } } }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+    put:
+      operationId: putPublicationSettings
+      tags: [settings]
+      summary: Set the 11 Estates MahaRERA agent number and the "subject to confirmation" note (Admin)
+      description: A change refreshes every public item (job `projection-refresh`) and adds `updated` entries to the change feed.
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: PUT is idempotent by design. Optional If-Match → 412.
+      x-emits: [audit.recorded.v1]
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PublicationSettingsInput' } } }
+      responses:
+        '200':
+          description: Saved
+          content: { application/json: { schema: { $ref: '#/components/schemas/PublicationSettings' } } }
+        '400': { $ref: './_common.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '412': { $ref: './_common.yaml#/components/responses/PreconditionFailed' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /v1/api-keys:
+    parameters:
+      - $ref: './_common.yaml#/components/parameters/CorrelationId'
+    get:
+      operationId: listApiKeys
+      tags: [settings]
+      summary: List website API keys (metadata only; secrets are never returned after creation)
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/Limit'
+        - $ref: './_common.yaml#/components/parameters/Cursor'
+        - { name: status, in: query, schema: { type: string, enum: [active, rotating, revoked] } }
+      responses:
+        '200':
+          description: Page sorted by createdAt desc, id
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/ApiKey' } }
+                  nextCursor: { type: [string, 'null'] }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+    post:
+      operationId: createApiKey
+      tags: [settings]
+      summary: Create an API key for a website or microsite; the secret is returned once
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key accepted. A replay returns the original status and the key metadata with `secret` omitted (the plaintext secret is never stored, not even in the idempotency store).
+      x-emits: [audit.recorded.v1]
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateApiKeyRequest' } } }
+      responses:
+        '201':
+          description: Created
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiKeyWithSecret' } } }
+        '400': { $ref: './_common.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '409': { $ref: './_common.yaml#/components/responses/Conflict' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /v1/api-keys/{keyId}/rotate:
+    parameters:
+      - { name: keyId, in: path, required: true, schema: { type: string, format: uuid } }
+      - $ref: './_common.yaml#/components/parameters/CorrelationId'
+    post:
+      operationId: rotateApiKey
+      tags: [settings]
+      summary: Issue a replacement key; the old key stays valid for a grace period (default 168 h, max 720 h)
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key accepted; replay returns the new key metadata without `secret`. Rotating a key that is already rotating → 409 conflict.
+      x-emits: [audit.recorded.v1]
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                graceHours: { type: integer, minimum: 0, maximum: 720, default: 168 }
+      responses:
+        '201':
+          description: New key issued
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiKeyWithSecret' } } }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './_common.yaml#/components/responses/NotFound' }
+        '409': { $ref: './_common.yaml#/components/responses/Conflict' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /v1/api-keys/{keyId}/revoke:
+    parameters:
+      - { name: keyId, in: path, required: true, schema: { type: string, format: uuid } }
+      - $ref: './_common.yaml#/components/parameters/CorrelationId'
+    post:
+      operationId: revokeApiKey
+      tags: [settings]
+      summary: Revoke a key immediately (the edge cache entries for it expire within 30 s)
+      security: [{ staffViaWeb: [] }]
+      x-roles: [Admin]
+      x-rate-limit: per user at web (20 req/s, burst 40)
+      x-timeout-ms: 2000
+      x-idempotency: Naturally idempotent (revoking a revoked key returns 200 with the same body); Idempotency-Key also accepted.
+      x-emits: [audit.recorded.v1]
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Revoked
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiKey' } } }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './_common.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './_common.yaml#/components/responses/NotFound' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  # ------------------------------------------------------------------ public website API
+  /v1/listings:
+    get:
+      operationId: publicListOffers
+      tags: [public]
+      summary: Published offers (Anonymous or Public shape per item), stored-field filters, cursor pagination (max 50)
+      security: [{ websiteApiKey: [] }]
+      x-roles: [Website client]
+      x-rate-limit: 50 req/s, burst 100 per API key (token bucket enforced by listings itself, conventions R-1; cache hits are not counted)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-cache: 'public, s-maxage=20, stale-while-revalidate=10; Vary: X-Api-Key'
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/PublicLimit'
+        - $ref: './_common.yaml#/components/parameters/Cursor'
+        - { name: dealType, in: query, schema: { type: string }, x-vocabulary: deal_type }
+        - { name: market, in: query, schema: { type: string }, x-vocabulary: market }
+        - { name: segment, in: query, schema: { type: string }, x-vocabulary: segment }
+        - { name: propertyType, in: query, description: 'Matches if any of the item propertyTypes equals it', schema: { type: string }, x-vocabulary: property_type }
+        - { name: city, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: micromarket, in: query, description: Includes child localities (hierarchy), schema: { type: string, maxLength: 80 } }
+        - { name: locality, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: bhkMin, in: query, schema: { type: number, minimum: 0 } }
+        - { name: bhkMax, in: query, schema: { type: number, minimum: 0 } }
+        - { name: areaSqftMin, in: query, schema: { type: number, minimum: 0 } }
+        - { name: areaSqftMax, in: query, schema: { type: number, minimum: 0 } }
+        - { name: salePriceInrMax, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: rentMonthlyInrMax, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: possessionBy, in: query, description: 'possessionDate ≤ this (YYYY-MM or YYYY-MM-DD)', schema: { type: string } }
+        - { name: saleMode, in: query, schema: { type: string }, x-vocabulary: sale_mode }
+        - { name: tenancyStatus, in: query, schema: { type: string }, x-vocabulary: tenancy_status }
+        - { name: furnishing, in: query, schema: { type: string }, x-vocabulary: furnishing }
+        - { name: level, in: query, schema: { type: string, enum: [Anonymous, Public] } }
+        - { name: projectPublicId, in: query, schema: { type: string, pattern: '^L-[0-9A-HJKMNP-TV-Z]{10}$' } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, priceAsc, priceDesc], default: newest }, description: 'priceAsc/priceDesc require dealType' }
+      responses:
+        '200':
+          description: Page of items
+          headers:
+            Cache-Control: { schema: { type: string } }
+            X-RateLimit-Remaining: { schema: { type: integer } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/PublicOffer' } }
+                  nextCursor: { type: [string, 'null'] }
+        '400': { $ref: './_common.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /v1/listings/{publicId}:
+    get:
+      operationId: publicGetOffer
+      tags: [public]
+      summary: One published offer. Withdrawn or unknown IDs → 404 (the change feed says "withdrawn").
+      security: [{ websiteApiKey: [] }]
+      x-roles: [Website client]
+      x-rate-limit: 50 req/s, burst 100 per API key
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-cache: 'public, s-maxage=20, stale-while-revalidate=10; Vary: X-Api-Key'
+      parameters:
+        - $ref: '#/components/parameters/PublicId'
+        - $ref: './_common.yaml#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Item
+          content: { application/json: { schema: { $ref: '#/components/schemas/PublicOffer' } } }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '404': { $ref: './_common.yaml#/components/responses/NotFound' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /v1/projects:
+    get:
+      operationId: publicListProjects
+      tags: [public]
+      summary: Published projects (Sale, Primary)
+      security: [{ websiteApiKey: [] }]
+      x-roles: [Website client]
+      x-rate-limit: 50 req/s, burst 100 per API key
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-cache: 'public, s-maxage=20, stale-while-revalidate=10; Vary: X-Api-Key'
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/PublicLimit'
+        - $ref: './_common.yaml#/components/parameters/Cursor'
+        - { name: city, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: micromarket, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: locality, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: propertyType, in: query, schema: { type: string }, x-vocabulary: property_type }
+        - { name: bhkMin, in: query, schema: { type: number, minimum: 0 } }
+        - { name: bhkMax, in: query, schema: { type: number, minimum: 0 } }
+        - { name: priceInrMax, in: query, description: 'Any configuration priceInrFrom ≤ this', schema: { type: integer, minimum: 0 } }
+        - { name: possessionBy, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Page sorted by publishedAt desc, id
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/PublicProject' } }
+                  nextCursor: { type: [string, 'null'] }
+        '400': { $ref: './_common.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /v1/projects/{publicId}:
+    get:
+      operationId: publicGetProject
+      tags: [public]
+      summary: One published project with configurations
+      security: [{ websiteApiKey: [] }]
+      x-roles: [Website client]
+      x-rate-limit: 50 req/s, burst 100 per API key
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-cache: 'public, s-maxage=20, stale-while-revalidate=10; Vary: X-Api-Key'
+      parameters:
+        - $ref: '#/components/parameters/PublicId'
+        - $ref: './_common.yaml#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Item
+          content: { application/json: { schema: { $ref: '#/components/schemas/PublicProject' } } }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '404': { $ref: './_common.yaml#/components/responses/NotFound' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /v1/demand-posts:
+    get:
+      operationId: publicListDemandPosts
+      tags: [public]
+      summary: Anonymous demand posts ("Wants" label) while the demand is in Sourcing
+      security: [{ websiteApiKey: [] }]
+      x-roles: [Website client]
+      x-rate-limit: 50 req/s, burst 100 per API key
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-cache: 'public, s-maxage=20, stale-while-revalidate=10; Vary: X-Api-Key'
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/PublicLimit'
+        - $ref: './_common.yaml#/components/parameters/Cursor'
+        - { name: dealType, in: query, schema: { type: string }, x-vocabulary: deal_type }
+        - { name: segment, in: query, schema: { type: string }, x-vocabulary: segment }
+        - { name: propertyType, in: query, schema: { type: string }, x-vocabulary: property_type }
+        - { name: micromarket, in: query, schema: { type: string, maxLength: 80 } }
+      responses:
+        '200':
+          description: Page sorted by publishedAt desc, id
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/PublicDemandPost' } }
+                  nextCursor: { type: [string, 'null'] }
+        '400': { $ref: './_common.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /v1/changes:
+    get:
+      operationId: publicListChanges
+      tags: [public]
+      summary: Change feed (published / updated / upgraded / downgraded / withdrawn) since a cursor or a time
+      description: |
+        Ordered by a monotonic sequence. Pass `since` = the `nextCursor` of the previous call (preferred) or an ISO
+        date-time for the first call. Entries are kept 30 days; an older `since` → 410 `change-feed-expired` (do a full
+        resync from the list endpoints). `nextCursor` is never null: it is the position to resume from.
+      security: [{ websiteApiKey: [] }]
+      x-roles: [Website client]
+      x-rate-limit: 50 req/s, burst 100 per API key
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-cache: 'public, s-maxage=5; Vary: X-Api-Key'
+      parameters:
+        - $ref: './_common.yaml#/components/parameters/CorrelationId'
+        - { name: since, in: query, required: true, schema: { type: string, maxLength: 64 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 100 } }
+      responses:
+        '200':
+          description: Changes after `since`
+          content: { application/json: { schema: { $ref: '#/components/schemas/ChangePage' } } }
+        '400': { $ref: './_common.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '410': { description: change-feed-expired, content: { application/problem+json: { schema: { $ref: './_common.yaml#/components/schemas/Problem' } } } }
+        '429': { $ref: './_common.yaml#/components/responses/TooMany' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  # ------------------------------------------------------------------ internal (scheduler)
+  /internal/v1/relay:
+    post:
+      operationId: relayOutbox
+      tags: [internal]
+      summary: Publish unpublished outbox rows to subscribed consumer queues (pg_cron every minute + poke after commit)
+      security: [{ cronSecret: [] }]
+      x-roles: [scheduler]
+      x-rate-limit: none (scheduler only; single-flight via advisory lock)
+      x-timeout-ms: 55000
+      x-idempotency: Idempotent (FOR UPDATE SKIP LOCKED; published_at set in the same transaction as pgmq.send)
+      x-emits: [publication.changed.v1, audit.recorded.v1]
+      responses:
+        '200': { $ref: '#/components/responses/BatchResult' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /internal/v1/drain/{queue}:
+    post:
+      operationId: drainQueue
+      tags: [internal]
+      summary: Consume a batch from listings' queue (dedupe on eventId, per-aggregate version check, DLQ after 5 attempts)
+      security: [{ cronSecret: [] }]
+      x-roles: [scheduler]
+      x-rate-limit: none (scheduler only; every 20 s + poke from the producer relay)
+      x-timeout-ms: 55000
+      x-idempotency: Idempotent (processed_events dedupe)
+      x-emits: [publication.changed.v1, audit.recorded.v1]
+      parameters:
+        - { name: queue, in: path, required: true, schema: { type: string, enum: [q_listings, q_listings_photos] } }
+        - { name: batch, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
+      responses:
+        '200': { $ref: '#/components/responses/BatchResult' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /internal/v1/jobs/{name}:
+    post:
+      operationId: runJob
+      tags: [internal]
+      summary: Scheduled jobs
+      description: |
+        - `ceiling-sweep` (04:30 IST daily): recompute every ceiling after the nightly life-curve run; auto-downgrade where needed.
+        - `projection-refresh`: rebuild public payloads after a settings or vocabulary change (batched, resumable).
+        - `change-feed-prune` (daily): delete change-feed rows older than 30 days.
+        - `idempotency-prune` / `rate-limit-prune` (hourly).
+        - `api-key-expire` (every 5 min): end rotation grace periods.
+      security: [{ cronSecret: [] }]
+      x-roles: [scheduler]
+      x-rate-limit: none (scheduler only; single-flight per job name)
+      x-timeout-ms: 55000
+      x-idempotency: Idempotent; each job is resumable from a stored checkpoint
+      x-emits: [publication.changed.v1]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string, enum: [ceiling-sweep, projection-refresh, change-feed-prune, idempotency-prune, rate-limit-prune, api-key-expire] } }
+      responses:
+        '200': { $ref: '#/components/responses/BatchResult' }
+        '401': { $ref: './_common.yaml#/components/responses/Unauthenticated' }
+        '404': { $ref: './_common.yaml#/components/responses/NotFound' }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  # ------------------------------------------------------------------ health
+  /health/live:
+    get:
+      operationId: live
+      tags: [health]
+      security: []
+      x-roles: [anonymous]
+      x-rate-limit: none
+      x-timeout-ms: 500
+      x-idempotency: safe (read-only)
+      x-emits: []
+      responses:
+        '200': { description: Process up, content: { application/json: { schema: { $ref: './_common.yaml#/components/schemas/Health' } } } }
+        '500': { $ref: './_common.yaml#/components/responses/ServerError' }
+  /health/ready:
+    get:
+      operationId: ready
+      tags: [health]
+      security: []
+      x-roles: [anonymous]
+      x-rate-limit: none
+      x-timeout-ms: 1000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      responses:
+        '200': { description: 'DB reachable, migrations at expected version, vocabulary cached', content: { application/json: { schema: { $ref: './_common.yaml#/components/schemas/Health' } } } }
+        '503': { description: Not ready, content: { application/json: { schema: { $ref: './_common.yaml#/components/schemas/Health' } } } }
+components:
+  parameters:
+    PublicLimit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
+    PublicId:
+      name: publicId
+      in: path
+      required: true
+      description: Opaque public ID, `L-` + 10 Crockford base32 characters. Never the internal id or code.
+      schema: { type: string, pattern: '^L-[0-9A-HJKMNP-TV-Z]{10}$' }
+  responses:
+    PublicationBlocked:
+      description: |
+        privacy-scan-blocked (findings in `errors[]` as {field, code=<finding kind>, message with offsets}),
+        rera-missing (agent MahaRERA number not set, or project RERA number missing for Sale/Primary).
+        Photo text is never a blocking reason (R-8).
+      content: { application/problem+json: { schema: { $ref: './_common.yaml#/components/schemas/Problem' } } }
+    BatchResult:
+      description: Batch processed
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [processed]
+            properties:
+              processed: { type: integer }
+              failed: { type: integer }
+              deadLettered: { type: integer }
+              more: { type: boolean, description: More work is waiting (the scheduler may poke again) }
+  schemas:
+    CeilingReason:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [commercial_closed, commercial_inactive, retired_unwilling, life_expired, life_stale, life_paused, outside_launch_area,
+                 not_verified, no_real_photos, project_rera_missing, agent_rera_missing, demand_not_sourcing, demand_exited, project_no_live_configuration,
+                 merged, voided]
+        message: { type: string, description: Plain-English reason shown on C-12 }
+    PublicationBase:
+      type: object
+      required: [subjectType, subjectId, code, level, ceiling, ceilingReasons, allowedLevels, version, updatedAt]
+      properties:
+        subjectType: { type: string, enum: [offer, project, demand_post] }
+        subjectId: { type: string, format: uuid }
+        code: { type: string, description: 'Display code (INV-…, PRJ-…, DEM-…)' }
+        level: { $ref: './_common.yaml#/components/schemas/PublicationLevel' }
+        ceiling: { $ref: './_common.yaml#/components/schemas/PublicationLevel' }
+        ceilingReasons: { type: array, items: { $ref: '#/components/schemas/CeilingReason' }, description: Why the ceiling is not higher (empty when ceiling = Public) }
+        allowedLevels: { type: array, items: { $ref: './_common.yaml#/components/schemas/PublicationLevel' } }
+        publicId: { type: [string, 'null'], description: Issued on first publish; kept for the life of the subject }
+        label: { type: [string, 'null'], description: Generated display label (BRD §4.2) }
+        lastChangedBy: { type: [string, 'null'], format: uuid }
+        lastChangeReason: { type: [string, 'null'], enum: [user, ceiling_dropped, closed, retired, expired, merged, voided, null] }
+        version: { type: integer }
+        updatedAt: { type: string, format: date-time }
+    OfferPublicationState:
+      allOf:
+        - $ref: '#/components/schemas/PublicationBase'
+        - type: object
+          required: [inputs, rera, photos]
+          properties:
+            inputs:
+              type: object
+              description: Ceiling inputs as last received from events
+              properties:
+                lifeStage: { type: [string, 'null'], enum: [Fresh, Ageing, Stale, Expired, Paused, null] }
+                recordStage: { type: [string, 'null'] }
+                commercialStatus: { type: [string, 'null'] }
+                hasRealPhotos: { type: boolean }
+                outsideLaunchArea: { type: boolean }
+            publicDescription: { type: [string, 'null'], maxLength: 2000 }
+            descriptionSource: { type: string, enum: [generated, staff] }
+            lastScan: { oneOf: [ { $ref: '#/components/schemas/PrivacyScanResult' }, { type: 'null' } ] }
+            rera:
+              type: object
+              required: [agentNumberSet, projectReraRequired]
+              properties:
+                agentNumberSet: { type: boolean }
+                projectReraRequired: { type: boolean }
+                projectReraNumber: { type: [string, 'null'] }
+            photos:
+              type: array
+              items:
+                type: object
+                required: [photoId, isReal, publicUse, ocrStatus]
+                properties:
+                  photoId: { type: string, format: uuid }
+                  isReal: { type: boolean }
+                  publicUse: { type: boolean, description: 'In the offer''s selectedPhotoIds (records) and processed; used when the item is Public' }
+                  ocrStatus: { type: string, enum: [pending, clear, text_found, failed] }
+                  warnings: { type: array, description: 'Warning only (R-8); never blocks or excludes', items: { type: string, enum: [text_detected, phone, email, url, building_name, wing_unit, other_text] } }
+    ProjectPublicationState:
+      allOf:
+        - $ref: '#/components/schemas/PublicationBase'
+        - type: object
+          properties:
+            projectReraNumber: { type: [string, 'null'] }
+            liveConfigurations: { type: integer }
+    DemandPostState:
+      allOf:
+        - $ref: '#/components/schemas/PublicationBase'
+        - type: object
+          properties:
+            commercialStatus: { type: [string, 'null'] }
+            lifeStage: { type: [string, 'null'] }
+            sourcingRequestId: { type: [string, 'null'], format: uuid }
+    PublicationSummary:
+      type: object
+      required: [subjectType, subjectId, code, level, ceiling, updatedAt]
+      properties:
+        subjectType: { type: string, enum: [offer, project, demand_post] }
+        subjectId: { type: string, format: uuid }
+        code: { type: string }
+        level: { $ref: './_common.yaml#/components/schemas/PublicationLevel' }
+        ceiling: { $ref: './_common.yaml#/components/schemas/PublicationLevel' }
+        label: { type: [string, 'null'] }
+        lifeStage: { type: [string, 'null'] }
+        publicId: { type: [string, 'null'] }
+        updatedAt: { type: string, format: date-time }
+    SetPublicationRequest:
+      type: object
+      additionalProperties: false
+      required: [level]
+      properties:
+        level: { $ref: './_common.yaml#/components/schemas/PublicationLevel' }
+        publicDescription:
+          type: [string, 'null']
+          maxLength: 2000
+          description: Staff-edited public description (offers only). Omit to keep the current text; null resets to the generated one.
+    PrivacyScanRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        text: { type: string, maxLength: 2000, description: Proposed public description; omit to scan the current effective text }
+        includePhotos: { type: boolean, default: true }
+    PrivacyScanFinding:
+      type: object
+      required: [kind, severity, field]
+      properties:
+        kind: { type: string, enum: [phone, email, url, social_handle, building_name, society_name, wing_unit, exact_floor, street_address, photo_text] }
+        severity: { type: string, enum: [block, warn] }
+        field: { type: string, enum: [description, photo] }
+        start: { type: integer, description: Character offset in the scanned text (description findings) }
+        end: { type: integer }
+        photoId: { type: string, format: uuid }
+    PrivacyScanResult:
+      type: object
+      required: [scanId, result, findings, scannedAt, rulesVersion]
+      properties:
+        scanId: { type: string, format: uuid }
+        result: { type: string, enum: [pass, warning, blocked] }
+        findings: { type: array, items: { $ref: '#/components/schemas/PrivacyScanFinding' } }
+        rulesVersion: { type: string }
+        scannedAt: { type: string, format: date-time }
+    PublicationSettingsInput:
+      type: object
+      additionalProperties: false
+      required: [mahareraAgentNumber]
+      properties:
+        mahareraAgentNumber: { type: string, pattern: '^[A-Z][0-9]{11}$', description: 'MahaRERA agent registration, e.g. A51900012345' }
+        subjectToConfirmationNote: { type: string, maxLength: 120, default: Details subject to confirmation }
+    PublicationSettings:
+      allOf:
+        - $ref: '#/components/schemas/PublicationSettingsInput'
+        - type: object
+          required: [version, updatedAt]
+          properties:
+            version: { type: integer }
+            updatedAt: { type: string, format: date-time }
+            updatedBy: { type: [string, 'null'], format: uuid }
+    CreateApiKeyRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 80, description: 'Site name, e.g. "11estates.in" or "PRJ-0031 microsite"' }
+        allowedOrigins: { type: array, maxItems: 10, items: { type: string, format: uri }, description: Informational CORS allow-list for browser use }
+        rateLimitRps: { type: integer, minimum: 1, maximum: 50, default: 50 }
+        burst: { type: integer, minimum: 1, maximum: 100, default: 100 }
+    ApiKey:
+      type: object
+      required: [keyId, name, prefix, status, createdAt]
+      properties:
+        keyId: { type: string, format: uuid }
+        name: { type: string }
+        prefix: { type: string, description: 'First 8 characters, e.g. "lk_live_ab"; for identification only' }
+        status: { type: string, enum: [active, rotating, revoked] }
+        rateLimitRps: { type: integer }
+        burst: { type: integer }
+        allowedOrigins: { type: array, items: { type: string } }
+        graceEndsAt: { type: [string, 'null'], format: date-time }
+        replacedByKeyId: { type: [string, 'null'], format: uuid }
+        lastUsedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        createdBy: { type: string, format: uuid }
+        revokedAt: { type: [string, 'null'], format: date-time }
+    ApiKeyWithSecret:
+      allOf:
+        - $ref: '#/components/schemas/ApiKey'
+        - type: object
+          properties:
+            secret: { type: string, description: 'Plaintext key (lk_live_ + 40 base62 chars). Returned once; only an HMAC-SHA-256 hash is stored.' }
+    Photo:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string, format: uri, description: 'Public CDN URL of a sanitised copy (EXIF stripped, resized)' }
+        width: { type: integer }
+        height: { type: integer }
+    PublicOfferBase:
+      type: object
+      description: Anonymous shape (PRD §8.3). Every field is generated or copied from stored fields; unknown = absent/null.
+      required: [publicId, level, label, dealType, segment, agentReraNumber, publishedAt, updatedAt]
+      properties:
+        publicId: { type: string }
+        level: { type: string, enum: [Anonymous, Public] }
+        label: { type: string, description: 'Generated, e.g. "For Rent", "New Project, For Sale"' }
+        headline: { type: string, description: 'Generated, e.g. "2 BHK Apartment · For Rent · Andheri West"' }
+        dealType: { type: string, x-vocabulary: deal_type }
+        market: { type: [string, 'null'], x-vocabulary: market }
+        segment: { type: string, x-vocabulary: segment }
+        propertyTypes: { type: array, items: { type: string, x-vocabulary: property_type } }
+        bhkMin: { type: [number, 'null'] }
+        bhkMax: { type: [number, 'null'] }
+        city: { type: [string, 'null'] }
+        micromarket: { type: [string, 'null'] }
+        locality: { type: [string, 'null'] }
+        areaSqftMin: { type: [number, 'null'] }
+        areaSqftMax: { type: [number, 'null'] }
+        areaBasis: { $ref: './_common.yaml#/components/schemas/AreaBasis' }
+        landAreaSqft: { type: [number, 'null'] }
+        salePriceInrMin: { type: [integer, 'null'] }
+        salePriceInrMax: { type: [integer, 'null'] }
+        rentMonthlyInrMin: { type: [integer, 'null'] }
+        rentMonthlyInrMax: { type: [integer, 'null'] }
+        possessionDate: { type: [string, 'null'], description: 'YYYY, YYYY-MM or YYYY-MM-DD' }
+        saleMode: { type: [string, 'null'], x-vocabulary: sale_mode }
+        tenancyStatus: { type: [string, 'null'], x-vocabulary: tenancy_status }
+        furnishing: { type: [string, 'null'], x-vocabulary: furnishing }
+        note: { type: [string, 'null'], description: '"Details subject to confirmation" (Anonymous items)' }
+        agentReraNumber: { type: string, description: 11 Estates MahaRERA agent number }
+        projectPublicId: { type: [string, 'null'] }
+        projectReraNumber: { type: [string, 'null'], description: 'Required for Sale, Primary items' }
+        publishedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PublicOffer:
+      description: 'Anonymous items carry only PublicOfferBase fields; Public items add photos, floorBand, parking, amenities, possessionStatus, description.'
+      allOf:
+        - $ref: '#/components/schemas/PublicOfferBase'
+        - type: object
+          properties:
+            photos: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/Photo' } }
+            floorBand: { type: [string, 'null'], enum: [Low, Mid, High, null] }
+            parking: { type: [integer, 'null'], description: Number of parking spaces }
+            amenities: { type: array, items: { type: string } }
+            possessionStatus: { type: [string, 'null'], x-vocabulary: possession_status }
+            description: { type: [string, 'null'], description: 'Sanitised public description (generated or staff-edited, privacy-scanned)' }
+    PublicProjectConfiguration:
+      type: object
+      required: [propertyType]
+      properties:
+        listingPublicId: { type: [string, 'null'] }
+        propertyType: { type: string, x-vocabulary: property_type }
+        bhkMin: { type: [number, 'null'] }
+        bhkMax: { type: [number, 'null'] }
+        areaSqftMin: { type: [number, 'null'] }
+        areaSqftMax: { type: [number, 'null'] }
+        areaBasis: { $ref: './_common.yaml#/components/schemas/AreaBasis' }
+        priceInrFrom: { type: [integer, 'null'] }
+        unitsAvailableBand: { type: [string, 'null'], enum: ['1-5', '6-20', '21-50', '50+', null] }
+    PublicProject:
+      type: object
+      required: [publicId, name, label, projectReraNumber, agentReraNumber, configurations, publishedAt, updatedAt]
+      properties:
+        publicId: { type: string }
+        label: { type: string, description: '"New Project, For Sale"' }
+        name: { type: string, description: Project marketing name (public by nature; not a building/society name of a resale unit) }
+        developerName: { type: [string, 'null'] }
+        city: { type: [string, 'null'] }
+        micromarket: { type: [string, 'null'] }
+        locality: { type: [string, 'null'] }
+        configurations: { type: array, items: { $ref: '#/components/schemas/PublicProjectConfiguration' } }
+        possessionDate: { type: [string, 'null'] }
+        amenities: { type: array, items: { type: string } }
+        floorPlans: { type: array, items: { $ref: '#/components/schemas/Photo' } }
+        photos: { type: array, items: { $ref: '#/components/schemas/Photo' } }
+        projectReraNumber: { type: string }
+        agentReraNumber: { type: string }
+        publishedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PublicDemandPost:
+      type: object
+      required: [publicId, label, dealTypes, agentReraNumber, publishedAt, updatedAt]
+      properties:
+        publicId: { type: string }
+        label: { type: string, description: 'Generated "Wants" label, e.g. "Wants to Lease"' }
+        dealTypes: { type: array, items: { type: string, x-vocabulary: deal_type } }
+        segment: { type: [string, 'null'], x-vocabulary: segment }
+        propertyTypes: { type: array, items: { type: string, x-vocabulary: property_type } }
+        micromarkets: { type: array, items: { type: string } }
+        areaSqftMin: { type: [number, 'null'] }
+        areaSqftMax: { type: [number, 'null'] }
+        areaBasis: { $ref: './_common.yaml#/components/schemas/AreaBasis' }
+        budgetBandInr: { type: [object, 'null'], description: Rounded band (never the exact budget), properties: { min: { type: integer }, max: { type: integer } } }
+        rentBandMonthlyInr: { type: [object, 'null'], properties: { min: { type: integer }, max: { type: integer } } }
+        timing: { type: [string, 'null'], description: 'Move-in by, month precision (YYYY-MM)' }
+        agentReraNumber: { type: string }
+        publishedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ChangeItem:
+      type: object
+      required: [changeType, subjectType, publicId, occurredAt]
+      properties:
+        changeType: { type: string, enum: [published, updated, upgraded, downgraded, withdrawn] }
+        subjectType: { type: string, enum: [listing, project, demand_post] }
+        publicId: { type: string }
+        level: { type: [string, 'null'], enum: [Anonymous, Public, null], description: Level after the change; null when withdrawn }
+        occurredAt: { type: string, format: date-time }
+    ChangePage:
+      type: object
+      required: [items, nextCursor, hasMore]
+      properties:
+        items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/ChangeItem' } }
+        nextCursor: { type: string, description: Opaque position to resume from; never null }
+        hasMore: { type: boolean }
+  securitySchemes:
+    staffViaWeb: { $ref: './_common.yaml#/components/securitySchemes/staffViaWeb' }
+    cronSecret: { $ref: './_common.yaml#/components/securitySchemes/cronSecret' }
+    websiteApiKey: { $ref: './_common.yaml#/components/securitySchemes/websiteApiKey' }

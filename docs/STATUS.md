@@ -1,12 +1,12 @@
 Current stage: 4 — Low-Level Design (LLD)
-State: IN PROGRESS
+State: AWAITING APPROVAL (4 product questions Q4-1…Q4-4 in docs/04-lld/README.md)
 
 | Stage | Status | Approved on | Artifacts |
 |---|---|---|---|
 | 1 — BRD | APPROVED (v0.6.1: v0.6 via CR-003 + CR-004) | 2026-09-24 | docs/01-brd.md, docs/01-brd.pdf |
 | 2 — PRD | APPROVED (v0.6 incl. CR-005, CR-006) | 2026-09-24 | docs/02-prd.md, docs/02-prd.pdf, docs/prototype/11estate-crm-prototype.html |
 | 3 — HLD | APPROVED (v0.2) | 2026-09-24 | docs/03-hld.md, docs/03-hld.pdf, docs/adr/0001–0008 |
-| 4 — LLD | IN PROGRESS | — | contracts/, docs/04-lld/ (pending) |
+| 4 — LLD | AWAITING APPROVAL (v0.1) | — | contracts/openapi/*.yaml (240 ops), contracts/asyncapi/events.yaml (68 events), docs/04-lld/ (7 service LLDs, conventions, data-hosting, capacity-plan, stage4-summary.pdf) |
 | 5 — Task Breakdown | NOT STARTED | — | — |
 | 6 — Implementation Rules | NOT STARTED | — | — |
 | 7 — Execution | NOT STARTED | — | — |
