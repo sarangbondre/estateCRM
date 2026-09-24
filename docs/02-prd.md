@@ -3,10 +3,10 @@
 | | |
 |---|---|
 | Project | 11 Estates CRM (estateCRM) |
-| Version | 0.5.1 |
+| Version | 0.6 |
 | Date | 2026-09-24 |
 | Based on | `docs/01-brd.md` v0.6 (approved 2026-09-24 via CR-003); worked scenarios from `docs/inputs/vinit-journeys-artifact.md` |
-| Status | APPROVED 2026-09-24, amended by CR-005 (frozen; changes via Change Request). Appendix C to be confirmed against the extractor columns (OQ-P11) through a CR |
+| Status | APPROVED 2026-09-24, amended by CR-005 and CR-006 (frozen; changes via Change Request) |
 
 ### Change log
 | Version | Change |
@@ -15,6 +15,7 @@
 | 0.4 | Rewritten for BRD v0.5 (CR-002): demand and supply teams, Property/Project/Offer/Demand/Person model, status axes, life curve, publication levels, call queues, journeys to Closed, many-to-many matching with bundles, manual entry, three dashboards. Chat-first kept, with a "My queue" panel added. Vinit's scenarios added as acceptance scenarios (Appendix B). |
 | 0.5 | Updated for BRD v0.6 (CR-003): the standard deal vocabulary (record_scope → deal_type → market → segment → property_type → side), Land segment, deal tags, generated labels, party_type; non-property desks (Business, Capital, Archive, Network, Watchlist); two intake modes with row-level validation; review queue by review_reason; classification dashboards and side checks; read-only vocabulary; field dictionary (Appendix C). |
 | 0.5.1 | CR-005 (2026-09-24): new §8.4, the Phase 1a pilot on free plans with temporary NFR relaxations and a paid-plan gate. |
+| 0.6 | CR-006 (2026-09-24): aligned with Vinit's extractor master file. Appendix C is now the exact 89-column upload schema. Area is a range plus a basis. Source ads with split records. Extractor dedup trusted, with possible repeats sent to review. Idempotent master re-uploads with migration maps. Review reason codes. Outside-MMR flag. CRM working columns ignored. Pilot anonymise switch. Unknown market. |
 
 ### Decisions for this PRD
 | # | Decision | Source |
@@ -155,6 +156,17 @@ with first-touch flag.
 | Market Participant | A Person with participant_role (Broker, Developer, Auctioneer, Architect, PMC, Consultant, Lender) | Network (People directory) |
 | Watchlist item (WCH) | signal_type (Redevelopment Upcoming, Government Tender, Land Policy, Title Notice), party_type, deadline_date, follow-up task (supply team) | Watchlist |
 
+### 3.6a Source ads, splits and repeats (CR-006 Z-3, Z-4)
+- A **source ad** is one uploaded ad (raw_text, source_name, edition, date, page, language, OCR flag, confidence). One ad can hold
+  **1..n records**, linked by `parent_record_id` + `split_index`. Split children are never merged with each other automatically.
+- The extractor's own repeat handling is trusted: `times_seen`, `first_seen_date` and `last_seen_date` update the record's
+  last seen. `possible_repeat_of` becomes an **uncertain-merge review item**. The CRM still dedups across sources and
+  against records already in the CRM.
+- Records whose city is outside Mumbai/MMR carry an **outside-launch-area flag**. They're visible in search and
+  dashboards, but excluded from queues, matching and listings (Z-7).
+- `area_sqft_min/max` + `area_basis` (Carpet / Builtup / Saleable / blank) replaces separate built-up and carpet fields.
+  Land keeps `land_area_value/unit/sqft` (Z-2).
+
 ### 3.7 Other records
 | Record | Key fields |
 |---|---|
@@ -225,6 +237,7 @@ To contact, To qualify, Reconfirm due, In sourcing, Sourcing requests open, Open
   - micromarket overlap (the hierarchy counts, e.g. Chakala is inside Andheri East);
   - possession_date within the demand's window, otherwise excluded with the reason;
   - offer not Expired, Closed or Inactive; demand not Stale and not exited.
+- **Unknowns (CR-006):** a blank `area_basis` is compared with a wider tolerance and shows an "area basis unknown" flag. A blank `market` on a supply Sale is compatible with any demand market and shows a "market unknown" flag.
 - **Scored:** micromarket proximity, price vs budget (the right price field for the deal_type), area like with like
   (built up vs built up, carpet vs carpet), bhk range, timing, furnishing and must-haves. The weights are tunables, initially set from the PRD v0.3
   factors and tuned from feedback (M6).
@@ -415,6 +428,13 @@ client or demand instead of creating a duplicate.
 that the life curve and status stay true (C-08, C-14).
 
 ### 6.3 Deduplication
+**US-07a (CR-006 Z-5)** As a Data operator, I want to re-upload the extractor master at any time without creating duplicates.
+- AC1 Rows are **upserted by `record_id`**. Unchanged rows do nothing, and changed rows update facts and last seen.
+- AC2 If the workbook has a `migration_map` sheet, it is applied first: kept = re-key, merged = reversible merge into the target, split = re-point to the children. CRM work (calls, stages, matches, notes) follows the new ID.
+- AC3 A re-upload never deletes CRM records that are missing from the file.
+- AC4 `lead_status`, `follow_up_date` and `crm_notes` are ignored (the CRM owns them). `route_to` is kept as the extractor's suggestion (Z-8).
+- AC5 `review_reason` text is kept, and a **reason code** is derived for grouping: side_defaulted, deal_type_missing, side_unclear, property_type_missing, other (Z-6).
+
 **US-07** Supply dedup at property level (building, floor, area, locality). A phone number never decides alone. A
 matching post from another broker is linked as a **second source** with its price, and a **price gap** is flagged
 when prices differ by more than 5% (A-39). Reposts become sightings and update last seen.
@@ -635,7 +655,7 @@ Until the **paid-plan gate** is passed, these relaxations apply. The gate: Verce
 | NFR-5 Bulk | 100k rows ≤ 30 min, 10 files/day | ≤ 20k rows per file, ≤ 3 files/day (DB ≤ 500 MB) |
 | NFR-11 Volume | 5M records | ≤ ~200k records in total |
 | NFR-17 RPO/RTO | 5 min / 1 h | 24 h / 1 day |
-| Data | Real 11 Estates data | **Sample or anonymised data only**; no real client or owner contacts |
+| Data | Real 11 Estates data | **Sample or anonymised data only**; no real client or owner contacts. Intake has an **anonymise-on-import switch** (pilot only) that replaces names, phones, emails and other contacts with consistent fake values (CR-006 Z-9) |
 | Use | Production | **Internal testing and demo only** (Vercel Hobby is non-commercial) |
 
 ### 8.3 Listings API fields
@@ -696,7 +716,7 @@ Numbering continues. Assumptions A-20 and A-28 from v0.3 are dropped (CR-002 X-8
 | OQ-11 (BRD) | Budget, launch date, team size | Stage 3 |
 | OQ-13 (BRD) | Review the chat benchmark in Appendix A | No |
 | OQ-P9 | Confirm A-36 (40 calls/day), A-41 (60-day Dormant revisit), A-40 (14-day proposal links) | No |
-| OQ-P11 | **Vinit's extractor output columns** (or a sample file from each extractor), so that Appendix C matches them one to one (BRD §4.2) | Yes, for Stage 2 approval of Appendix C |
+| OQ-P11 | Resolved by CR-006: Appendix C = the 89 extractor columns. A sample WhatsApp extractor file is still wanted to confirm sender_name, sender_phone and text_variants | No |
 | OQ-P10 | Should the supply team see a client's name on a matched demand, or only the demand summary? (D-1 says all staff see all; confirm this includes client identity) | No |
 
 ## 12. Traceability to BRD v0.6
@@ -746,51 +766,159 @@ Each scenario must run end to end in the product, with the stated status axes, q
 | AS-S5 | **Future availability**: Upcoming INV-00701 (from 1 Feb) → Anonymous with date → fintech excluded "Available too late", logistics firm matched → clock starts 2 Dec → verified → Public → visit 1 Feb | Date-aware exclusion; life curve start rule; lease-renewal Upcoming |
 | AS-S6 | **New project**: PRJ-0031 with 2 BHK (38 units) and 3 BHK (22) → Public → 11 enquiries, 4 matches (one also matched to resale) → new sheet: price up, units down → "price above budget" flag → Ageing → request sheet → booking reduces units | Project RERA on listings; unit counts; price-change flags |
 
-## Appendix C: Field dictionary (draft, to be matched to the extractor columns, OQ-P11)
-Names and values follow BRD v0.6 §4.2. Columns marked † are inferred from the BRD and must be confirmed against Vinit's extractor files.
+## Appendix C: Field dictionary (the upload schema, CR-006 Z-1)
 
-| Field | Type | Values / notes | Applies to |
-|---|---|---|---|
-| record_scope | enum | Property, Business, Capital, Equipment, Market Participant, Market Signal | all |
-| side | enum | Supply, Demand, None (Participant/Signal only) | all |
-| side_evidence | text | Deciding phrase from the ad | extracted rows |
-| needs_review | bool | TRUE / FALSE | all |
-| review_reason | text | † controlled reasons TBD with Vinit | all |
-| deal_type | enum, pipe-list | Property: Sale, Lease, JV, Pagdi. Business: Sale, Lease, Partnership, Distribution. Capital: Equity, Debt, Project Funding, Asset Sale. Equipment: Sale, Lease | all but Participant/Signal |
-| market | enum | Primary, Secondary, Any (Any on demand only) | Sale |
-| segment | enum | Residential, Commercial, Industrial, Land | Property |
-| property_type | enum, pipe-list | Per segment, BRD §4.2 | Property |
-| property_detail | text | Descriptive words (Luxury, Duplex…) | Property |
-| land_use | enum | Residential, Commercial, Industrial, Agricultural, NA, Mixed | Land |
-| bhk_min, bhk_max | number | 0.5 = 1 RK (D-17) | Residential |
-| built_up_area_sqft_min / _max † | number | Supply uses min = max | Property |
-| carpet_area_sqft_min / _max † | number | | Property |
-| sale_price_inr_min, sale_price_inr_max | number | | Sale |
-| rent_monthly_inr_min, rent_monthly_inr_max | number | | Lease |
-| current_rent_inr | number | Tenant's rent on a preleased sale | Sale + Tenanted |
-| deposit_inr | number | | Lease |
-| budget_inr_min, budget_inr_max † | number | Demand; the price field depends on deal_type | Demand |
-| sale_mode | enum | Private, Auction | Sale |
-| deadline_date | date | Auction / tender / offer / EOI last date | any |
-| tenancy_status | enum | Vacant, Tenanted | Property |
-| tenure | enum | Freehold, Leasehold | Property |
-| agreement_form | enum | Leave and License, Registered Lease | Lease |
-| is_jodi | bool | | Residential |
-| possession_status | enum | Ready, Under Construction, Under Redevelopment, Available From | Property |
-| possession_date | date/month | Available from date | Property |
-| furnishing | enum | Furnished, Semi Furnished, Unfurnished, Bare Shell | Property |
-| price_negotiable | bool | | Property |
-| locality, city, state, landmark | text | Locality normalised to the micromarket hierarchy | Property |
-| building_name † | text | Private; proposals only | Property |
-| contact_name †, contact_phone † | text | PII; phone normalised | all |
-| party_type | enum | Owner, Broker, Developer, Company, Bank, Society, Government | Person |
-| participant_role | enum | Broker, Developer, Auctioneer, Architect, PMC, Consultant, Lender | Market Participant |
-| sector | enum | Hospitality, Education, Manufacturing, Food and Beverage, Healthcare, Media, Distribution, Agriculture, Technology, Real Estate, Other | Business, Capital |
-| includes_property | enum | Yes, No, blank | Business |
-| business_description | text | | Business, Capital, Equipment |
-| signal_type | enum | Redevelopment Upcoming, Government Tender, Land Policy, Title Notice | Market Signal |
-| source_type | enum | Channel, Digi, Direct | all |
-| source_detail † | text | Newspaper edition / group / campaign / form / listing ID | all |
-| posted_date † | date | Edition or message date (starts last seen) | extracted rows |
-| raw_text † | text | Original ad text | extracted rows |
+This is the exact column set of the extractor master file (89 columns). A file whose header matches this set uses **strict mode** (D-15). Column order does not matter. Extra sheets `run_log` (ignored) and `migration_map` (`old_ad_id`, `new_record_ids`, `action`; applied first, Z-5) are recognised. A PII-free profile of real values is in `docs/inputs/extractor-master-profile.md`.
 
+### CRM working columns: ignored on import except route_to (Z-8)
+| Column | Type / values |
+|---|---|
+| `lead_status` | text |
+| `follow_up_date` | date |
+| `crm_notes` | text |
+| `route_to` | enum: Supply Team, Demand Team, Business Desk, Capital Desk, Archive, Network, Watchlist |
+
+### Review
+| Column | Type / values |
+|---|---|
+| `needs_review` | bool |
+| `review_reason` | text (";"-joined); CRM derives a reason code |
+
+### Identity and splits
+| Column | Type / values |
+|---|---|
+| `record_id` | 12-hex id; upsert key |
+| `parent_record_id` | 12-hex id of the source ad (split parent) |
+| `split_index` | "k of n" |
+
+### Classification (BRD §4.2)
+| Column | Type / values |
+|---|---|
+| `record_scope` | enum (BRD §4.2) |
+| `deal_type` | enum, pipe-list (BRD §4.2) |
+| `market` | enum: Primary, Secondary, Any; Sale only; blank = unknown |
+| `segment` | enum: Residential, Commercial, Industrial, Land |
+| `property_type` | enum, pipe-list, per segment |
+| `property_detail` | text |
+| `land_use` | enum: Residential, Commercial, Industrial, Agricultural, NA, Mixed |
+| `side` | enum: Supply, Demand, None |
+| `side_evidence` | text |
+
+### Deal tags
+| Column | Type / values |
+|---|---|
+| `sale_mode` | enum: Private, Auction |
+| `deadline_date` | date |
+| `tenancy_status` | enum: Vacant, Tenanted |
+| `tenure` | enum: Freehold, Leasehold |
+| `agreement_form` | enum: Leave and License, Registered Lease |
+| `is_jodi` | bool |
+| `possession_status` | enum: Ready, Under Construction, Under Redevelopment, Available From |
+| `possession_date` | YYYY, YYYY-MM or YYYY-MM-DD |
+| `furnishing` | enum: Furnished, Semi Furnished, Unfurnished, Bare Shell |
+
+### Non-property
+| Column | Type / values |
+|---|---|
+| `sector` | enum (BRD §4.2) |
+| `includes_property` | enum: Yes, No |
+| `business_description` | text |
+| `participant_role` | enum (BRD §4.2) |
+| `signal_type` | enum (BRD §4.2) |
+
+### Project
+| Column | Type / values |
+|---|---|
+| `project_name` | text |
+| `developer_name` | text |
+
+### Configuration and features
+| Column | Type / values |
+|---|---|
+| `bhk_min` | number (0.5 = 1 RK) |
+| `bhk_max` | number |
+| `features` | text |
+
+### Location
+| Column | Type / values |
+|---|---|
+| `locality` | text, normalised to the micromarket hierarchy |
+| `city` | text; outside MMR is flagged (Z-7) |
+| `state` | text |
+| `landmark` | text |
+| `location_text` | text (as written) |
+
+### Area
+| Column | Type / values |
+|---|---|
+| `area_sqft_min` | number |
+| `area_sqft_max` | number |
+| `area_basis` | enum: Carpet, Builtup, Saleable; blank = unknown |
+| `land_area_value` | number |
+| `land_area_unit` | enum: acre, sqft, sqm, sqyd, gunta, bigha |
+| `land_area_sqft` | number |
+| `area_text` | text (as written) |
+
+### Price
+| Column | Type / values |
+|---|---|
+| `price_text` | text (as written) |
+| `sale_price_inr_min` | integer INR |
+| `sale_price_inr_max` | integer INR |
+| `sale_rate_inr` | integer INR per unit |
+| `sale_rate_unit` | enum: sqft, acre, sqyd, sqm |
+| `price_negotiable` | bool |
+| `rent_monthly_inr_min` | integer INR |
+| `rent_monthly_inr_max` | integer INR |
+| `rent_rate_psf` | number INR per sq ft |
+| `deposit_inr` | integer INR |
+| `deposit_months` | integer |
+| `current_rent_inr` | integer INR (tenanted sale) |
+| `yield_pct` | number |
+
+### Contact (PII: anonymised in the pilot)
+| Column | Type / values |
+|---|---|
+| `contact_name` | text, PII |
+| `company_name` | text |
+| `party_type` | enum: Owner, Broker, Developer, Company, Bank, Society, Government |
+| `phones` | E.164, "\|"-list, PII |
+| `whatsapp_phone` | E.164, PII |
+| `emails` | "\|"-list, PII |
+| `rera_number` | text |
+| `other_contact` | text, PII |
+
+### Source
+| Column | Type / values |
+|---|---|
+| `source_channel` | enum: Newspaper, WhatsApp (maps to source type Channel) |
+| `source_name` | text (publication or group) |
+| `source_edition` | text |
+| `source_supplement` | text |
+| `source_date` | date |
+| `source_page` | integer |
+| `source_files` | text |
+
+### Repeats
+| Column | Type / values |
+|---|---|
+| `first_seen_date` | date |
+| `last_seen_date` | date |
+| `times_seen` | integer |
+| `possible_repeat_of` | 12-hex id → uncertain-merge review item |
+
+### Extraction
+| Column | Type / values |
+|---|---|
+| `raw_text` | text, PII (redacted before any AI use) |
+| `source_language` | text |
+| `ocr_used` | bool |
+| `extraction_confidence` | number 0–1 |
+| `extractor_notes` | text |
+
+### WhatsApp extractor
+| Column | Type / values |
+|---|---|
+| `sender_name` | text, PII (WhatsApp) |
+| `sender_phone` | E.164, PII (WhatsApp) |
+| `text_variants` | text (WhatsApp repeats) |
