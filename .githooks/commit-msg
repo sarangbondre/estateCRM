@@ -1,0 +1,14 @@
+#!/bin/sh
+# momentum commit-msg hook (Phase 19 — Lifecycle Hardening).
+# Validates that the commit subject is a Conventional Commit. All logic lives
+# in run-check.js (shared with the installer + /hotfix, unit-tested) so this
+# wrapper stays trivial. Vendor-neutral: pure git, runs under any agent.
+#
+# Bypass for emergencies:  MOMENTUM_SKIP_HOOKS=1 git commit ...
+dir=$(dirname "$0")
+if command -v node >/dev/null 2>&1; then
+  exec node "$dir/run-check.js" commit-msg "$1"
+fi
+# No node on PATH — cannot enforce; allow rather than block the commit.
+echo "momentum: node not found on PATH — skipping commit-msg validation." >&2
+exit 0
