@@ -3,6 +3,7 @@ import type { MiddlewareHandler } from 'hono';
 import type { Kysely } from 'kysely';
 import type { ServiceEnv } from '@11e/http';
 import type { Observability } from '@11e/observability';
+import type { Clock } from './application/ports.js';
 import type { Config } from './config.js';
 import type { InsightDb } from './adapters/db.js';
 
@@ -11,4 +12,7 @@ export interface AppDeps {
   db: Kysely<InsightDb>;
   obs: Observability;
   auth: MiddlewareHandler<ServiceEnv>;
+  clock: Clock;
+  /** Per-call budget of jobs (default 50 s; tests use less). */
+  jobBudgetMs?: number;
 }

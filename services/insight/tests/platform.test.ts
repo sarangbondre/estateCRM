@@ -1,40 +1,11 @@
 // Platform wiring on the local stack (`pnpm db:start`): migrations, health, authentication, and the relay, drain and jobs endpoints.
-import { randomUUID } from 'node:crypto';
 import { readdirSync } from 'node:fs';
-import { exportJWK, generateKeyPair } from 'jose';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { authenticate } from '@11e/auth';
-import { createDb, migrate } from '@11e/db';
-import { observe } from '@11e/observability';
-import { buildApp } from '../src/app.js';
-import { EXPECTED_MIGRATION, SCHEMA, SERVICE, loadConfig } from '../src/config.js';
-import type { InsightDb } from '../src/adapters/db.js';
+import { afterAll, describe, expect, it } from 'vitest';
+import { EXPECTED_MIGRATION } from '../src/config.js';
+import { env, harness } from './helpers.js';
 
-const HOST = '127.0.0.1:54322/postgres';
-const env = {
-  DATABASE_URL:
-    process.env['INSIGHT_DATABASE_URL'] ?? `postgresql://${SCHEMA}_svc:local_${SCHEMA}_svc@${HOST}`,
-  MIGRATOR_DATABASE_URL:
-    process.env['INSIGHT_MIGRATOR_DATABASE_URL'] ??
-    `postgresql://${SCHEMA}_migrator:local_${SCHEMA}_migrator@${HOST}`,
-  CRON_SECRET: randomUUID(),
-};
-const config = loadConfig(env);
-const handle = createDb<InsightDb>({ connectionString: config.databaseUrl, schema: SCHEMA });
-let app: ReturnType<typeof buildApp>['app'];
-
-beforeAll(async () => {
-  await migrate({
-    connectionString: env.MIGRATOR_DATABASE_URL,
-    schema: SCHEMA,
-    dir: new URL('../migrations', import.meta.url).pathname,
-  });
-  const { publicKey } = await generateKeyPair('ES256');
-  const jwks = { keys: [{ ...(await exportJWK(publicKey)), kid: 'k1', alg: 'ES256' }] };
-  const auth = authenticate({ service: SERVICE, jwks, cronSecret: env.CRON_SECRET });
-  app = buildApp({ config, db: handle.db, obs: observe(SERVICE, { level: 'fatal' }), auth }).app;
-});
-afterAll(() => handle.close());
+const h = harness();
+afterAll(() => h.close());
 
 const cron = { 'x-cron-secret': env.CRON_SECRET };
 
@@ -48,24 +19,29 @@ describe('insight platform', () => {
   });
 
   it('serves health and readiness', async () => {
-    expect((await app.request('/health/live')).status).toBe(200);
-    expect(await (await app.request('/health/ready')).json()).toEqual({ status: 'ok', checks: { db: 'ok' } });
+    expect((await h.app.request('/health/live')).status).toBe(200);
+    const ready = (await (await h.app.request('/health/ready')).json()) as { status: string; checks: Record<string, string> };
+    expect(ready.status).toBe('ok');
+    expect(ready.checks.db).toBe('ok');
   });
 
   it('relay and drain run with the cron secret and refuse without it', async () => {
-    expect((await app.request('/internal/v1/relay', { method: 'POST' })).status).toBe(401);
-    const relay = await app.request('/internal/v1/relay', { method: 'POST', headers: cron });
+    expect((await h.app.request('/internal/v1/relay', { method: 'POST' })).status).toBe(401);
+    const relay = await h.app.request('/internal/v1/relay', { method: 'POST', headers: cron });
     expect(relay.status).toBe(200); // body shape is checked against the contract (validateResponses in tests)
-    const drain = await app.request('/internal/v1/drain/q_insight', { method: 'POST', headers: cron });
+    const drain = await h.app.request('/internal/v1/drain/q_insight', { method: 'POST', headers: cron });
     expect(drain.status).toBe(200);
   });
 
   it('rejects unknown queues and jobs', async () => {
-    expect((await app.request('/internal/v1/drain/q_nope', { method: 'POST', headers: cron })).status).toBe(
-      400,
-    );
-    expect(
-      (await app.request('/internal/v1/jobs/no-such-job', { method: 'POST', headers: cron })).status,
-    ).toBe(400);
+    expect((await h.app.request('/internal/v1/drain/q_nope', { method: 'POST', headers: cron })).status).toBe(400);
+    expect((await h.app.request('/internal/v1/jobs/no-such-job', { method: 'POST', headers: cron })).status).toBe(400);
+  });
+
+  it('runs the idempotency-prune and rollup-reconcile jobs', async () => {
+    const prune = await h.cron('/internal/v1/jobs/idempotency-prune');
+    expect(prune.status).toBe(200);
+    const reconcile = await h.cron('/internal/v1/jobs/rollup-reconcile');
+    expect(reconcile.status).toBe(200);
   });
 });
