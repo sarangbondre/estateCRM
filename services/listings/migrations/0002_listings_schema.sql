@@ -190,8 +190,10 @@ create index if not exists public_item_newest on public_item (tenant_id, subject
 create index if not exists public_item_deal_segment
   on public_item (tenant_id, subject_type, deal_type, segment, published_at desc, id desc);
 create index if not exists public_item_price on public_item (tenant_id, subject_type, deal_type, price_sort_inr, id);
-create index if not exists public_item_property_types on public_item using gin (tenant_id, property_types);
-create index if not exists public_item_micromarket_path on public_item using gin (tenant_id, micromarket_path);
+-- propertyType= / micromarket= / locality=: GIN on the arrays. The LLD's (tenant_id, array) GIN needs btree_gin, which
+-- the service owner role can't install; tenant_id stays a filter on every query (technical deviation, B3).
+create index if not exists public_item_property_types on public_item using gin (property_types);
+create index if not exists public_item_micromarket_path on public_item using gin (micromarket_path);
 create index if not exists public_item_city on public_item (tenant_id, subject_type, city, published_at desc, id desc);
 create index if not exists public_item_project on public_item (tenant_id, project_public_id)
   where project_public_id is not null;
