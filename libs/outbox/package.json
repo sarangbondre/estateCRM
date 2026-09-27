@@ -19,6 +19,16 @@
     }
   },
   "files": [
-    "dist"
-  ]
+    "dist",
+    "sql"
+  ],
+  "dependencies": {
+    "@11e/contracts": "workspace:*",
+    "@11e/db": "workspace:*",
+    "kysely": "~0.29.6",
+    "pg": "~8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
 }
