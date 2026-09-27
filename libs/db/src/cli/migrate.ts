@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Usage: 11e-migrate --schema <schema> [--dir migrations] [--check]
-// Env:   MIGRATOR_DATABASE_URL (the service's <schema>_migrator role; direct/session connection).
+// Env:   MIGRATOR_DATABASE_URL, or <SCHEMA>_MIGRATOR_DATABASE_URL as printed by `pnpm db:env` (the service's
+//        <schema>_migrator role; direct/session connection).
 // --check only loads and lints the files (no database), for CI.
 import { parseArgs } from 'node:util';
 import { loadMigrations, migrate } from '../migrate.js';
@@ -25,7 +26,10 @@ if (values.check) {
   out(`migrations ok: ${files.length} file(s) in ${dir}`);
 } else {
   const schema = values.schema ?? fail('--schema is required');
-  const url = process.env['MIGRATOR_DATABASE_URL'] ?? fail('MIGRATOR_DATABASE_URL is not set');
+  const url =
+    process.env['MIGRATOR_DATABASE_URL'] ??
+    process.env[`${schema.toUpperCase()}_MIGRATOR_DATABASE_URL`] ??
+    fail(`MIGRATOR_DATABASE_URL (or ${schema.toUpperCase()}_MIGRATOR_DATABASE_URL) is not set`);
   const r = await migrate({ connectionString: url, schema, dir }).catch((e: Error) => fail(e.message));
   out(
     `${schema}: applied ${r.applied.length} (${r.applied.join(', ') || 'none'}), already applied ${r.alreadyApplied.length}`,
