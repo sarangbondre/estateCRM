@@ -54,3 +54,23 @@ jobs:
       - run: pnpm --filter @11e/contracts run typecheck
       - name: contract mocks start and enforce auth
         run: pnpm mock:smoke
+  db-platform:
+    name: db-platform
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.118.0
+      - run: pnpm install --frozen-lockfile
+      - name: start local Postgres with the platform bootstrap
+        run: supabase --workdir infra db start
+      - run: node infra/scripts/local-roles.mjs --env > /dev/null
+      - name: verify schemas, roles, queues and isolation
+        run: pnpm db:verify
