@@ -2,8 +2,10 @@
 import type { operations } from '@11e/contracts/journeys';
 import type { Service } from '@11e/http';
 import type { AppDeps } from '../deps.js';
+import { createHttp } from './http.js';
+import { registerQueueRoutes } from './routes-queues.js';
 
 export function registerRoutes(svc: Service<operations>, deps: AppDeps): void {
-  void svc;
-  void deps;
+  const http = createHttp(deps);
+  registerQueueRoutes(svc, http);
 }
