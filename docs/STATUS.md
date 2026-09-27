@@ -22,7 +22,8 @@ Stage 7 task progress:
 - [x] F-03 CI: reusable per-service workflow (lint, layers, typecheck, tests, build) × 7 with path filters + repo workflow (gitleaks, libs) (2026-09-27)
 - [x] F-04 Contract tooling: Redocly lint (baseline ignore file), AsyncAPI parser validation, TS types in `@11e/contracts` (7 services + 68 events), drift check, CI `contracts` job (2026-09-27)
 - [x] F-05 Contract mocks: Prism per OpenAPI spec (`pnpm mock`, ports 4010–4016), 68 schema-valid event fixtures, `pnpm mock:event` pgmq publisher, CI smoke test (2026-09-27)
-- next: F-06 local database stack
+- [x] F-06 Local database stack: Supabase CLI (Postgres 17) under `infra/`, generated platform bootstrap (7 schemas, owner/migrator/svc roles with pilot caps, pgmq/pg_cron/pg_net, 14 queues, SECURITY DEFINER queue wrappers derived from AsyncAPI), Data API exposure none, `pnpm db:*` + `pnpm dev`, 61-check platform verifier (CI `db-platform` job; reused for F-07) (2026-09-27)
+- next: F-08 libs/db (F-07 provisioning deferred to the joint session)
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)

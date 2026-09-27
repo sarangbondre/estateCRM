@@ -16,11 +16,17 @@
     "secrets": "gitleaks detect --no-banner --redact",
     "format": "prettier --check .",
     "contracts:lint": "redocly lint contracts/openapi/*.yaml && node tools/contracts/validate-asyncapi.mjs && node tools/contracts/check-event-fixtures.mjs",
-    "contracts:gen": "python3 tools/gen_events.py && python3 tools/gen_tasks.py && node tools/gen_gate_tables.mjs && node tools/contracts/gen-types.mjs && node tools/contracts/gen-event-fixtures.mjs",
-    "contracts:check": "pnpm contracts:gen && git diff --exit-code -- contracts docs tools",
+    "contracts:gen": "python3 tools/gen_events.py && python3 tools/gen_tasks.py && node tools/gen_gate_tables.mjs && node tools/contracts/gen-types.mjs && node tools/contracts/gen-event-fixtures.mjs && node tools/gen-db-bootstrap.mjs",
+    "contracts:check": "pnpm contracts:gen && git diff --exit-code -- contracts docs tools infra",
     "mock": "node tools/contracts/mock.mjs",
     "mock:event": "node tools/contracts/publish-event.mjs",
-    "mock:smoke": "node tools/contracts/mock-smoke.mjs"
+    "mock:smoke": "node tools/contracts/mock-smoke.mjs",
+    "db:start": "supabase --workdir infra start && node infra/scripts/local-roles.mjs",
+    "db:stop": "supabase --workdir infra stop",
+    "db:reset": "supabase --workdir infra db reset && node infra/scripts/local-roles.mjs",
+    "db:env": "node infra/scripts/local-roles.mjs --env",
+    "db:verify": "node infra/scripts/verify-platform.mjs",
+    "dev": "pnpm db:start && turbo run dev"
   },
   "devDependencies": {
     "@asyncapi/parser": "^3.6.3",
@@ -32,6 +38,7 @@
     "ajv-formats": "^3.0.1",
     "dependency-cruiser": "18.4.0",
     "eslint": "10.11.0",
+    "globals": "^17.12.0",
     "js-yaml": "^5.4.2",
     "json-schema-faker": "0.6.3",
     "openapi-typescript": "7.13.0",
