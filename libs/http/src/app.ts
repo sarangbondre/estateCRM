@@ -41,6 +41,8 @@ export interface ServiceOptions {
   /** Validate every JSON response against the contract (contract tests). Default: NODE_ENV === 'test'. */
   validateResponses?: boolean;
   onRequestEnd?: (info: RequestEndInfo) => void;
+  /** Runs for every contract operation after the operation is resolved and before its own middleware (e.g. libs/auth). */
+  operationMiddleware?: MiddlewareHandler<ServiceEnv>[];
   /** Unexpected errors (500). The lib never logs. */
   onError?: (err: unknown, c: ServiceContext) => void;
 }
@@ -195,7 +197,14 @@ export function createService<Ops>(options: ServiceOptions): Service<Ops> {
       return res;
     };
 
-    app.on(operation.method, operation.honoPath, validate, ...middleware, run);
+    app.on(
+      operation.method,
+      operation.honoPath,
+      validate,
+      ...(options.operationMiddleware ?? []),
+      ...middleware,
+      run,
+    );
   };
 
   return {
