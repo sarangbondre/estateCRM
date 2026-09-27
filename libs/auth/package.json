@@ -20,5 +20,13 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@11e/http": "workspace:*",
+    "hono": "~4.13.9",
+    "jose": "~6.2.12"
+  },
+  "devDependencies": {
+    "@11e/contracts": "workspace:*"
+  }
 }

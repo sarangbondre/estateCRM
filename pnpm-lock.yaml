@@ -230,7 +230,21 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
-  libs/auth: {}
+  libs/auth:
+    dependencies:
+      '@11e/http':
+        specifier: workspace:*
+        version: link:../http
+      hono:
+        specifier: ~4.13.9
+        version: 4.13.9
+      jose:
+        specifier: ~6.2.12
+        version: 6.2.12
+    devDependencies:
+      '@11e/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
 
   libs/db:
     dependencies:
@@ -1613,6 +1627,9 @@ packages:
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
+
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
 
   js-levenshtein@1.1.6:
     resolution: {integrity: sha512-X2BB11YZtrRqY4EnQcLX5Rh373zbK4alC1FW7D7MBhL2gtcC17cTnr6DmfHZeS0s2rTHjUTMMHfG7gO8SSdw+g==}
@@ -4170,6 +4187,8 @@ snapshots:
   isarray@2.0.5: {}
 
   isexe@2.0.0: {}
+
+  jose@6.2.12: {}
 
   js-levenshtein@1.1.6: {}
 

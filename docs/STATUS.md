@@ -29,7 +29,9 @@ Stage 7 task progress:
 - [x] F-09 libs/outbox: typed transactional outbox write, relay (SKIP LOCKED, atomic fan-out to pgmq), event drains (processed_events dedupe in the handler transaction, backoff via visibility timeout, DLQ after 5), work drains, DLQ replay, retention purges; platform bootstrap extended with private work queues (32 queues) + queue-argument wrappers; `contracts/generated/event-topology.json`; 9 integration tests on real pgmq (2026-09-27)
 - [x] F-10 libs/http: contract-driven Hono service factory (Ajv validation against bundled OpenAPI, CR-007 auto-approved technical), RFC 7807 errors, correlation ID, health, response contract checks, Idempotency-Key helper (+ stale-claim takeover in libs/db), If-Match, cursor pagination, outbound client with timeout/retry/circuit breaker; 22 tests (2026-09-27)
 - in progress (parallel agent): F-14 libs/redaction
-- next: F-11 libs/auth, F-12 libs/observability
+- [x] F-11 libs/auth: contract-driven authenticate middleware (staff JWT + header/claim match + x-roles, service tokens + x-callers, cron secret, website API key hook), principals, tenant/role re-checks (other tenant → 404), service-token client with caching; libs/http gains per-operation middleware + effective security; 11 tests (2026-09-27)
+- in progress (parallel agents): F-12 libs/observability, F-17 synthetic data
+- next: F-15 schedules/alarms (local part), F-16 runbooks
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)
