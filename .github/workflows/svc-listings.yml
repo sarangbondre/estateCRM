@@ -1,0 +1,13 @@
+name: listings
+on:
+  pull_request:
+    paths: ['services/listings/**', 'libs/**', 'contracts/**', 'pnpm-lock.yaml', '.github/workflows/_service-ci.yml', '.github/workflows/svc-listings.yml']
+  push:
+    branches: [main]
+    paths: ['services/listings/**', 'libs/**', 'contracts/**', 'pnpm-lock.yaml']
+jobs:
+  ci:
+    uses: ./.github/workflows/_service-ci.yml
+    with:
+      service: listings
+      path: services/listings

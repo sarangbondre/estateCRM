@@ -1,0 +1,34 @@
+# Reusable per-service pipeline (CLAUDE.md §3.9, docs/06-implementation-rules.md §1.5).
+name: service-ci (reusable)
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+      path:
+        required: true
+        type: string
+jobs:
+  ci:
+    name: ${{ inputs.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm --filter "./${{ inputs.path }}" run lint
+      - name: Layer check
+        run: pnpm exec depcruise ${{ inputs.path }} --config .dependency-cruiser.cjs
+      - name: Typecheck
+        run: pnpm --filter "./${{ inputs.path }}" run typecheck
+      - name: Tests (unit, integration, contract)
+        run: pnpm --filter "./${{ inputs.path }}" run test
+      - name: Build
+        run: pnpm --filter "./${{ inputs.path }}" run build
