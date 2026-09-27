@@ -20,5 +20,23 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@11e/http": "workspace:*",
+    "@11e/outbox": "workspace:*",
+    "@opentelemetry/api": "~1.9.1",
+    "@opentelemetry/context-async-hooks": "~2.11.0",
+    "@opentelemetry/core": "~2.11.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "~0.222.0",
+    "@opentelemetry/exporter-trace-otlp-http": "~0.222.0",
+    "@opentelemetry/resources": "~2.11.0",
+    "@opentelemetry/sdk-metrics": "~2.11.0",
+    "@opentelemetry/sdk-trace-base": "~2.11.0",
+    "@opentelemetry/sdk-trace-node": "~2.11.0",
+    "hono": "~4.13.9",
+    "pino": "~10.3.1"
+  },
+  "devDependencies": {
+    "@11e/contracts": "workspace:*"
+  }
 }
