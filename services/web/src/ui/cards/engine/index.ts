@@ -1,5 +1,9 @@
-// engine cards and panels (added by a later WEB task). Registered by ../all.ts.
+// crm-engine cards (C-10 matches and bundles). Registered by ../all.ts.
+import { defineCard } from '../registry';
 import type { AnyCard, AnyPanel } from '../registry';
+import MatchesCard from './MatchesCard';
 
-export const cards: Record<string, AnyCard> = {};
+export const cards: Record<string, AnyCard> = {
+  matches: defineCard(MatchesCard),
+};
 export const panels: Record<string, AnyPanel> = {};
