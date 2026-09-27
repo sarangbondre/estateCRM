@@ -45,7 +45,7 @@ export async function uploadFile(
   });
   expect(r.status).toBe(201);
   const upload = r.body['upload'] as { id: string; code: string };
-  await h.files.put(`intake-uploads/${tenant}/${upload.id}/source`, bytes);
+  await h.app.files.put(`intake-uploads/${tenant}/${upload.id}/source`, bytes, 'application/octet-stream');
   return { id: upload.id, code: upload.code, headers };
 }
 

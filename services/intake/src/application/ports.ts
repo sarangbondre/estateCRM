@@ -138,6 +138,8 @@ export interface RowErrorRepository {
   rejectionReasons(tenantId: string, uploadId: string): Promise<Record<string, number>>;
   /** Errors of the given rows (rejected-rows file), in row order. */
   forRows(tenantId: string, uploadId: string, rowNos: readonly number[]): Promise<RowErrorRecord[]>;
+  /** Retention: deletes up to `limit` errors of an upload. */
+  purge(tenantId: string, uploadId: string, limit: number): Promise<number>;
 }
 
 export type { MigrationAction, MigrationEntry };

@@ -91,6 +91,14 @@ export function rowErrorRepository(db: Db): RowErrorRepository {
       }));
     },
 
+    async purge(tenantId, uploadId, limit) {
+      const r = await sql<{ n: number }>`with doomed as (
+          select id from intake.row_errors where tenant_id = ${tenantId} and upload_id = ${uploadId} limit ${limit})
+        delete from intake.row_errors e using doomed d where e.id = d.id and e.tenant_id = ${tenantId}
+        returning 1 as n`.execute(db);
+      return r.rows.length;
+    },
+
     async rejectionReasons(tenantId, uploadId) {
       const rows = await tenantScope(db, tenantId)
         .selectFrom('row_errors')

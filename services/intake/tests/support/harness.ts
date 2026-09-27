@@ -48,7 +48,7 @@ export async function createHarness(overrides: Overrides & { env?: Record<string
   const handle = createDb<IntakeDb>({
     connectionString: config.databaseUrl,
     schema: SCHEMA,
-    maxConnections: 3,
+    maxConnections: config.poolMax,
   });
   const files = (overrides.files as MemoryFileStore | undefined) ?? new MemoryFileStore();
   const app: App = composeApp(config, handle.db, { ...overrides, files });
