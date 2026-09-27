@@ -2,8 +2,8 @@
 import type { operations } from '@11e/contracts/intake';
 import type { Service } from '@11e/http';
 import type { AppDeps } from '../deps.js';
+import { registerUploadRoutes } from './http/uploads.js';
 
 export function registerRoutes(svc: Service<operations>, deps: AppDeps): void {
-  void svc;
-  void deps;
+  registerUploadRoutes(svc, deps.app, deps.db);
 }

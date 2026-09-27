@@ -12,15 +12,25 @@ export interface Config {
   cronSecret: string;
   /** web's JWKS (service tokens, R-2). */
   jwksUrl: string;
-  /** This service's credential for web POST /internal/v1/service-tokens (only if it calls other services). */
+  /** This service's credential for web POST /internal/v1/service-tokens (vocabulary fetch from records). */
   serviceCredential: string | undefined;
   webUrl: string;
   environment: string;
+  /** Supabase project URL (Storage API) and service-role key (secret). */
+  storageUrl: string | undefined;
+  storageServiceKey: string | undefined;
+  /** Pilot mode until the paid-plan gate (CR-005, CR-006 Z-9). */
+  pilotMode: boolean;
+  chunkSize: number;
+  chunkConcurrency: number;
 }
 
 export class ConfigError extends Error {
   override readonly name = 'ConfigError';
 }
+
+const bool = (v: string | undefined, fallback: boolean) =>
+  v === undefined || v === '' ? fallback : ['1', 'true', 'yes', 'on'].includes(v.toLowerCase());
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const get = (name: string) => env[name] ?? env[`INTAKE_${name}`];
@@ -30,6 +40,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     return v;
   };
   const webUrl = get('WEB_URL') ?? 'http://127.0.0.1:3000';
+  const pilotMode = bool(get('PILOT_MODE'), true);
   return {
     port: Number(get('PORT') ?? 3001),
     databaseUrl: need('DATABASE_URL'),
@@ -39,5 +50,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     serviceCredential: get('SERVICE_CREDENTIAL'),
     webUrl,
     environment: get('ENVIRONMENT_NAME') ?? 'local',
+    storageUrl: get('STORAGE_URL') ?? env['SUPABASE_URL'],
+    storageServiceKey: get('STORAGE_SERVICE_KEY') ?? env['SUPABASE_SERVICE_ROLE_KEY'],
+    pilotMode,
+    chunkSize: Number(get('CHUNK_SIZE') ?? (pilotMode ? 500 : 2000)),
+    chunkConcurrency: Number(get('CHUNK_CONCURRENCY') ?? (pilotMode ? 5 : 12)),
   };
 }

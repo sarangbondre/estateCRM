@@ -25,11 +25,15 @@
     "@11e/outbox": "workspace:*",
     "@hono/node-server": "^2.1.1",
     "hono": "~4.13.9",
-    "kysely": "~0.29.6"
+    "kysely": "~0.29.6",
+    "uuidv7": "~1.2.1"
   },
   "devDependencies": {
+    "@11e/testing": "workspace:*",
+    "@types/pg": "^8.23.1",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "jose": "~6.2.12",
-    "pg": "~8.23.0",
-    "@types/pg": "^8.23.1"
+    "pg": "~8.23.0"
   }
 }
