@@ -4,6 +4,7 @@ import type { Service } from '@11e/http';
 import type { AppDeps } from '../deps.js';
 import { registerDemandRoutes } from './http/demand.js';
 import { registerMergeRoutes } from './http/merges.js';
+import { registerPrivacyRoutes } from './http/privacy.js';
 import { registerReferenceRoutes } from './http/reference.js';
 import { registerSupplyRoutes } from './http/supply.js';
 
@@ -12,4 +13,5 @@ export function registerRoutes(svc: Service<operations>, deps: AppDeps): void {
   registerSupplyRoutes(svc, deps);
   registerDemandRoutes(svc, deps);
   registerMergeRoutes(svc, deps);
+  registerPrivacyRoutes(svc, deps);
 }

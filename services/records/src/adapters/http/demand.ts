@@ -9,7 +9,8 @@ import { createPerson, flagPerson, patchPerson } from '../../application/people.
 import type { PersonInput } from '../../application/people.js';
 import { quickAdd, quickAddLookup } from '../../application/quickadd.js';
 import type { SortKey } from '../../application/queries.js';
-import type { Dto } from '../../application/supply.js';
+import type { Dto, PartyInputDto } from '../../application/supply.js';
+import { addSupplyForDemand } from '../../application/addsupply.js';
 import { candidateDto, demandDto, enquiryDto, personDto, sourceAdDto, touchDto } from './presenters.js';
 import { supplyViews } from './supply.js';
 import { actorOf, guard, ifMatchVersion, isoKey, json, page, pageOf, withIdempotency, wrap } from './support.js';
@@ -132,6 +133,33 @@ export function registerDemandRoutes(svc: Service<Ops>, deps: AppDeps): void {
       return withIdempotency(c, deps, actor, body, async () => {
         const touch = await addTouch(app, actor, params.idOrCode, body);
         return { status: 201, body: touchDto(touch) };
+      });
+    }),
+  );
+
+  svc.op(
+    'addSupplyForDemand',
+    wrap(async (c, { params, body }) => {
+      const actor = actorOf(c);
+      return withIdempotency(c, deps, actor, body, async () => {
+        const r = await addSupplyForDemand(
+          app,
+          actor,
+          params.idOrCode,
+          {
+            sourcingRequestId: body.sourcingRequestId,
+            existingPropertyId: body.existingPropertyId,
+            property: body.property as Dto | null | undefined,
+            offer: body.offer as Dto,
+            parties: body.parties as PartyInputDto[] | undefined,
+            sourceType: body.sourceType,
+            sourceDetail: body.sourceDetail,
+            confirmNewDespiteCandidates: body.confirmNewDespiteCandidates,
+          },
+          candidateDto,
+        );
+        const [property] = await supply.properties(actor, [r.propertyId]);
+        return { status: 201, body: { property, offers: await supply.offers(actor, r.offerIds) } };
       });
     }),
   );

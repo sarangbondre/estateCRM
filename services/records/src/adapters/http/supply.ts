@@ -19,10 +19,13 @@ import {
 } from '../../application/supply.js';
 import type { Dto, PartyInputDto } from '../../application/supply.js';
 import { listPhotos } from '../../application/photos.js';
+import { addPriceSheet } from '../../application/pricesheets.js';
+import type { PriceSheetLine } from '../../application/pricesheets.js';
 import {
   candidateDto,
   offerDto,
   photoDto,
+  priceSheetDto,
   projectDto,
   propertyDto,
   secondSourceDto,
@@ -356,6 +359,34 @@ export function registerSupplyRoutes(svc: Service<Ops>, deps: AppDeps): void {
       const id = await guard(() => app.uow.run(actor, async (tx) => (await mustFind(tx, 'projects', params.idOrCode)).id));
       const [dto] = await views.projects(actor, [id]);
       return json(c, dto);
+    }),
+  );
+
+  svc.op(
+    'addPriceSheet',
+    wrap(async (c, { params, body }) => {
+      const actor = actorOf(c);
+      return withIdempotency(c, deps, actor, body, async () => {
+        const sheet = await addPriceSheet(app, actor, params.idOrCode, {
+          sheetDate: body.sheetDate,
+          receivedVia: body.receivedVia,
+          lines: body.lines as PriceSheetLine[],
+          missingConfigurations: body.missingConfigurations,
+        });
+        return { status: 201, body: priceSheetDto(sheet) };
+      });
+    }),
+  );
+
+  svc.op(
+    'listPriceSheets',
+    wrap(async (c, { params, query }) => {
+      const actor = actorOf(c);
+      const { limit, after } = page(query);
+      const rows = await guard(() =>
+        app.uow.run(actor, async (tx) => tx.q.listPriceSheets((await mustFind(tx, 'projects', params.idOrCode)).id, { after, limit: limit + 1 })),
+      );
+      return json(c, await pageOf(rows, limit, (r) => ({ k: r.sheet_date, id: r.id }), (items) => items.map(priceSheetDto)));
     }),
   );
 
