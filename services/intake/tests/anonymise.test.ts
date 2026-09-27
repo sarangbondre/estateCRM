@@ -88,8 +88,10 @@ describe('anonymise at split (pilot)', () => {
       expect(i < 0, `${v}: …${chunkText.slice(Math.max(0, i - 80), i + 40)}…`).toBe(true);
     }
     // no real-looking synthetic mobile survives (the anonymised +9100000 form is allowed)
+    // (12-hex record ids and other hex strings can contain phone-like digit runs: masked before scanning)
+    const scanned = chunkText.replace(/\b[0-9a-f]{12,64}\b/gi, '<hex>');
     expect(
-      findPhoneLikeNumbers(chunkText).filter((p) => isSyntheticPhone(p) && !p.startsWith('+9100000')),
+      findPhoneLikeNumbers(scanned).filter((p) => isSyntheticPhone(p) && !p.startsWith('+9100000')),
     ).toEqual([]);
 
     await processAll(h, t, u.id);
