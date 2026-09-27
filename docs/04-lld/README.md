@@ -5,7 +5,7 @@
 | Version | 0.1 |
 | Date | 2026-09-24 |
 | Based on | BRD v0.6.1, PRD v0.6, HLD v0.2 (all approved) |
-| Status | AWAITING APPROVAL |
+| Status | APPROVED 2026-09-27 (frozen; changes via Change Request) |
 
 ## Contents
 | Deliverable | File |
@@ -40,6 +40,8 @@ The conventions (§10) record R-1…R-22. The ones that touch product behaviour:
 - A split record keeps its CRM work on the first child when the extractor re-splits an ad.
 
 ## Questions for the product owner
+At approval (2026-09-27) the product owner gave no answers, so **the defaults apply**: Q4-1 Google Workspace accounts with 2-step enforced, Q4-2 no contact export for Data operators, Q4-3 add "maybe", Q4-4 fake phone format as proposed. Any of these can still be changed through a CR.
+
 | # | Question | Default if you don't mind |
 |---|---|---|
 | Q4-1 | **2-step sign-in:** should staff use Google Workspace accounts (so 2-step verification can be enforced), or personal Gmail with 2-step as a policy only? | Google Workspace for 11 Estates staff |
