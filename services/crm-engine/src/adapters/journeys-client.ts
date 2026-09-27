@@ -3,6 +3,7 @@
 import type { components } from '@11e/contracts/journeys';
 import { createServiceTokenClient } from '@11e/auth';
 import { DownstreamError, createHttpClient } from '@11e/http';
+import type { ClientOptions } from '@11e/http';
 import type { SubjectStateSource } from '../application/ports.js';
 
 type Page = components['schemas']['SubjectStatePage'];
@@ -12,6 +13,8 @@ export interface JourneysClientOptions {
   webUrl: string;
   credential: string | undefined;
   fetch?: typeof fetch;
+  /** RED metrics per downstream (libs/observability onCall). */
+  onCall?: ClientOptions['onCall'];
 }
 
 export function journeysSubjectStates(options: JourneysClientOptions): SubjectStateSource {
@@ -19,6 +22,7 @@ export function journeysSubjectStates(options: JourneysClientOptions): SubjectSt
     name: 'journeys',
     baseUrl: options.journeysUrl,
     ...(options.fetch ? { fetch: options.fetch } : {}),
+    ...(options.onCall ? { onCall: options.onCall } : {}),
   });
   const tokens = options.credential
     ? createServiceTokenClient({

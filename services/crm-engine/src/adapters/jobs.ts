@@ -1,6 +1,7 @@
 // Scheduled jobs (infra/schedules.yaml). Contract enum: full-rescore, micromarket-refresh, projection-reconcile.
 // Each call works through bounded batches within a 50 s budget; unfinished work continues via q_crm_engine_rescore.
 import type { JobResult } from '@11e/http';
+import { withSpan } from '@11e/observability';
 import type { JobDeps, JobOutcome } from '../application/jobs.js';
 import {
   FULL_RESCORE,
@@ -50,9 +51,18 @@ export function runJob(d: JobDeps, job: string, tenantId: string | null): Promis
 
 export function jobs(deps: AppDeps): Record<string, () => Promise<JobResult>> {
   const d = jobDeps(deps);
+  const traced = (name: string, fn: () => Promise<JobOutcome>) => async () => {
+    const started = Date.now();
+    const o = await withSpan(`job ${name}`, fn, { 'job.name': name });
+    deps.obs.logger.info(
+      { code: name, processed: o.processed, remaining: o.remaining, durationMs: Date.now() - started },
+      'job batch',
+    );
+    return toResult(o);
+  };
   return {
-    [FULL_RESCORE]: async () => toResult(await runFullRescore(d, null)),
-    [MICROMARKET_REFRESH]: async () => toResult(await runMicromarketRefresh(d, null)),
-    [PROJECTION_RECONCILE]: async () => toResult(await runReconcile(d, null)),
+    [FULL_RESCORE]: traced(FULL_RESCORE, () => runFullRescore(d, null)),
+    [MICROMARKET_REFRESH]: traced(MICROMARKET_REFRESH, () => runMicromarketRefresh(d, null)),
+    [PROJECTION_RECONCILE]: traced(PROJECTION_RECONCILE, () => runReconcile(d, null)),
   };
 }

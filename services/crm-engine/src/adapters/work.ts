@@ -1,5 +1,6 @@
 // Private work queue q_crm_engine_rescore (LLD §4.5): dirty subjects (deduped by rescore_pending) and job
 // continuations. Each subject is re-scored in its own transaction; the claim of the dedupe row commits with it.
+import { withSpan } from '@11e/observability';
 import type { WorkHandler } from '@11e/outbox';
 import { processDirtySubject } from '../application/pipeline.js';
 import type { AppDeps } from '../deps.js';
@@ -47,10 +48,15 @@ export function workHandlers(
       const msg = parseRescoreMessage(payload);
       if (!msg) return; // malformed: dropped (nothing to retry)
       if (msg.kind === 'job') return jobContinuation(msg.job, msg.tenantId);
-      await uow.run(
-        msg.correlationId ?? `rescore-${msg.subjectId}`,
-        (store) => processDirtySubject(store, deps.clock, msg.tenantId, msg.subjectType, msg.subjectId),
-        { statementTimeoutMs: RESCORE_STATEMENT_TIMEOUT_MS },
+      await withSpan(
+        `rescore ${msg.subjectType}`,
+        () =>
+          uow.run(
+            msg.correlationId ?? `rescore-${msg.subjectId}`,
+            (store) => processDirtySubject(store, deps.clock, msg.tenantId, msg.subjectType, msg.subjectId),
+            { statementTimeoutMs: RESCORE_STATEMENT_TIMEOUT_MS },
+          ),
+        { 'subject.type': msg.subjectType },
       );
     },
   };

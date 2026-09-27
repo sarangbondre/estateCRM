@@ -98,14 +98,23 @@ describe('full-rescore', () => {
     expect(r.remaining).toBe(1);
   });
 
-  it('the scheduler endpoint returns the batch job result shape', async () => {
-    const r = await h.app.request('/internal/v1/jobs/full-rescore', { method: 'POST', headers: h.cron });
+  it('the scheduler endpoint returns the batch job result shape (projection-reconcile: light for every tenant)', async () => {
+    h.subjectStates.items = [];
+    const r = await h.app.request('/internal/v1/jobs/projection-reconcile', {
+      method: 'POST',
+      headers: h.cron,
+    });
     expect(r.status).toBe(200);
     expect(await r.json()).toMatchObject({
-      job: 'full-rescore',
+      job: 'projection-reconcile',
       done: expect.any(Boolean),
       processed: expect.any(Number),
     });
+    // a second call while nothing is running is accepted again (single-flight lease released)
+    expect(
+      (await h.app.request('/internal/v1/jobs/projection-reconcile', { method: 'POST', headers: h.cron }))
+        .status,
+    ).toBe(200);
   });
 });
 
@@ -202,6 +211,14 @@ describe('projection-reconcile', () => {
       sql`update ${sql.table('matches')} set updated_at = now() - interval '3 years' where id = ${old.id}`.execute(
         trx,
       ),
+    );
+    // the scheduler test above already ran today's reconcile for every tenant: start a fresh run
+    await h.tx((s) =>
+      s.jobs.save('projection-reconcile', '2026-10-01', h.tenant, {
+        cursor: null,
+        processed: 0,
+        done: false,
+      }),
     );
     const r = await runReconcile(jobDeps(h.deps), h.tenant);
     expect(r.remaining).toBe(0);

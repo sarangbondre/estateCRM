@@ -3,6 +3,7 @@
 import { randomUUID } from 'node:crypto';
 import { expireIdempotencyKeys, sql, tenantScope, withTransaction } from '@11e/db';
 import type { Kysely, Transaction } from '@11e/db';
+import { eventTrace } from '@11e/observability';
 import { purgeProcessedEvents, purgePublishedOutbox, queueSend, writeEvent } from '@11e/outbox';
 import type { EventDataMap, EventType } from '@11e/outbox';
 import { Hierarchy } from '../domain/micromarket.js';
@@ -1252,6 +1253,7 @@ export function createStore(db: Db, ctx: StoreContext): Store {
           data,
           correlationId: ctx.correlationId,
           producer: PRODUCER,
+          ...eventTrace(),
         } as Parameters<typeof writeEvent>[1]);
       },
     },

@@ -4,6 +4,7 @@
 import type { components } from '@11e/contracts/records';
 import { createServiceTokenClient } from '@11e/auth';
 import { DownstreamError, createHttpClient } from '@11e/http';
+import type { ClientOptions } from '@11e/http';
 import type { MicromarketSource } from '../application/ports.js';
 import type { MmSourceNode } from '../domain/micromarket.js';
 
@@ -14,6 +15,8 @@ export interface RecordsClientOptions {
   webUrl: string;
   credential: string | undefined;
   fetch?: typeof fetch;
+  /** RED metrics per downstream (libs/observability onCall). */
+  onCall?: ClientOptions['onCall'];
   /** Hard cap on pages (100 nodes each). */
   maxPages?: number;
 }
@@ -23,6 +26,7 @@ export function recordsMicromarketSource(options: RecordsClientOptions): Microma
     name: 'records',
     baseUrl: options.recordsUrl,
     ...(options.fetch ? { fetch: options.fetch } : {}),
+    ...(options.onCall ? { onCall: options.onCall } : {}),
   });
   const tokens = options.credential
     ? createServiceTokenClient({

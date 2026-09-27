@@ -28,7 +28,9 @@ afterAll(async () => {
 const publish = (message: unknown) =>
   admin.query('select pgmq.send($1, $2::jsonb)', ['q_crm_engine', JSON.stringify(message)]);
 
-async function drainUntil(queue: string, done: () => Promise<boolean>, rounds = 10) {
+// The work queue is FIFO and shared by every test file (earlier files leave no-op messages behind), so drain until
+// this test's subject is reached rather than a fixed number of rounds.
+async function drainUntil(queue: string, done: () => Promise<boolean>, rounds = 200) {
   for (let i = 0; i < rounds; i++) {
     const r = await h.app.request(`/internal/v1/drain/${queue}`, { method: 'POST', headers: h.cron });
     expect(r.status).toBe(200);
@@ -38,27 +40,31 @@ async function drainUntil(queue: string, done: () => Promise<boolean>, rounds = 
 }
 
 describe('queues end to end', () => {
-  it('offer and demand events → drains → a suggested match in the outbox → relayed', async () => {
-    const offerId = randomUUID();
-    const demandId = randomUUID();
-    await publish(envelopeFor(h, 'offer.created.v1', offerId, 1, officeFacts(offerId)));
-    await publish(envelopeFor(h, 'demand.created.v1', demandId, 1, officeDemandFacts(demandId)));
-    await drainUntil(
-      'q_crm_engine',
-      async () =>
-        !!(await h.tx((s) => s.mx.getDemand(h.tenant, demandId))) &&
-        !!(await h.tx((s) => s.mx.getOffer(h.tenant, offerId))),
-    );
-    await drainUntil('q_crm_engine_rescore', async () => (await matchesOf(h, demandId)).length > 0);
-    const [m] = await matchesOf(h, demandId);
-    expect(m).toMatchObject({ status: 'Suggested', offer_ids: [offerId] });
-    expect((await outbox(h, 'match.suggested.v1')).some((e) => e.aggregateId === m?.id)).toBe(true);
+  it(
+    'offer and demand events → drains → a suggested match in the outbox → relayed',
+    { timeout: 300_000 },
+    async () => {
+      const offerId = randomUUID();
+      const demandId = randomUUID();
+      await publish(envelopeFor(h, 'offer.created.v1', offerId, 1, officeFacts(offerId)));
+      await publish(envelopeFor(h, 'demand.created.v1', demandId, 1, officeDemandFacts(demandId)));
+      await drainUntil(
+        'q_crm_engine',
+        async () =>
+          !!(await h.tx((s) => s.mx.getDemand(h.tenant, demandId))) &&
+          !!(await h.tx((s) => s.mx.getOffer(h.tenant, offerId))),
+      );
+      await drainUntil('q_crm_engine_rescore', async () => (await matchesOf(h, demandId)).length > 0);
+      const [m] = await matchesOf(h, demandId);
+      expect(m).toMatchObject({ status: 'Suggested', offer_ids: [offerId] });
+      expect((await outbox(h, 'match.suggested.v1')).some((e) => e.aggregateId === m?.id)).toBe(true);
 
-    const relay = await h.app.request('/internal/v1/relay', { method: 'POST', headers: h.cron });
-    expect(relay.status).toBe(200);
-    const body = (await relay.json()) as { claimed: number; published: number };
-    expect(body.published).toBeGreaterThan(0);
-  });
+      const relay = await h.app.request('/internal/v1/relay', { method: 'POST', headers: h.cron });
+      expect(relay.status).toBe(200);
+      const body = (await relay.json()) as { claimed: number; published: number };
+      expect(body.published).toBeGreaterThan(0);
+    },
+  );
 
   it('a duplicate delivery is applied once (processed_events dedupe)', async () => {
     const offerId = randomUUID();
@@ -71,9 +77,13 @@ describe('queues end to end', () => {
     );
     await publish(e);
     await publish(e);
-    const r = await h.app.request('/internal/v1/drain/q_crm_engine', { method: 'POST', headers: h.cron });
-    const body = (await r.json()) as { duplicates: number; applied: number };
-    expect(body.duplicates).toBeGreaterThanOrEqual(1);
+    let duplicates = 0;
+    for (let round = 0; round < 200; round++) {
+      const r = await h.app.request('/internal/v1/drain/q_crm_engine', { method: 'POST', headers: h.cron });
+      duplicates += ((await r.json()) as { duplicates: number }).duplicates;
+      if (duplicates > 0 && (await h.tx((s) => s.mx.getOffer(h.tenant, offerId)))) break;
+    }
+    expect(duplicates).toBeGreaterThanOrEqual(1);
     expect(await h.tx((s) => s.mx.getOffer(h.tenant, offerId))).toMatchObject({ micromarket: 'Powai' });
   });
 });

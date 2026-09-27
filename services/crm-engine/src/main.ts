@@ -22,11 +22,13 @@ export function compose(env: NodeJS.ProcessEnv = process.env) {
     recordsUrl: config.recordsUrl,
     webUrl: config.webUrl,
     credential: config.serviceCredential,
+    onCall: obs.onCall,
   });
   const subjectStates = journeysSubjectStates({
     journeysUrl: config.journeysUrl,
     webUrl: config.webUrl,
     credential: config.serviceCredential,
+    onCall: obs.onCall,
   });
   const svc = buildApp({
     config,

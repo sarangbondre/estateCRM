@@ -2,6 +2,7 @@
 // transaction together with processed_events dedupe (libs/outbox); the repositories are bound to that transaction.
 import type { EventEnvelope, EventHandlers, EventType } from '@11e/outbox';
 import type { Transaction } from '@11e/db';
+import { withEventSpan } from '@11e/observability';
 import { releaseContent, VOCABULARY_RELEASE_ID } from '@11e/vocabulary';
 import type { EventMeta } from '../application/projection.js';
 import {
@@ -41,6 +42,8 @@ import type { AppDeps } from '../deps.js';
 import type { CrmEngineDb } from './db.js';
 import { createStore } from './store.js';
 
+const EVENT_QUEUE = 'q_crm_engine';
+
 const metaOf = (e: EventEnvelope): EventMeta => ({
   eventId: e.eventId,
   tenantId: e.tenantId,
@@ -60,16 +63,26 @@ export function eventHandlers(deps: Pick<AppDeps, 'clock'>): EventHandlers<CrmEn
     <T extends EventType>(
       fn: (store: Store, meta: EventMeta, data: EventEnvelope<T>['data']) => Promise<unknown>,
     ) =>
-    async (e: EventEnvelope<T>, ctx: { trx: Transaction<CrmEngineDb> }) => {
-      await fn(createStore(ctx.trx, { correlationId: e.correlationId, now }), metaOf(e), e.data);
-    };
+    (e: EventEnvelope<T>, ctx: { trx: Transaction<CrmEngineDb> }) =>
+      withEventSpan(
+        e,
+        () => fn(createStore(ctx.trx, { correlationId: e.correlationId, now }), metaOf(e), e.data),
+        {
+          queue: EVENT_QUEUE,
+        },
+      ).then(() => undefined);
 
   const at = (e: EventEnvelope) => new Date(e.occurredAt);
   const onEnv =
     <T extends EventType>(fn: (store: Store, meta: EventMeta, e: EventEnvelope<T>) => Promise<unknown>) =>
-    async (e: EventEnvelope<T>, ctx: { trx: Transaction<CrmEngineDb> }) => {
-      await fn(createStore(ctx.trx, { correlationId: e.correlationId, now }), metaOf(e), e);
-    };
+    (e: EventEnvelope<T>, ctx: { trx: Transaction<CrmEngineDb> }) =>
+      withEventSpan(
+        e,
+        () => fn(createStore(ctx.trx, { correlationId: e.correlationId, now }), metaOf(e), e),
+        {
+          queue: EVENT_QUEUE,
+        },
+      ).then(() => undefined);
 
   return {
     // records → projection facts
