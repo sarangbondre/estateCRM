@@ -1,0 +1,2833 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "11 Estates CRM — crm-engine (matching) API",
+    "version": "0.1.0",
+    "description": "Service S4 (HLD §2). Pairs demand with supply many-to-many, ranks pairs, builds bundles, records date-aware exclusions, flags and feedback, and owns the weights. PII-free by design: its projection holds no names, phones, emails, building names or unit details. Conventions: docs/04-lld/conventions.md. LLD: docs/04-lld/crm-engine.md."
+  },
+  "servers": [
+    {
+      "url": "https://{service}.internal.11estates.in",
+      "description": "Vercel project `crm-engine` (bom1). Reached only via web (staff), pg_cron (internal) or service tokens.",
+      "variables": {
+        "service": {
+          "default": "crm-engine"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "staffViaWeb": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Matches"
+    },
+    {
+      "name": "Bundles"
+    },
+    {
+      "name": "Matching runs"
+    },
+    {
+      "name": "Weights"
+    },
+    {
+      "name": "Internal"
+    },
+    {
+      "name": "Health"
+    }
+  ],
+  "paths": {
+    "/v1/demands/{idOrCode}/matches": {
+      "get": {
+        "operationId": "listDemandMatches",
+        "summary": "Matches for a demand, best first (C-10, P-03)",
+        "tags": [
+          "Matches"
+        ],
+        "description": "Sorted by (status: Confirmed first, score desc, id). Open suggestions are capped at topNPerDemand (default 20).",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/IdOrCode"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Suggested",
+                  "Confirmed",
+                  "Rejected",
+                  "Closed"
+                ]
+              }
+            },
+            "description": "Default: Suggested,Confirmed"
+          },
+          {
+            "name": "flag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "price_above_budget",
+                "reconfirm",
+                "area_basis_unknown",
+                "market_unknown"
+              ]
+            }
+          },
+          {
+            "name": "bundlesOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "x-pagination": "cursor (limit default 25, max 100); response {items, nextCursor}"
+      }
+    },
+    "/v1/offers/{idOrCode}/matches": {
+      "get": {
+        "operationId": "listOfferMatches",
+        "summary": "Matches that include an offer (single or bundle) (P-02)",
+        "tags": [
+          "Matches"
+        ],
+        "description": "Sorted by (score desc, id).",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/IdOrCode"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Suggested",
+                  "Confirmed",
+                  "Rejected",
+                  "Closed"
+                ]
+              }
+            },
+            "description": "Default: Suggested,Confirmed"
+          },
+          {
+            "name": "flag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "price_above_budget",
+                "reconfirm",
+                "area_basis_unknown",
+                "market_unknown"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "x-pagination": "cursor (limit default 25, max 100); response {items, nextCursor}"
+      }
+    },
+    "/v1/matches/{idOrCode}": {
+      "get": {
+        "operationId": "getMatch",
+        "summary": "Get a match",
+        "tags": [
+          "Matches"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdOrCode"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Match",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Match"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": []
+      }
+    },
+    "/v1/matches/{idOrCode}/explanation": {
+      "get": {
+        "operationId": "explainMatch",
+        "summary": "Explain a match: hard filters, factor breakdown, flags",
+        "tags": [
+          "Matches"
+        ],
+        "description": "Recomputed on read from the current projection and the weights version the match was scored with.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdOrCode"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Explanation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Explanation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": []
+      }
+    },
+    "/v1/matches/{idOrCode}/confirm": {
+      "post": {
+        "operationId": "confirmMatch",
+        "summary": "Confirm a suggested match (US-21)",
+        "tags": [
+          "Matches"
+        ],
+        "description": "Suggested → Confirmed. 409 invalid-match-status for Rejected/Closed. Records feedback (M6).",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/IdOrCode"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Match"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body; confirming an already Confirmed match returns 200 unchanged",
+        "x-emits": [
+          "match.confirmed.v1"
+        ]
+      }
+    },
+    "/v1/matches/{idOrCode}/reject": {
+      "post": {
+        "operationId": "rejectMatch",
+        "summary": "Reject a match with a reason code (US-21)",
+        "tags": [
+          "Matches"
+        ],
+        "description": "Suggested or Confirmed → Rejected (a confirmed match can be withdrawn before a deal opens; 409 match-in-deal otherwise). The pair is not re-suggested unless its score rises by ≥ rejectedResuggestMinGain after an offer fact change.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/IdOrCode"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Match"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body; rejecting an already Rejected match returns 200 unchanged",
+        "x-emits": [
+          "match.rejected.v1"
+        ]
+      }
+    },
+    "/v1/bundles": {
+      "post": {
+        "operationId": "createBundle",
+        "summary": "Build a bundle of 2–3 offers for a demand (A-38)",
+        "tags": [
+          "Bundles"
+        ],
+        "description": "Validates the bundle rules; failures return 400 with errors[] (bundle-too-large, bundle-segment-not-allowed, bundle-not-colocated, bundle-mixed-deal-type, bundle-hard-filter-failed, bundle-area-insufficient; LLD §6). Same offer set for the demand → returns the existing bundle (200).",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BundleCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body",
+        "x-emits": [
+          "match.suggested.v1",
+          "match.confirmed.v1"
+        ],
+        "x-role-rules": "Supply agent: suggest only (confirm=true → 403)."
+      }
+    },
+    "/v1/bundles/{idOrCode}": {
+      "get": {
+        "operationId": "getBundle",
+        "summary": "Get a bundle",
+        "tags": [
+          "Bundles"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdOrCode"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bundle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bundle"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": []
+      }
+    },
+    "/v1/demands/{idOrCode}/exclusions": {
+      "get": {
+        "operationId": "listDemandExclusions",
+        "summary": "Offers excluded for a demand, with reasons (date-aware, e.g. 'Available too late')",
+        "tags": [
+          "Matches"
+        ],
+        "description": "Only pairs that pass every other hard filter are recorded (max 50 per demand). Sorted by (computedAt desc, id).",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/IdOrCode"
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "available_too_late",
+                "offer_expired",
+                "offer_inactive",
+                "demand_stale"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exclusions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExclusionPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "x-pagination": "cursor (limit default 25, max 100); response {items, nextCursor}"
+      }
+    },
+    "/v1/demands/{idOrCode}/matching-runs": {
+      "post": {
+        "operationId": "rerunDemandMatching",
+        "summary": "Re-run matching for one demand (async)",
+        "tags": [
+          "Matching runs"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/IdOrCode"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/Accepted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body; a run already queued/running for the demand is returned (202)",
+        "x-emits": [
+          "demand.matching_completed.v1",
+          "match.suggested.v1",
+          "match.closed.v1",
+          "match.flagged.v1"
+        ]
+      }
+    },
+    "/v1/matching-runs/{runId}": {
+      "get": {
+        "operationId": "getMatchingRun",
+        "summary": "Status of a matching run",
+        "tags": [
+          "Matching runs"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchingRun"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": []
+      }
+    },
+    "/v1/weights": {
+      "get": {
+        "operationId": "getWeights",
+        "summary": "Current match weights and tunables",
+        "tags": [
+          "Weights"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Weights",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Weights"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": []
+      },
+      "put": {
+        "operationId": "putWeights",
+        "summary": "Replace match weights (Admin); queues a full re-score",
+        "tags": [
+          "Weights"
+        ],
+        "description": "Creates a new weights version (old versions kept for explanations). A full-rescore run is queued; re-ranked suggestions are emitted asynchronously.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Weights"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Weights"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "PUT is idempotent; If-Match (row version) → 412 on mismatch",
+        "x-emits": [
+          "audit.recorded.v1",
+          "match.suggested.v1",
+          "match.closed.v1"
+        ]
+      }
+    },
+    "/internal/v1/matches": {
+      "get": {
+        "operationId": "listMatchesForRebuild",
+        "summary": "All matches (keyset), for consumers rebuilding a projection",
+        "tags": [
+          "Internal"
+        ],
+        "description": "Callers: journeys, listings, insight (serviceToken aud=crm-engine). Sorted by (updatedAt, id).",
+        "security": [
+          {
+            "serviceToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "updatedSince",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "demandId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchProjectionPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "10/s per calling service",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "x-pagination": "cursor (limit default 25, max 100); response {items, nextCursor}",
+        "x-caller": "journeys, listings, insight (projection rebuild only)"
+      }
+    },
+    "/internal/v1/relay": {
+      "post": {
+        "operationId": "relayOutbox",
+        "summary": "Relay unpublished outbox rows into consumer pgmq queues",
+        "tags": [
+          "Internal"
+        ],
+        "description": "Invoked every minute by Supabase pg_cron + pg_net and poked after commits. Claims up to 500 outbox rows (FOR UPDATE SKIP LOCKED, ordered by occurred_at), sends one copy per subscribed consumer queue (subscriptions from contracts/asyncapi/events.yaml) and sets published_at. Timeout 10 s: batch work, not on a user request path.",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Relay batch result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelayResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "1 call/min per job (pg_cron); internal only",
+        "x-timeout-ms": 10000,
+        "x-idempotency": "safe to re-run: work is claimed with FOR UPDATE SKIP LOCKED; events deduped on eventId",
+        "x-emits": [],
+        "x-caller": "pg_cron (every minute) + post-commit poke",
+        "x-timeout-reason": "batch relay of ≤500 outbox rows; internal, not a user request (R-5)"
+      }
+    },
+    "/internal/v1/drain/{queue}": {
+      "post": {
+        "operationId": "drainQueue",
+        "summary": "Drain a pgmq queue owned by this service",
+        "tags": [
+          "Internal"
+        ],
+        "description": "Reads up to 100 messages (visibility timeout 60 s), dedupes on eventId via processed_events, applies each in its own transaction, deletes on success. After 5 failed reads a message moves to <queue>_dlq (alarm on depth > 0). Timeout 55 s: stays under the Hobby function limit; remaining messages are picked up by the next minute's call.",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "name": "queue",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "q_crm_engine",
+                "q_crm_engine_rescore"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Drain batch result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrainResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "1 call/min per job (pg_cron); internal only",
+        "x-timeout-ms": 55000,
+        "x-idempotency": "safe to re-run: work is claimed with FOR UPDATE SKIP LOCKED; events deduped on eventId",
+        "x-emits": [
+          "match.suggested.v1",
+          "match.closed.v1",
+          "match.flagged.v1",
+          "match.reopened.v1",
+          "demand.matching_completed.v1"
+        ],
+        "x-caller": "pg_cron (every minute per queue)",
+        "x-timeout-reason": "consumer batch under the function limit; internal, not a user request (R-5)"
+      }
+    },
+    "/internal/v1/jobs/{name}": {
+      "post": {
+        "operationId": "runJob",
+        "summary": "Run a scheduled job (one bounded batch; continues on the next call)",
+        "tags": [
+          "Internal"
+        ],
+        "description": "Jobs:\n- `full-rescore` (03:00 IST daily (after journeys' 02:00 life-curve run) and after PUT /v1/weights): re-score every live demand against its candidates in keyset batches; emits re-ranks, flags and closes\n- `micromarket-refresh` (on micromarkets.updated.v1 / vocabulary.released.v1 and 01:30 IST daily): reload the micromarket hierarchy and adjacency list from records (GET /v1/micromarkets, serviceToken issued by web, R-2/R-13) and recompute mm_path / mm_expanded\n- `projection-reconcile` (Sunday 04:00 IST): compare projection versions with records/journeys rebuild APIs and repair gaps\n\nEach call processes batches until a 50 s budget is used, records a cursor in job_runs and returns `done=false` if work remains; pg_cron calls again the next minute until `done=true`.",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "full-rescore",
+                "micromarket-refresh",
+                "projection-reconcile"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job batch result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "1 call/min per job (pg_cron); internal only",
+        "x-timeout-ms": 55000,
+        "x-idempotency": "safe to re-run: work is claimed with FOR UPDATE SKIP LOCKED; events deduped on eventId",
+        "x-emits": [
+          "match.suggested.v1",
+          "match.closed.v1",
+          "match.flagged.v1",
+          "match.reopened.v1",
+          "demand.matching_completed.v1"
+        ],
+        "x-caller": "pg_cron",
+        "x-schedules": {
+          "full-rescore": "03:00 IST daily (after journeys' 02:00 life-curve run) and after PUT /v1/weights",
+          "micromarket-refresh": "on micromarkets.updated.v1 / vocabulary.released.v1 and 01:30 IST daily",
+          "projection-reconcile": "Sunday 04:00 IST"
+        },
+        "x-timeout-reason": "bounded job batch (50 s budget) with continuation; internal (R-5)"
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "healthLive",
+        "summary": "Liveness: process is up",
+        "tags": [
+          "Health"
+        ],
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "unlimited (platform probe)",
+        "x-timeout-ms": 500,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "x-caller": "platform / uptime monitor"
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "healthReady",
+        "summary": "Readiness: DB reachable and migrations at the expected version",
+        "tags": [
+          "Health"
+        ],
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "unlimited (platform probe)",
+        "x-timeout-ms": 1000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "x-caller": "platform / uptime monitor"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "staffViaWeb": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Service token minted by web for a signed-in staff user (aud=<service>, sub=web, tid, 5 min), plus headers X-User-Id, X-User-Role, X-Tenant-Id. Services re-check role and tenant.\n"
+      },
+      "serviceToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Service-to-service JWT (aud=<service>, sub=<caller>, tid, 5 min). Issued by web at POST /internal/v1/service-tokens; verify with web GET /.well-known/jwks.json (conventions R-2). Internal routes only."
+      },
+      "cronSecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Cron-Secret",
+        "description": "Per-service secret used by Supabase pg_cron/pg_net for /internal/v1/relay, /internal/v1/drain/*, /internal/v1/jobs/*."
+      }
+    },
+    "responses": {
+      "Gone": {
+        "description": "Link expired or revoked",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Accepted": {
+        "description": "Accepted for asynchronous processing",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Accepted"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Validation failed",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Unauthenticated": {
+        "description": "Missing or invalid credentials",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Role or tenant not allowed",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Not found",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "TooMany": {
+        "description": "rate-limited",
+        "headers": {
+          "Retry-After": {
+            "$ref": "#/components/headers/RetryAfter"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "internal or dependency-unavailable",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Conflict (state or idempotency-key-reused)",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "PreconditionFailed": {
+        "description": "version-mismatch",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Accepted": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ]
+          },
+          "statusUrl": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "runId",
+          "status"
+        ]
+      },
+      "Factor": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "factor": {
+            "type": "string",
+            "enum": [
+              "micromarket",
+              "price",
+              "area",
+              "bhk",
+              "timing",
+              "furnishing"
+            ]
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "points": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "applicable": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Generated explanation, e.g. 'rent ₹8.5L vs budget ₹8–10L'"
+          }
+        },
+        "required": [
+          "factor",
+          "weight",
+          "value",
+          "points"
+        ]
+      },
+      "Match": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Display code"
+          },
+          "demandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "demandCode": {
+            "type": "string",
+            "description": "Display code"
+          },
+          "offerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 3,
+            "minItems": 1
+          },
+          "offerCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Display code"
+            },
+            "maxItems": 3
+          },
+          "isBundle": {
+            "type": "boolean"
+          },
+          "bundleId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "bundleCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Display code"
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "rank": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "Rank among the demand's open suggestions (1 = best)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Suggested",
+              "Confirmed",
+              "Rejected",
+              "Closed"
+            ]
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "price_above_budget",
+                "reconfirm",
+                "area_basis_unknown",
+                "market_unknown"
+              ]
+            },
+            "maxItems": 4
+          },
+          "factors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Factor"
+            },
+            "maxItems": 6
+          },
+          "closedReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "leased_to_another_client",
+              "sold_to_another_client",
+              "offer_retired",
+              "demand_exited",
+              "merged",
+              "deal_closed",
+              "demand_closed",
+              "superseded",
+              "offer_expired",
+              "voided",
+              null
+            ]
+          },
+          "rejectedReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "too_expensive",
+              "wrong_location",
+              "too_small",
+              "too_large",
+              "timing",
+              "wrong_type",
+              "client_not_interested",
+              "already_seen",
+              "owner_unwilling",
+              "other",
+              null
+            ]
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "engine",
+              "user"
+            ]
+          },
+          "weightsVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "confirmedBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "confirmedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "demandId",
+          "offerIds",
+          "isBundle",
+          "score",
+          "status",
+          "flags",
+          "version"
+        ],
+        "description": "A ranked pairing of one Demand with one Offer or a bundle (≤3) of Offers. PII-free."
+      },
+      "MatchPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Match"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Explanation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "matchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Display code"
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "weightsVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hardFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "filter": {
+                  "type": "string",
+                  "enum": [
+                    "side",
+                    "record_scope",
+                    "deal_type",
+                    "market",
+                    "segment",
+                    "property_type",
+                    "stated_tags",
+                    "micromarket",
+                    "possession_window",
+                    "offer_live",
+                    "demand_live",
+                    "launch_area"
+                  ]
+                },
+                "passed": {
+                  "type": "boolean"
+                },
+                "detail": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "filter",
+                "passed"
+              ]
+            },
+            "maxItems": 12
+          },
+          "factors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Factor"
+            },
+            "maxItems": 6
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "flag": {
+                  "type": "string",
+                  "enum": [
+                    "price_above_budget",
+                    "reconfirm",
+                    "area_basis_unknown",
+                    "market_unknown"
+                  ]
+                },
+                "detail": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "flag"
+              ]
+            },
+            "maxItems": 4
+          },
+          "bundle": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "grouping": {
+                "type": "string",
+                "enum": [
+                  "same_building",
+                  "same_micromarket",
+                  "adjacent_micromarket"
+                ]
+              },
+              "combinedAreaSqft": {
+                "type": "number",
+                "minimum": 0
+              },
+              "combinedPriceInr": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "combinedRentMonthlyInr": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "grouping",
+              "combinedAreaSqft"
+            ]
+          },
+          "computedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "matchId",
+          "score",
+          "weightsVersion",
+          "hardFilters",
+          "factors",
+          "flags"
+        ],
+        "description": "Why this match exists: every hard filter checked, every factor with weight and points (US-28 'score and factor breakdown', R-CHAT-2)."
+      },
+      "ConfirmRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {},
+        "description": "Empty body. Free-text notes are not accepted (crm-engine is PII-free)."
+      },
+      "RejectRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reasonCode": {
+            "type": "string",
+            "enum": [
+              "too_expensive",
+              "wrong_location",
+              "too_small",
+              "too_large",
+              "timing",
+              "wrong_type",
+              "client_not_interested",
+              "already_seen",
+              "owner_unwilling",
+              "other"
+            ]
+          }
+        },
+        "required": [
+          "reasonCode"
+        ]
+      },
+      "BundleCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "demandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "offerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 3,
+            "minItems": 2
+          },
+          "confirm": {
+            "type": "boolean",
+            "default": false,
+            "description": "Confirm immediately (Demand agent, Manager, Admin only)"
+          }
+        },
+        "required": [
+          "demandId",
+          "offerIds"
+        ],
+        "description": "Manual bundle (C-10 'Build bundle'). 2–3 offers, Commercial or Industrial demand, same building or same/adjacent micromarket, each offer must pass the demand's hard filters except area (A-38)."
+      },
+      "Bundle": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Display code"
+          },
+          "demandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "offerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 3,
+            "minItems": 2
+          },
+          "grouping": {
+            "type": "string",
+            "enum": [
+              "same_building",
+              "same_micromarket",
+              "adjacent_micromarket"
+            ]
+          },
+          "combinedAreaSqft": {
+            "type": "number",
+            "minimum": 0
+          },
+          "combinedPriceInr": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "combinedRentMonthlyInr": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "engine",
+              "user"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "demandId",
+          "offerIds",
+          "grouping",
+          "combinedAreaSqft",
+          "matchId"
+        ]
+      },
+      "BundleResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "bundle": {
+            "$ref": "#/components/schemas/Bundle"
+          },
+          "match": {
+            "$ref": "#/components/schemas/Match"
+          }
+        },
+        "required": [
+          "bundle",
+          "match"
+        ]
+      },
+      "Exclusion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "demandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "offerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "offerCode": {
+            "type": "string",
+            "description": "Display code"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "available_too_late",
+              "offer_expired",
+              "offer_inactive",
+              "demand_stale"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "e.g. 'Available from 2027-02-01, demand needs by 2026-12-15'"
+          },
+          "availableFrom": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "moveInBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "computedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "demandId",
+          "offerId",
+          "reason",
+          "computedAt"
+        ]
+      },
+      "ExclusionPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Exclusion"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "RunCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "manual",
+              "after_edit",
+              "support",
+              null
+            ]
+          }
+        }
+      },
+      "MatchingRun": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "demand",
+              "offer",
+              "full"
+            ]
+          },
+          "subjectId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "trigger": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ]
+          },
+          "candidates": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "suggested": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "closed": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "excluded": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "scope",
+          "status"
+        ]
+      },
+      "Weights": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "factors": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "micromarket": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.25
+              },
+              "price": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.25
+              },
+              "area": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.2
+              },
+              "bhk": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.1
+              },
+              "timing": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.1
+              },
+              "furnishing": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.1
+              }
+            },
+            "required": [
+              "micromarket",
+              "price",
+              "area",
+              "bhk",
+              "timing",
+              "furnishing"
+            ]
+          },
+          "tuning": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "minScore": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "default": 40
+              },
+              "topNPerDemand": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50,
+                "default": 20
+              },
+              "areaTolerancePct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "default": 15
+              },
+              "areaToleranceUnknownBasisPct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "default": 25
+              },
+              "priceOverBudgetZeroPct": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 20,
+                "description": "Price factor falls linearly to 0 at this % over budget max"
+              },
+              "timingSoonDays": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 365,
+                "default": 30
+              },
+              "bundleMaxOffers": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 3,
+                "default": 3
+              },
+              "bundleCandidateCap": {
+                "type": "integer",
+                "minimum": 5,
+                "maximum": 60,
+                "default": 30
+              },
+              "bundlesPerDemand": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10,
+                "default": 3
+              },
+              "rejectedResuggestMinGain": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "default": 10
+              },
+              "proximity": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "sameLocality": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "default": 1
+                  },
+                  "sameMicromarket": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "default": 0.85
+                  },
+                  "coarserLevel": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "default": 0.6
+                  }
+                }
+              }
+            }
+          },
+          "updatedBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "version",
+          "factors",
+          "tuning"
+        ],
+        "description": "Match scoring weights and tunables (PRD §4.5, M6). Factor weights are normalised by the sum of applicable factors."
+      },
+      "MatchProjectionRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Display code"
+          },
+          "demandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "offerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 3
+          },
+          "isBundle": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Suggested",
+              "Confirmed",
+              "Rejected",
+              "Closed"
+            ]
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4
+          },
+          "closedReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "demandId",
+          "offerIds",
+          "status",
+          "score",
+          "version"
+        ]
+      },
+      "MatchProjectionPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatchProjectionRow"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "RelayResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "claimed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "published": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "lagSeconds": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "claimed",
+          "published"
+        ]
+      },
+      "DrainResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "queue": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "read": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "applied": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "duplicates": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "movedToDlq": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "queue",
+          "read",
+          "applied",
+          "duplicates",
+          "failed"
+        ]
+      },
+      "JobResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "job": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "done": {
+            "type": "boolean"
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "job",
+          "runId",
+          "processed",
+          "done"
+        ]
+      },
+      "Problem": {
+        "type": "object",
+        "description": "RFC 7807 problem details.",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "correlationId"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://errors.11estates.in/validation-failed"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable kebab-case error code"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "field",
+                "code"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Money": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "INR, whole rupees"
+      },
+      "Health": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "down"
+            ]
+          },
+          "checks": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "CorrelationId": {
+        "name": "X-Correlation-Id",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 25
+        }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "IdOrCode": {
+        "name": "idOrCode",
+        "in": "path",
+        "required": true,
+        "description": "UUID or display code (e.g. INV-00452).",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "description": "UUID; 24 h replay window per user+route. Same key with a different body → 409 idempotency-key-reused.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": false,
+        "description": "Row version for optimistic concurrency; mismatch → 412 version-mismatch.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "headers": {
+      "RetryAfter": {
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Seconds to wait before retrying."
+      }
+    }
+  }
+}

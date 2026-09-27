@@ -6,6 +6,7 @@
   "description": "Wire-contract types generated from OpenAPI/AsyncAPI (types only, no logic, no domain models).",
   "exports": {
     "./event-topology.json": "./generated/event-topology.json",
+    "./openapi/*.json": "./generated/openapi/*.json",
     "./*": "./generated/ts/*.ts"
   },
   "scripts": {
