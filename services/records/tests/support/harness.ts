@@ -4,9 +4,10 @@ import { randomUUID } from 'node:crypto';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 import type { CryptoKey } from 'jose';
 import { authenticate } from '@11e/auth';
-import { createDb, migrate } from '@11e/db';
+import { createDb, migrate, withTransaction } from '@11e/db';
 import { observe } from '@11e/observability';
 import { buildApp } from '../../src/app.js';
+import { eventHandlers } from '../../src/adapters/events.js';
 import { SCHEMA, SERVICE, loadConfig } from '../../src/config.js';
 import { composeApp } from '../../src/main.js';
 import type { App, AppPorts } from '../../src/application/context.js';
@@ -43,6 +44,11 @@ export interface Harness {
     headers: Record<string, string>,
     body?: unknown,
   ): Promise<{ status: number; body: Record<string, unknown> & { items?: Record<string, unknown>[] }; headers: Headers }>;
+  /**
+   * Delivers an event to the records consumer as the drain does: processed_events dedupe and the handler in one
+   * transaction. Returns false for a duplicate.
+   */
+  deliver(event: { eventType: string; tenantId: string; data: unknown; aggregateVersion?: number; aggregateId?: string; eventId?: string }): Promise<boolean>;
   /** Outbox events of a tenant (each validated against the AsyncAPI payload schema). */
   events(tenant: string, type?: string): Promise<{ eventType: string; aggregateId: string; aggregateVersion: number; data: Record<string, unknown> }[]>;
 }
@@ -72,6 +78,7 @@ export async function createHarness(overrides: Partial<AppPorts> = {}): Promise<
       .setExpirationTime('5m')
       .sign(privateKey as CryptoKey);
 
+  const handlers = eventHandlers({ config, db: handle.db, obs: observe(SERVICE, { level: 'fatal' }), auth, app: appCtx });
   const h: Harness = {
     app: svc.app,
     svc,
@@ -94,6 +101,34 @@ export async function createHarness(overrides: Partial<AppPorts> = {}): Promise<
       });
       const text = await res.text();
       return { status: res.status, body: text ? (JSON.parse(text) as Record<string, unknown>) : {}, headers: res.headers };
+    },
+    async deliver(e) {
+      const envelope = {
+        eventId: e.eventId ?? randomUUID(),
+        eventType: e.eventType,
+        schemaVersion: 1,
+        occurredAt: new Date().toISOString(),
+        correlationId: `test-${e.eventType}`,
+        producer: 'test',
+        tenantId: e.tenantId,
+        aggregateType: 'test',
+        aggregateId: e.aggregateId ?? randomUUID(),
+        aggregateVersion: e.aggregateVersion ?? 1,
+        data: e.data,
+      };
+      const handler = (handlers as Record<string, (ev: unknown, ctx: { trx: unknown; attempt: number }) => Promise<void>>)[e.eventType];
+      if (!handler) throw new Error(`records has no handler for ${e.eventType}`);
+      return withTransaction(handle.db, async (trx) => {
+        const claimed = await trx
+          .insertInto('processed_events')
+          .values({ event_id: envelope.eventId, consumer: SERVICE, processed_at: new Date() })
+          .onConflict((oc) => oc.column('event_id').doNothing())
+          .returning('event_id')
+          .executeTakeFirst();
+        if (!claimed) return false;
+        await handler(envelope, { trx, attempt: 1 });
+        return true;
+      }, { statementTimeoutMs: 30_000, retries: 0 });
     },
     async events(tenant, type) {
       let q = handle.db.selectFrom('outbox').select(['payload', 'occurred_at']).where('tenant_id', '=', tenant);

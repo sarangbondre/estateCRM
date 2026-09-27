@@ -5,6 +5,7 @@ import type {
   EnquiryRow,
   MarketDataRow,
   MergeCandidateRow,
+  MergeRow,
   MicromarketRow,
   OfferRow,
   PersonPhoneRow,
@@ -287,4 +288,6 @@ export interface Queries {
   /** The ids plus all their descendants (depth ≤ 4, capped at 200). */
   micromarketDescendants(ids: readonly string[]): Promise<string[]>;
   adjacentIds(ids: readonly string[]): Promise<Map<string, string[]>>;
+  /** Active merges whose survivor or merged ids include any of `ids` (undo-blocked check). */
+  activeMergesTouching(ids: readonly string[]): Promise<MergeRow[]>;
 }

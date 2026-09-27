@@ -7,9 +7,12 @@ import { queueSend, writeEvent } from '@11e/outbox';
 import type { EventDataMap, EventType } from '@11e/contracts/events';
 import type { CodeIssuer, EmitOptions, EventSink, Tx, UnitOfWork, UnitOfWorkOptions } from '../../application/ports.js';
 import { SCHEMA, SERVICE } from '../../config.js';
+import { UuidV7 } from '../crypto.js';
 import { KyselyQueries } from './queries.js';
 import type { RecordsDb } from './schema.js';
 import { KyselyStore } from './store.js';
+
+const eventIds = new UuidV7();
 
 class OutboxSink implements EventSink {
   constructor(
@@ -29,6 +32,8 @@ class OutboxSink implements EventSink {
       data,
       correlationId: this.correlationId,
       producer: SERVICE,
+      // UUIDv7: the relay publishes in (occurred_at, id) order, so events of one transaction keep emission order.
+      eventId: eventIds.next(),
       ...(this.traceparent ? { traceparent: this.traceparent } : {}),
     });
   }
@@ -58,6 +63,29 @@ class SequenceCodes implements CodeIssuer {
   }
 }
 
+/** A Tx over an existing transaction (event handlers run inside the drain's transaction with processed_events). */
+export function bindTx(
+  trx: Transaction<RecordsDb>,
+  ctx: { tenantId: string; correlationId: string },
+  traceparent?: string,
+): Tx {
+  return {
+    tenantId: ctx.tenantId,
+    correlationId: ctx.correlationId,
+    now: new Date(),
+    store: new KyselyStore(trx, ctx.tenantId),
+    q: new KyselyQueries(trx, ctx.tenantId),
+    codes: new SequenceCodes(trx, ctx.tenantId),
+    events: new OutboxSink(trx, ctx.tenantId, ctx.correlationId, traceparent),
+    advisoryLock: async (key: string) => {
+      await sql`select pg_advisory_xact_lock(hashtext(${`${SCHEMA}:${ctx.tenantId}:${key}`}))`.execute(trx);
+    },
+    enqueueWork: async (queue: string, message: Record<string, unknown>) => {
+      await queueSend(trx, SCHEMA, queue, { ...message, tenantId: ctx.tenantId, correlationId: ctx.correlationId });
+    },
+  };
+}
+
 export class KyselyUnitOfWork implements UnitOfWork {
   constructor(
     private readonly db: Kysely<RecordsDb>,
@@ -72,21 +100,7 @@ export class KyselyUnitOfWork implements UnitOfWork {
     return withTransaction(
       this.db,
       async (trx) => {
-        const tx: Tx = {
-          tenantId: ctx.tenantId,
-          correlationId: ctx.correlationId,
-          now: new Date(),
-          store: new KyselyStore(trx, ctx.tenantId),
-          q: new KyselyQueries(trx, ctx.tenantId),
-          codes: new SequenceCodes(trx, ctx.tenantId),
-          events: new OutboxSink(trx, ctx.tenantId, ctx.correlationId, this.traceparent()),
-          advisoryLock: async (key: string) => {
-            await sql`select pg_advisory_xact_lock(hashtext(${`${SCHEMA}:${ctx.tenantId}:${key}`}))`.execute(trx);
-          },
-          enqueueWork: async (queue: string, message: Record<string, unknown>) => {
-            await queueSend(trx, SCHEMA, queue, { ...message, tenantId: ctx.tenantId, correlationId: ctx.correlationId });
-          },
-        };
+        const tx = bindTx(trx, ctx, this.traceparent());
         return fn(tx);
       },
       { statementTimeoutMs: options.timeoutMs ?? 2000 },

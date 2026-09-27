@@ -8,6 +8,7 @@ import type {
   EnquiryRow,
   MarketDataRow,
   MergeCandidateRow,
+  MergeRow,
   MicromarketRow,
   OfferRow,
   PersonPhoneRow,
@@ -723,6 +724,16 @@ export class KyselyQueries implements Queries {
       )
       select distinct id from tree limit 200`.execute(this.#db);
     return r.rows.map((x) => x.id);
+  }
+
+  async activeMergesTouching(ids: readonly string[]): Promise<MergeRow[]> {
+    if (!ids.length) return [];
+    return (await this.#from('merges')
+      .selectAll()
+      .where('status', '=', 'active')
+      .where((eb) => eb.or([eb('survivor_id', 'in', [...ids]), eb(sql`merged_ids`, '&&', sql`${[...ids]}::uuid[]`)]))
+      .limit(100)
+      .execute()) as MergeRow[];
   }
 
   async adjacentIds(ids: readonly string[]): Promise<Map<string, string[]>> {

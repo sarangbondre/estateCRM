@@ -4,6 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import type { JobResult } from '@11e/http';
 import { systemActor, tenantsOf } from '../application/context.js';
+import { resolvePendingRepeats } from '../application/ingest.js';
 import { activateVocabulary } from '../application/reference.js';
 import { recomputeLaunchAreaStep } from '../application/recompute.js';
 import type { AppDeps } from '../deps.js';
@@ -41,6 +42,8 @@ export function jobs(deps: AppDeps): Record<string, () => Promise<JobResult>> {
         const r = await activateVocabulary(app, systemActor(tenantId, cid));
         return { processed: r.activated ? 1 : 0, more: false };
       }),
+    'resolve-pending-repeats': () =>
+      perTenant(deps, (tenantId, cid) => resolvePendingRepeats(app, systemActor(tenantId, cid))),
     'recompute-launch-area': () =>
       perTenant(deps, (tenantId, cid) => recomputeLaunchAreaStep(app, systemActor(tenantId, cid))),
   };
