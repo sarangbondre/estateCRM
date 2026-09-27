@@ -1,0 +1,13 @@
+name: crm-engine
+on:
+  pull_request:
+    paths: ['services/crm-engine/**', 'libs/**', 'contracts/**', 'pnpm-lock.yaml', '.github/workflows/_service-ci.yml', '.github/workflows/svc-crm-engine.yml']
+  push:
+    branches: [main]
+    paths: ['services/crm-engine/**', 'libs/**', 'contracts/**', 'pnpm-lock.yaml']
+jobs:
+  ci:
+    uses: ./.github/workflows/_service-ci.yml
+    with:
+      service: crm-engine
+      path: services/crm-engine

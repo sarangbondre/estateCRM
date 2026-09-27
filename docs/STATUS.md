@@ -19,7 +19,8 @@ Environments:
 Stage 7 task progress:
 - [x] F-01 Monorepo scaffold (2026-09-27)
 - [x] F-02 Code quality baseline: TS 6 strict, ESLint (no-console), dependency-cruiser layer rules (proven with a probe), gitleaks clean (2026-09-27)
-- next: F-03 CI pipeline per service
+- [x] F-03 CI: reusable per-service workflow (lint, layers, typecheck, tests, build) × 7 with path filters + repo workflow (gitleaks, libs) (2026-09-27)
+- next: F-04 contract tooling
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)
