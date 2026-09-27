@@ -12,7 +12,7 @@
   --line-strong: #c4ccc7;
   --ink: #17211f;
   --muted: #5e6b67;
-  --faint: #6f7b77; /* darker than the prototype's #8A9692 so small text meets WCAG AA (4.5:1) */
+  --faint: #5c6864; /* darker than the prototype's #8A9692 so small text meets WCAG AA (4.5:1) on every surface */
   --accent: #0f6e6a;
   --accent-ink: #ffffff;
   --accent-soft: #e1f0ee;
@@ -1272,6 +1272,47 @@
     max-height: 60vh;
     overflow-y: auto;
   }
+
+  /* publication preview (prototype .webcard / .pub-grid) and merge compare */
+  .webcard {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .webcard .imgs {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 3px;
+    height: 120px;
+  }
+  .webcard .imgs div {
+    background: linear-gradient(135deg, var(--accent-soft), var(--demand-soft));
+  }
+  .webcard .c {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 13px;
+  }
+  .pub-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 14px;
+  }
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr 50px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  .compare > div {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+  }
 }
 
 @keyframes blink {
@@ -1331,7 +1372,8 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .map-grid,
-  .form-grid {
+  .form-grid,
+  .pub-grid {
     grid-template-columns: 1fr;
   }
   .home h2 {
