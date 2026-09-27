@@ -29,6 +29,8 @@ export interface Config {
   hfToken: string | undefined;
   hfModel: string;
   hfEndpointUrl: string;
+  /** Secret for the pilot anonymiser's HMAC (per-tenant keys are derived from it). */
+  anonymisationKey: string;
 }
 
 export class ConfigError extends Error {
@@ -37,6 +39,13 @@ export class ConfigError extends Error {
 
 const bool = (v: string | undefined, fallback: boolean) =>
   v === undefined || v === '' ? fallback : ['1', 'true', 'yes', 'on'].includes(v.toLowerCase());
+
+/** Local and test runs get a fixed development key; deployed pilots must set ANONYMISATION_KEY. */
+function anonymisationKey(value: string | undefined, environment: string, pilotMode: boolean): string {
+  if (value) return value;
+  if (!pilotMode || ['local', 'test'].includes(environment)) return 'local-development-anonymisation-key';
+  throw new ConfigError('missing environment variable ANONYMISATION_KEY (or INTAKE_ANONYMISATION_KEY)');
+}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const get = (name: string) => env[name] ?? env[`INTAKE_${name}`];
@@ -62,6 +71,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     chunkSize: Number(get('CHUNK_SIZE') ?? (pilotMode ? 500 : 2000)),
     chunkConcurrency: Number(get('CHUNK_CONCURRENCY') ?? (pilotMode ? 5 : 12)),
     recordsUrl: get('RECORDS_URL'),
+    anonymisationKey: anonymisationKey(
+      get('ANONYMISATION_KEY'),
+      get('ENVIRONMENT_NAME') ?? 'local',
+      pilotMode,
+    ),
     hfToken: get('HF_TOKEN'),
     hfModel: get('HF_MODEL') ?? 'meta-llama/Llama-3.1-8B-Instruct',
     hfEndpointUrl: get('HF_ENDPOINT_URL') ?? 'https://router.huggingface.co',

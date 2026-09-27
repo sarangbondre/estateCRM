@@ -26,6 +26,14 @@ export interface ChunkLine {
   d?: 1;
 }
 
+/** Target field of each column: the normalised header in strict mode, the column map in mapping mode. */
+export function columnTargets(upload: Upload): (string | null)[] {
+  const header = upload.header ?? [];
+  if (upload.mode === 'strict') return header.map((h) => normaliseHeader(h));
+  const map = upload.columnMap ?? {};
+  return header.map((h) => map[h] ?? null);
+}
+
 /** Column holding the row's external reference: record_id (strict or mapped), else a mapped external_id. */
 export function refColumn(upload: Upload): number {
   const header = upload.header ?? [];
@@ -141,7 +149,7 @@ interface SplitPlan {
 async function writeChunks(app: App, upload: Upload): Promise<SplitPlan> {
   const chunkSize = upload.chunkSize as number;
   const header = upload.header ?? [];
-  const anonymise = upload.anonymise ? app.anonymiser(upload.tenantId, header) : undefined;
+  const anonymise = upload.anonymise ? app.anonymiser(upload.tenantId, columnTargets(upload)) : undefined;
   const migration = new MigrationMapParser();
   const chunks: ChunkRecord[] = [];
   let buffer: ChunkLine[] = [];

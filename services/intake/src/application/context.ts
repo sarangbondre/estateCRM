@@ -46,8 +46,8 @@ export interface App {
   clock: Clock;
   ids: IdGenerator;
   policy: IntakePolicy;
-  /** Builds the anonymiser for one upload's header (tenant-keyed, deterministic). */
-  anonymiser(tenantId: string, header: readonly string[]): RowAnonymiser;
+  /** Anonymiser for one upload: `targets[i]` is the target field of column i (null = unmapped). Tenant-keyed. */
+  anonymiser(tenantId: string, targets: readonly (string | null)[]): RowAnonymiser;
   /** records micromarket hierarchy (locality normalisation). */
   localities: LocalityDirectory;
   /** records vocabulary releases; undefined when records is not configured. */

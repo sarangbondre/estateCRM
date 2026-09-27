@@ -211,7 +211,7 @@ describe('mapping mode chunk processing', () => {
       bhkMin: 2,
       side: 'Supply',
       locality: 'Andheri West',
-      phones: ['+919000011111'],
+      phones: [expect.stringMatching(/^\+9100000\d{6}$/)], // pilot: anonymised at split
       salePriceInrMin: 12_000_000,
     });
     expect(raw[1]?.normalised).toMatchObject({

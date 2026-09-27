@@ -61,7 +61,9 @@ const interceptingFetch: typeof fetch = async (input, init) => {
 
 let h: Harness;
 beforeAll(async () => {
+  // paid-plan mode (no anonymisation), so the test checks redaction of real-looking synthetic contacts
   h = await createHarness({
+    env: { PILOT_MODE: 'false', CHUNK_SIZE: '500' },
     model: huggingFaceClassifier({
       token: 'test-token',
       model: 'test/model',

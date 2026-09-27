@@ -1,5 +1,7 @@
 // Composition root: the only place concrete adapters are created (CLAUDE.md §3.1).
+import { createHmac } from 'node:crypto';
 import { uuidv7 } from 'uuidv7';
+import { Anonymiser } from './domain/anonymisation.js';
 import { authenticate } from '@11e/auth';
 import { createDb } from '@11e/db';
 import type { Kysely } from '@11e/db';
@@ -56,7 +58,11 @@ export function composeApp(config: Config, db: Kysely<IntakeDb>, overrides: Over
     clock: { now: () => new Date() },
     ids: { uuid: () => uuidv7() },
     policy: policyFrom(config),
-    anonymiser: () => (cells) => [...cells],
+    anonymiser: (tenantId, targets) => {
+      const tenantKey = createHmac('sha256', config.anonymisationKey).update(tenantId).digest();
+      const a = new Anonymiser((input) => createHmac('sha256', tenantKey).update(input).digest('hex'));
+      return (cells) => a.row(targets, cells);
+    },
     localities: overrides.localities ?? records ?? noLocalities,
     releases: overrides.releases ?? records,
     model:
