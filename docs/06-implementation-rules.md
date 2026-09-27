@@ -5,7 +5,7 @@
 | Version | 0.1 (draft) |
 | Date | 2026-09-27 |
 | Based on | CLAUDE.md §3 and §5; BRD v0.6.1, PRD v0.6, HLD v0.2, LLD v0.1, Tasks v0.1 (all approved) |
-| Status | AWAITING APPROVAL (one open decision, §4 D-10) |
+| Status | AWAITING APPROVAL (questionnaire `docs/06-questionnaire.md` to be answered first) |
 
 This document confirms **what we build with** and **the few places we deviate from CLAUDE.md §3**, with reasons.
 Everything not listed here follows CLAUDE.md §3 as written. Versions were checked against the npm registry on 2026-09-27. The
@@ -109,7 +109,7 @@ The same build artifact (the Vercel deployment of a commit) is promoted between 
 | D-7 | §3.10 **No manual console changes** | A few settings the Terraform providers can't manage (e.g. Data API schema exposure, extension enabling) are applied by versioned scripts (`infra/scripts/`) or migrations, with a checklist in the runbook | Provider gaps | Every such setting is scripted or documented. None is set by hand without the script. |
 | D-8 | Versions (§1 Stage 6: "confirm versions") | TypeScript 6.0 instead of the newest 7.0 | typescript-eslint peer range is < 6.1 | Upgrade when supported |
 | D-9 | §3.5 Timeouts: default 2 s | Declared exceptions: intake `/v1/parse` 4 s; chat streaming (first token 3 s, total 15 s); PDFs and exports are async | Per NFR-7 and conventions R-5 | Declared in `x-timeout-ms` |
-| D-10 | §1 Stage 7: **one task at a time** | **OPEN, your decision:** (a) keep one task at a time (≈ 185 working days to the pilot), or (b) run **service tracks in parallel** with Claude agents per service (≈ 49–69 working days to the pilot) | Contract mocks (F-05) make services independent. You still approve each service with `APPROVED: <service>`, and each task still meets the full Definition of Done. | If (b): at most 3 service tracks in flight at once. The Foundation track is always done first and sequentially. |
+| D-10 | §1 Stage 7: **one task at a time** | **Decided (product owner, 2026-09-27): (b) service tracks run in parallel** with Claude agents per service, and work continues to delivery without stopping for questions (rules in `docs/06-questionnaire.md` §B) | Contract mocks (F-05) make services independent. You still approve each service with `APPROVED: <service>`, and each task still meets the full Definition of Done. | If (b): at most 3 service tracks in flight at once. The Foundation track is always done first and sequentially. |
 
 ## 5. Local prerequisites (checked on this machine, 2026-09-27)
 | Tool | Needed | Found | Action |
