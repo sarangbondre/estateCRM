@@ -238,6 +238,7 @@ function toDeal(r: Row): DealRecord {
 function toWeights(r: Row): WeightsRecord {
   const body = r['body'] as Partial<WeightsBody>;
   return {
+    id: r['id'] as string,
     version: r['version'] as number,
     factors: { ...DEFAULT_WEIGHTS.factors, ...(body.factors ?? {}) },
     tuning: {
@@ -918,9 +919,10 @@ export function createStore(db: Db, ctx: StoreContext): Store {
         const version = (cur.rows[0]?.v ?? 0) + 1;
         await scope(t).updateTable('weights').set({ active: false }).where('active', '=', true).execute();
         const now = ctx.now();
+        const id = randomUUID();
         await scope(t)
           .insertInto('weights', {
-            id: randomUUID(),
+            id,
             version,
             body: json(body),
             active: true,
@@ -928,7 +930,87 @@ export function createStore(db: Db, ctx: StoreContext): Store {
             created_at: now,
           })
           .execute();
-        return { version, factors: body.factors, tuning: body.tuning, createdBy, createdAt: now };
+        return { id, version, factors: body.factors, tuning: body.tuning, createdBy, createdAt: now };
+      },
+    },
+
+    queries: {
+      async demandMatches(t, demandId, q) {
+        const ord = sql<number>`(case when matches.status = 'Confirmed' then 0 else 1 end)`;
+        let b = scope(t)
+          .selectFrom('matches')
+          .selectAll()
+          .where('demand_id', '=', demandId)
+          .where('status', 'in', [...q.statuses]);
+        if (q.flag) b = b.where(sql<boolean>`flags @> ${sql.val([q.flag])}::text[]`);
+        if (q.bundlesOnly) b = b.where('is_bundle', '=', true);
+        if (q.after)
+          b = b.where(
+            sql<boolean>`(${ord}, -score, id) > (${Number(q.after['o'])}, ${-Number(q.after['s'])}, ${String(q.after['id'])}::uuid)`,
+          );
+        const rows = await b
+          .orderBy(ord)
+          .orderBy('score', 'desc')
+          .orderBy('id')
+          .limit(q.limit + 1)
+          .execute();
+        return rows.map((r) => toMatch(r as Row));
+      },
+      async offerMatches(t, offerId, q) {
+        let b = tenantScope(db, t)
+          .selectFrom('match_offers')
+          .innerJoin('matches', 'matches.id', 'match_offers.match_id')
+          .selectAll('matches')
+          .where('match_offers.offer_id', '=', offerId)
+          .where('match_offers.status', 'in', [...q.statuses]);
+        if (q.flag) b = b.where(sql<boolean>`matches.flags @> ${sql.val([q.flag])}::text[]`);
+        if (q.after)
+          b = b.where(
+            sql<boolean>`(-match_offers.score, match_offers.match_id) > (${-Number(q.after['s'])}, ${String(q.after['id'])}::uuid)`,
+          );
+        const rows = await b
+          .orderBy('match_offers.score', 'desc')
+          .orderBy('match_offers.match_id')
+          .limit(q.limit + 1)
+          .execute();
+        return rows.map((r) => toMatch(r as Row));
+      },
+      async exclusions(t, demandId, q) {
+        let b = scope(t).selectFrom('exclusions').selectAll().where('demand_id', '=', demandId);
+        if (q.reason) b = b.where('reason', '=', q.reason);
+        if (q.after)
+          b = b.where(
+            sql<boolean>`(computed_at < ${new Date(String(q.after['k']))} or (computed_at = ${new Date(String(q.after['k']))} and id > ${String(q.after['id'])}::uuid))`,
+          );
+        const rows = await b
+          .orderBy('computed_at', 'desc')
+          .orderBy('id')
+          .limit(q.limit + 1)
+          .execute();
+        return rows.map((r) => ({
+          id: r.id,
+          demandId: r.demand_id,
+          offerId: r.offer_id,
+          reason: r.reason as ExclusionRecord['reason'],
+          availableFrom: dateStr(r.available_from),
+          moveInBy: dateStr(r.move_in_by),
+          computedAt: r.computed_at,
+        }));
+      },
+      async rebuild(t, q) {
+        let b = scope(t).selectFrom('matches').selectAll();
+        if (q.demandId) b = b.where('demand_id', '=', q.demandId);
+        if (q.updatedSince) b = b.where('updated_at', '>=', q.updatedSince);
+        if (q.after)
+          b = b.where(
+            sql<boolean>`(updated_at, id) > (${new Date(String(q.after['k']))}, ${String(q.after['id'])}::uuid)`,
+          );
+        const rows = await b
+          .orderBy('updated_at')
+          .orderBy('id')
+          .limit(q.limit + 1)
+          .execute();
+        return rows.map((r) => toMatch(r as Row));
       },
     },
 

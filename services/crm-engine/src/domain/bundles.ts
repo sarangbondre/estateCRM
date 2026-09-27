@@ -81,6 +81,8 @@ export function scoreBundle(
   grouping: BundleGrouping,
   d: DemandMx,
   ctx: ScoringContext,
+  /** false for a manual bundle: area and budget limits are scored (and flagged), not enforced. */
+  enforceLimits = true,
 ): BundleCandidate | null {
   const offers = members.map((m) => m.offer);
   const dealType = offers[0]?.dealType;
@@ -89,15 +91,19 @@ export function scoreBundle(
   if (sizes.some((s) => s === null)) return null;
   const area = (sizes as number[]).reduce((s, v) => s + v, 0);
   const dMin = d.areaSqftMin ?? 0;
-  if (area < dMin) return null;
-  if (d.areaSqftMax !== null && area > d.areaSqftMax * (1 + ctx.weights.tuning.areaTolerancePct / 100))
+  if (enforceLimits && area < dMin) return null;
+  if (
+    enforceLimits &&
+    d.areaSqftMax !== null &&
+    area > d.areaSqftMax * (1 + ctx.weights.tuning.areaTolerancePct / 100)
+  )
     return null;
   const prices = offers.map((o) => priceKeyOf(o));
   const combinedPrice = prices.some((p) => p === null)
     ? null
     : (prices as number[]).reduce((s, v) => s + v, 0);
   const budget = budgetMaxFor(d, dealType);
-  if (combinedPrice !== null && budget !== null && combinedPrice > budget) return null;
+  if (enforceLimits && combinedPrice !== null && budget !== null && combinedPrice > budget) return null;
 
   const bases = new Set(offers.map((o) => o.areaBasis));
   const basis = bases.size === 1 ? (offers[0]?.areaBasis ?? null) : null;

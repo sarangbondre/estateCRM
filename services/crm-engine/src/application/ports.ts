@@ -115,8 +115,43 @@ export interface FeedbackRecord {
 }
 
 export interface WeightsRecord extends Weights {
+  id: string | null;
   createdBy: string | null;
   createdAt: Date;
+}
+
+/** Keyset position of a list page (opaque to clients: encoded by the HTTP adapter). */
+export type Position = Record<string, string | number>;
+
+export interface MatchPageQuery {
+  statuses: readonly MatchStatus[];
+  flag: MatchFlag | null;
+  bundlesOnly: boolean;
+  limit: number;
+  after: Position | null;
+}
+
+/** Read models for the list endpoints (every query served by an index of migration 0002). */
+export interface QueryRepository {
+  /** Sorted by (Confirmed first, score desc, id); fetches limit + 1. */
+  demandMatches(tenantId: string, demandId: string, q: MatchPageQuery): Promise<MatchRecord[]>;
+  /** Sorted by (score desc, id); fetches limit + 1. */
+  offerMatches(
+    tenantId: string,
+    offerId: string,
+    q: Omit<MatchPageQuery, 'bundlesOnly'>,
+  ): Promise<MatchRecord[]>;
+  /** Sorted by (computedAt desc, id); fetches limit + 1. */
+  exclusions(
+    tenantId: string,
+    demandId: string,
+    q: { reason: string | null; limit: number; after: Position | null },
+  ): Promise<(ExclusionRecord & { id: string })[]>;
+  /** Sorted by (updatedAt, id); fetches limit + 1. */
+  rebuild(
+    tenantId: string,
+    q: { updatedSince: Date | null; demandId: string | null; limit: number; after: Position | null },
+  ): Promise<MatchRecord[]>;
 }
 
 export type SubjectType = 'offer' | 'demand';
@@ -314,6 +349,7 @@ export interface Store {
   weights: WeightsRepository;
   hierarchy: HierarchyRepository;
   mergeLog: MergeLogRepository;
+  queries: QueryRepository;
   events: EventPublisher;
   rescore: RescoreQueue;
   jobs: JobCursorStore;
