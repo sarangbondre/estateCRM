@@ -1,0 +1,596 @@
+{
+  "services": {
+    "web": {
+      "schema": "web",
+      "eventQueue": "q_web",
+      "workQueues": [],
+      "sendsTo": [
+        "q_insight",
+        "q_journeys",
+        "q_web"
+      ]
+    },
+    "intake": {
+      "schema": "intake",
+      "eventQueue": "q_intake",
+      "workQueues": [
+        "q_intake_chunks",
+        "q_intake_finalize",
+        "q_intake_inspect",
+        "q_intake_split"
+      ],
+      "sendsTo": [
+        "q_insight",
+        "q_records",
+        "q_web"
+      ]
+    },
+    "records": {
+      "schema": "records",
+      "eventQueue": "q_records",
+      "workQueues": [
+        "q_records_photo_fetch"
+      ],
+      "sendsTo": [
+        "q_crm_engine",
+        "q_insight",
+        "q_intake",
+        "q_journeys",
+        "q_listings",
+        "q_web"
+      ]
+    },
+    "journeys": {
+      "schema": "journeys",
+      "eventQueue": "q_journeys",
+      "workQueues": [
+        "q_journeys_work"
+      ],
+      "sendsTo": [
+        "q_crm_engine",
+        "q_insight",
+        "q_listings",
+        "q_records",
+        "q_web"
+      ]
+    },
+    "crm-engine": {
+      "schema": "crm_engine",
+      "eventQueue": "q_crm_engine",
+      "workQueues": [
+        "q_crm_engine_rescore"
+      ],
+      "sendsTo": [
+        "q_insight",
+        "q_journeys",
+        "q_listings",
+        "q_web"
+      ]
+    },
+    "listings": {
+      "schema": "listings",
+      "eventQueue": "q_listings",
+      "workQueues": [
+        "q_listings_photos"
+      ],
+      "sendsTo": [
+        "q_insight",
+        "q_journeys",
+        "q_records",
+        "q_web"
+      ]
+    },
+    "insight": {
+      "schema": "insight",
+      "eventQueue": "q_insight",
+      "workQueues": [
+        "q_insight_exports"
+      ],
+      "sendsTo": [
+        "q_web"
+      ]
+    }
+  },
+  "routes": {
+    "upload.started.v1": {
+      "producer": "intake",
+      "queues": [
+        "q_insight"
+      ]
+    },
+    "rows.classified.v1": {
+      "producer": "intake",
+      "queues": [
+        "q_insight",
+        "q_records"
+      ]
+    },
+    "upload.completed.v1": {
+      "producer": "intake",
+      "queues": [
+        "q_insight",
+        "q_web"
+      ]
+    },
+    "upload.failed.v1": {
+      "producer": "intake",
+      "queues": [
+        "q_insight",
+        "q_web"
+      ]
+    },
+    "review_item.created.v1": {
+      "producer": "intake",
+      "queues": [
+        "q_insight"
+      ]
+    },
+    "review_item.resolved.v1": {
+      "producer": "intake",
+      "queues": [
+        "q_insight",
+        "q_records"
+      ]
+    },
+    "offer.created.v1": {
+      "producer": "records",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_journeys",
+        "q_listings"
+      ]
+    },
+    "offer.updated.v1": {
+      "producer": "records",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_journeys",
+        "q_listings"
+      ]
+    },
+    "offer.price_changed.v1": {
+      "producer": "records",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_journeys",
+        "q_listings"
+      ]
+    },
+    "offer.record_stage_changed.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight",
+        "q_journeys",
+        "q_listings"
+      ]
+    },
+    "demand.created.v1": {
+      "producer": "records",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_journeys",
+        "q_listings"
+      ]
+    },
+    "demand.updated.v1": {
+      "producer": "records",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_journeys",
+        "q_listings"
+      ]
+    },
+    "demand.touch_added.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "enquiry.received.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "records.merged.v1": {
+      "producer": "records",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_journeys",
+        "q_listings"
+      ]
+    },
+    "records.merge_undone.v1": {
+      "producer": "records",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_journeys",
+        "q_listings"
+      ]
+    },
+    "person.flagged.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "watchlist_item.created.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "vocabulary.released.v1": {
+      "producer": "records",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_intake",
+        "q_listings"
+      ]
+    },
+    "photo.added.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight",
+        "q_listings"
+      ]
+    },
+    "photo.removed.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight",
+        "q_listings"
+      ]
+    },
+    "project.created.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight",
+        "q_listings"
+      ]
+    },
+    "project.updated.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight",
+        "q_listings"
+      ]
+    },
+    "price_sheet.applied.v1": {
+      "producer": "records",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "offer.voided.v1": {
+      "producer": "records",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_journeys",
+        "q_listings"
+      ]
+    },
+    "demand.voided.v1": {
+      "producer": "records",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_journeys",
+        "q_listings"
+      ]
+    },
+    "person.flag_removed.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "desk_item.created.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight"
+      ]
+    },
+    "desk_item.updated.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight"
+      ]
+    },
+    "merge_candidate.raised.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight"
+      ]
+    },
+    "market_data.recorded.v1": {
+      "producer": "records",
+      "queues": [
+        "q_insight"
+      ]
+    },
+    "micromarkets.updated.v1": {
+      "producer": "records",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_listings"
+      ]
+    },
+    "offer.confirmed.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_listings",
+        "q_records"
+      ]
+    },
+    "demand.confirmed.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight"
+      ]
+    },
+    "lifecycle.stage_changed.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_listings"
+      ]
+    },
+    "offer.commercial_status_changed.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_listings"
+      ]
+    },
+    "demand.qualified.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight"
+      ]
+    },
+    "demand.status_changed.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_listings"
+      ]
+    },
+    "demand.exited.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_listings",
+        "q_records"
+      ]
+    },
+    "demand.reactivated.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_records"
+      ]
+    },
+    "demand.sourcing_started.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_insight",
+        "q_listings"
+      ]
+    },
+    "sourcing_request.created.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_insight"
+      ]
+    },
+    "proposal.sent.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight"
+      ]
+    },
+    "site_visit.completed.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_records"
+      ]
+    },
+    "deal.opened.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight"
+      ]
+    },
+    "deal.closed.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_listings",
+        "q_records"
+      ]
+    },
+    "deal.cancelled.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_listings",
+        "q_records"
+      ]
+    },
+    "offer.retired.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight",
+        "q_listings",
+        "q_records"
+      ]
+    },
+    "lease_renewal.due.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_records"
+      ]
+    },
+    "watchlist_task.completed.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_insight"
+      ]
+    },
+    "call.logged.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_insight",
+        "q_records"
+      ]
+    },
+    "site_visit.scheduled.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_insight"
+      ]
+    },
+    "sourcing_request.updated.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_insight"
+      ]
+    },
+    "proposal.feedback_recorded.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_crm_engine",
+        "q_insight"
+      ]
+    },
+    "deal.updated.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_insight"
+      ]
+    },
+    "queue.counts_changed.v1": {
+      "producer": "journeys",
+      "queues": [
+        "q_insight"
+      ]
+    },
+    "match.suggested.v1": {
+      "producer": "crm-engine",
+      "queues": [
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "match.confirmed.v1": {
+      "producer": "crm-engine",
+      "queues": [
+        "q_insight",
+        "q_journeys",
+        "q_listings"
+      ]
+    },
+    "match.rejected.v1": {
+      "producer": "crm-engine",
+      "queues": [
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "match.closed.v1": {
+      "producer": "crm-engine",
+      "queues": [
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "match.flagged.v1": {
+      "producer": "crm-engine",
+      "queues": [
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "demand.matching_completed.v1": {
+      "producer": "crm-engine",
+      "queues": [
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "match.reopened.v1": {
+      "producer": "crm-engine",
+      "queues": [
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "publication.changed.v1": {
+      "producer": "listings",
+      "queues": [
+        "q_insight",
+        "q_journeys",
+        "q_records"
+      ]
+    },
+    "export.completed.v1": {
+      "producer": "insight",
+      "queues": [
+        "q_web"
+      ]
+    },
+    "export.failed.v1": {
+      "producer": "insight",
+      "queues": [
+        "q_web"
+      ]
+    },
+    "user.changed.v1": {
+      "producer": "web",
+      "queues": [
+        "q_insight",
+        "q_journeys"
+      ]
+    },
+    "audit.recorded.v1": {
+      "producer": "*",
+      "queues": [
+        "q_web"
+      ]
+    }
+  }
+}

@@ -3,14 +3,14 @@
 // Local:  node infra/scripts/verify-platform.mjs
 // Pilot:  ADMIN_DATABASE_URL=... VERIFY_ROLE_URL_<SCHEMA>=... node infra/scripts/verify-platform.mjs
 import pg from 'pg';
-import { events, queueOf } from '../../tools/contracts/events.mjs';
+import { readFileSync } from 'node:fs';
 import { SERVICES, adminUrl, localUrl, schemaOf } from './db-roles.mjs';
 
-const all = events();
-const sendsTo = (svc) =>
-  [...new Set(all.filter((e) => e.producer === svc || e.producer === '*').flatMap((e) => e.consumers))].map(
-    queueOf,
-  );
+const topology = JSON.parse(
+  readFileSync(new URL('../../contracts/generated/event-topology.json', import.meta.url), 'utf8'),
+);
+const sendsTo = (svc) => topology.services[svc].sendsTo;
+const ownQueues = (svc) => [topology.services[svc].eventQueue, ...topology.services[svc].workQueues];
 
 const results = [];
 const check = async (name, fn) => {
@@ -62,7 +62,7 @@ try {
   await check('queues exist with DLQs', async () => {
     const { rows } = await admin.query('select queue_name from pgmq.list_queues()');
     const names = new Set(rows.map((r) => r.queue_name));
-    const missing = SERVICES.flatMap((s) => [`q_${schemaOf(s)}`, `q_${schemaOf(s)}_dlq`]).filter(
+    const missing = SERVICES.flatMap((s) => ownQueues(s).flatMap((q) => [q, `${q}_dlq`])).filter(
       (q) => !names.has(q),
     );
     if (missing.length) throw new Error(`missing: ${missing.join(', ')}`);
@@ -106,9 +106,21 @@ for (const svc of SERVICES) {
     await check(`${s}_svc: no DDL in own schema`, () =>
       expectDenied(c, `create table ${s}.probe_t (id int)`),
     );
-    await check(`${s}_svc: reads own queue`, async () => {
-      await c.query(`select * from ${s}.queue_read(0, 1)`);
-    });
+    await check(
+      `${s}_svc: reads and acks its own queues (${ownQueues(svc).join(', ')}) and DLQs`,
+      async () => {
+        for (const q of ownQueues(svc)) {
+          await c.query(`select * from ${s}.queue_read($1, 0, 1)`, [q]);
+          await c.query(`select * from ${s}.queue_read($1, 0, 1)`, [`${q}_dlq`]);
+          const { rows } = await c.query(`select ${s}.queue_send($1, $2::jsonb) as id`, [q, probeMsg]);
+          await c.query(`select ${s}.queue_delete($1, $2)`, [q, rows[0].id]);
+        }
+      },
+    );
+    const foreign = ownQueues(SERVICES.find((x) => x !== svc))[0];
+    await check(`${s}_svc: cannot read another service's queue (${foreign})`, () =>
+      expectDenied(c, `select * from ${s}.queue_read($1, 0, 1)`, [foreign]),
+    );
     await check(`${s}_svc: sends to its consumers' queues (${sendsTo(svc).join(', ')})`, async () => {
       for (const q of sendsTo(svc)) await c.query(`select ${s}.queue_send($1, $2::jsonb)`, [q, probeMsg]);
     });
