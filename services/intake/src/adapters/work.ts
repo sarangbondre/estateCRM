@@ -5,6 +5,7 @@ import { runInspection } from '../application/inspection.js';
 import { runSplit } from '../application/split.js';
 import type { ChunkMessage } from '../application/split.js';
 import { processChunk } from '../application/chunk.js';
+import { runFinalize } from '../application/finalize.js';
 import type { InspectMessage } from '../application/inspection.js';
 import type { AppDeps } from '../deps.js';
 import type { IntakeDb } from './db.js';
@@ -38,5 +39,6 @@ export function workHandlers(deps: AppDeps): Record<string, WorkHandler<IntakeDb
     q_intake_inspect: (payload) => runInspection(app, app.sheets, uploadMessage(payload)),
     q_intake_split: (payload) => runSplit(app, uploadMessage(payload)),
     q_intake_chunks: (payload) => processChunk(app, chunkMessage(payload)),
+    q_intake_finalize: (payload) => runFinalize(app, uploadMessage(payload)),
   };
 }

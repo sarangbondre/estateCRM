@@ -4,6 +4,7 @@ import { expect } from 'vitest';
 import { runInspection } from '../../src/application/inspection.js';
 import { runSplit } from '../../src/application/split.js';
 import { processChunk } from '../../src/application/chunk.js';
+import { runFinalize } from '../../src/application/finalize.js';
 import type { Harness } from './harness.js';
 import { XLSX_MIME } from './files.js';
 
@@ -56,10 +57,13 @@ export async function uploadAndSplit(
   options: Parameters<typeof uploadFile>[3] & { mapping?: Record<string, unknown> } = {},
 ): Promise<Uploaded> {
   const u = await uploadFile(h, tenant, bytes, options);
-  await inspect(h, tenant, u);
+  const inspected = await inspect(h, tenant, u);
+  expect(inspected['status'], JSON.stringify([inspected['status'], inspected['failureReason']])).not.toBe(
+    'failed',
+  );
   if (options.mapping) {
     const m = await h.call('PUT', `/v1/uploads/${u.id}/mapping`, u.headers, options.mapping);
-    expect(m.status).toBe(200);
+    expect(m.status, JSON.stringify(m.body)).toBe(200);
   }
   if (!(await h.app.uow.repos.vocabulary.active(tenant))) await seedVocabulary(h, tenant);
   const s = await h.call('POST', `/v1/uploads/${u.id}/start`, u.headers, { allowDuplicate: true });
@@ -80,6 +84,19 @@ export async function processAll(h: Harness, tenant: string, uploadId: string): 
   for (const c of chunks) {
     await processChunk(h.app, { tenantId: tenant, uploadId, chunkNo: c.chunk_no, correlationId: 'test' });
   }
+}
+
+/** The whole pipeline: upload, inspect, (map), start, split, every chunk, finalize. */
+export async function runUpload(
+  h: Harness,
+  tenant: string,
+  bytes: Uint8Array,
+  options: Parameters<typeof uploadAndSplit>[3] = {},
+): Promise<Uploaded> {
+  const u = await uploadAndSplit(h, tenant, bytes, options);
+  await processAll(h, tenant, u.id);
+  await runFinalize(h.app, { tenantId: tenant, uploadId: u.id, correlationId: 'test' });
+  return u;
 }
 
 /** POST /inspect then the q_intake_inspect handler (called directly: tests never depend on shared queue state). */

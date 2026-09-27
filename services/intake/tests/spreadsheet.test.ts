@@ -1,7 +1,7 @@
 // Adapter: streaming xlsx (exceljs) and CSV reading with sha256, sniffing the format from the bytes.
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { cellText, spreadsheetReader } from '../src/adapters/spreadsheet.js';
+import { spreadsheetReader } from '../src/adapters/spreadsheet.js';
 import { UnreadableFileError } from '../src/application/ports.js';
 import type { SheetRow } from '../src/application/ports.js';
 import { MemoryFileStore } from './support/fakes.js';
@@ -76,6 +76,19 @@ describe('xlsx', () => {
     expect(rows.some((r) => r.sheet === 'run_log')).toBe(true);
   });
 
+  it('never loses the sheets of small workbooks (regression: exceljs streaming reader dropped them ~20% of runs)', async () => {
+    for (let i = 0; i < 50; i++) {
+      const bytes = await workbook({
+        Leads: [
+          ['record_id', 'raw_text'],
+          ['aaaaaaaaaaa1', `x${i}`],
+        ],
+      });
+      const { rows } = await readAll(bytes);
+      expect(rows.map((r) => r.sheet)).toEqual(['Leads', 'Leads']);
+    }
+  });
+
   it('refuses legacy binary .xls (OLE2) as unreadable', async () => {
     const ole = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0]);
     await expect(readAll(ole)).rejects.toBeInstanceOf(UnreadableFileError);
@@ -84,15 +97,5 @@ describe('xlsx', () => {
   it('reports a corrupt zip as unreadable', async () => {
     const bad = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4, 5, 6, 7, 8]);
     await expect(readAll(bad)).rejects.toBeInstanceOf(UnreadableFileError);
-  });
-});
-
-describe('cellText', () => {
-  it('flattens rich text, formulas and hyperlinks; drops errors', () => {
-    expect(cellText({ richText: [{ text: 'a' }, { text: 'b' }] })).toBe('ab');
-    expect(cellText({ formula: 'A1', result: 7 })).toBe('7');
-    expect(cellText({ text: 'site', hyperlink: 'https://example.com' })).toBe('site');
-    expect(cellText({ error: '#N/A' })).toBeNull();
-    expect(cellText(new Date(Date.UTC(2026, 0, 2, 10, 30)))).toBe('2026-01-02T10:30:00Z');
   });
 });

@@ -134,6 +134,8 @@ export interface RowErrorRepository {
   ): Promise<RowErrorRecord[]>;
   /** severity=error counts per code (bounded by the code enum). */
   rejectionReasons(tenantId: string, uploadId: string): Promise<Record<string, number>>;
+  /** Errors of the given rows (rejected-rows file), in row order. */
+  forRows(tenantId: string, uploadId: string, rowNos: readonly number[]): Promise<RowErrorRecord[]>;
 }
 
 export type { MigrationAction, MigrationEntry };

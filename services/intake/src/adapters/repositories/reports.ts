@@ -65,6 +65,32 @@ export function rowErrorRepository(db: Db): RowErrorRepository {
       }));
     },
 
+    async forRows(tenantId, uploadId, rowNos) {
+      if (!rowNos.length) return [];
+      const rows = await tenantScope(db, tenantId)
+        .selectFrom('row_errors')
+        .selectAll()
+        .where('upload_id', '=', uploadId)
+        .where('row_no', 'in', [...rowNos])
+        .orderBy('row_no')
+        .orderBy('id')
+        .limit(rowNos.length * 100)
+        .execute();
+      return rows.map((r): RowErrorRecord => ({
+        id: r.id,
+        tenantId: r.tenant_id,
+        uploadId: r.upload_id,
+        rowId: r.row_id,
+        rowNo: r.row_no,
+        sheetName: r.sheet_name,
+        field: r.field,
+        severity: r.severity as 'error' | 'warning',
+        code: r.code,
+        value: r.value,
+        message: r.message,
+      }));
+    },
+
     async rejectionReasons(tenantId, uploadId) {
       const rows = await tenantScope(db, tenantId)
         .selectFrom('row_errors')
