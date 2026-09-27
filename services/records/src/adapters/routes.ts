@@ -2,8 +2,8 @@
 import type { operations } from '@11e/contracts/records';
 import type { Service } from '@11e/http';
 import type { AppDeps } from '../deps.js';
+import { registerReferenceRoutes } from './http/reference.js';
 
 export function registerRoutes(svc: Service<operations>, deps: AppDeps): void {
-  void svc;
-  void deps;
+  registerReferenceRoutes(svc, deps);
 }
