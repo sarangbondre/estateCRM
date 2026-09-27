@@ -49,6 +49,28 @@ tests/             Vitest: domain, use cases + HTTP contract on in-memory adapte
 - User-context tokens for proxied calls: `{iss: web, sub: web, aud, tid, uid, role, dop}` + `X-User-Id`, `X-User-Role`,
   `X-Tenant-Id` (verified by `@11e/auth`), cached per user and audience for 4 min.
 
+## Gateway (web LLD §4.3–4.5)
+
+- Routing: the contract's `x-routes` table (first match wins; `*` one segment). web's own operations always win; any
+  other `/v1/**` path goes one hop to its owner at `SVC_<NAME>_URL`; unknown paths → `404 route-not-found`;
+  `/internal/**` is never routed. A test checks that every staff path of every service contract routes to its owner.
+- Checks only "authenticated, active, tenant" (ADR-0007); the owning service applies role rules. Client `X-User-*`,
+  `X-Tenant-*`, `Authorization` and cookies are not forwarded; web adds its user-context service token, `X-User-Id`,
+  `X-User-Role`, `X-Tenant-Id`, `X-Correlation-Id` and `traceparent`. `Idempotency-Key`, `If-Match`, `Content-Type`
+  and `Accept` pass through unchanged (services own idempotency, R-3).
+- One hop only (sync depth ≤ 2 end to end): the gateway makes exactly one downstream call per request and never calls
+  itself; services call each other only with service tokens outside user request chains.
+- Resilience: 2 s timeout (`/v1/parse` 4 s; chat stream first byte 3 s, total 15 s), one retry with 100–400 ms jitter
+  for GET/PUT/DELETE and for POST/PATCH carrying `Idempotency-Key`/`If-Match`, a circuit breaker per downstream (state
+  in `/health/ready`). Timeout / open breaker → `503 dependency-unavailable` + `Retry-After: 30`.
+- Responses stream back unchanged (SSE with `Cache-Control: no-transform`); web adds `X-Correlation-Id`,
+  `X-RateLimit-Limit/Remaining`, and the correlation id to downstream problems that lack it.
+- Rate limits (Postgres token bucket `web.take_token`): `api` 20/s burst 40 per user on every own and proxied call
+  (taken in blocks of 5 per round trip), `chat_msg` 30/min, one concurrent chat stream (`chat_stream_lease`), `upload`
+  5/h, `public_page` 60/min per HMAC(client IP) on `/p/*`, `service_token` 60/min per caller. A store error or a round
+  trip over 50 ms falls back to an in-memory bucket at half the rates (fail-open) and logs `ratelimit_fallback`.
+- Correlation ids: `X-Correlation-Id` accepted if it matches `^[A-Za-z0-9-]{8,64}$`, else a UUIDv7.
+
 ## Run locally
 
 ```sh

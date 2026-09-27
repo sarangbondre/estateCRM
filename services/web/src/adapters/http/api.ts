@@ -10,12 +10,14 @@ import type { Observability } from '@11e/observability';
 import type { EnvironmentInfo, Sessions } from '../../application/sessions';
 import type { Tokens } from '../../application/tokens';
 import { roleCatalogue } from '../../domain/roles';
-import type { TokenSigner } from '../../application/ports';
+import type { RateLimiter, TokenSigner } from '../../application/ports';
 import { EXPECTED_MIGRATION } from '../../config';
 import type { WebDb } from '../db/schema';
 import { cookieSession } from '../supabase';
 import type { SupabaseSettings } from '../supabase';
-import { mapped, securityMiddleware, staffOf } from './security';
+import { registerGateway } from './proxy';
+import type { GatewayRouteDeps } from './proxy';
+import { limit, mapped, securityMiddleware, staffOf } from './security';
 
 export interface ApiDeps {
   db: Kysely<WebDb> | null;
@@ -29,6 +31,10 @@ export interface ApiDeps {
   environment: EnvironmentInfo;
   /** Extra readiness checks (downstream circuit states, WEB-03). */
   readyChecks?: () => Record<string, string>;
+  /** Token buckets (api on every own call, service_token per caller). */
+  limiter?: RateLimiter;
+  /** The gateway for every other /v1 route and /p/{token} (WEB-03). */
+  gateway?: GatewayRouteDeps;
 }
 
 export type WebService = Service<operations>;
@@ -100,15 +106,16 @@ export function buildApi(deps: ApiDeps): WebService {
   svc.op(
     'mintServiceToken',
     mapped(async (c, { body }) => {
-      const minted = await deps.tokens.mintForService(
-        c.req.header('x-service-credential'),
-        body.audience,
-        body.tenantId,
-      );
-      c.set('principal', { kind: 'service', caller: minted.caller, tenantId: body.tenantId });
+      const client = await deps.tokens.authenticateClient(c.req.header('x-service-credential'));
+      c.set('principal', { kind: 'service', caller: client.name, tenantId: body.tenantId });
+      await limit(c, deps.limiter, NIL_TENANT, client.name, 'service_token');
+      const minted = await deps.tokens.mintFor(client, body.audience, body.tenantId);
       return c.json({ token: minted.token, expiresAt: minted.expiresAt.toISOString() });
     }),
   );
 
+  if (deps.gateway) registerGateway(svc.app, deps.gateway);
   return svc;
 }
+
+const NIL_TENANT = '00000000-0000-0000-0000-000000000000';

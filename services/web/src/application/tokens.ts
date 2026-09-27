@@ -12,7 +12,7 @@ import {
   userTokenClaims,
 } from '../domain/service-tokens';
 import type { ServiceName } from '../domain/service-tokens';
-import type { Clock, ServiceClientRepo, SigningKeyStore, TokenSigner } from './ports';
+import type { Clock, ServiceClient, ServiceClientRepo, SigningKeyStore, TokenSigner } from './ports';
 import type { StaffContext } from './sessions';
 
 /** A new key is published in JWKS for at least this long before it signs anything. */
@@ -62,15 +62,20 @@ export class Tokens {
     for (const [k, v] of this.userTokens) if (v.until <= now) this.userTokens.delete(k);
   }
 
-  /** POST /internal/v1/service-tokens: caller authenticated by X-Service-Credential; pair must be allowed. */
-  async mintForService(
-    credential: string | undefined,
-    audience: string,
-    tenantId: string,
-  ): Promise<{ caller: ServiceName; token: string; expiresAt: Date }> {
+  /** POST /internal/v1/service-tokens: the caller authenticates with X-Service-Credential (HMAC lookup). */
+  async authenticateClient(credential: string | undefined): Promise<ServiceClient & { name: ServiceName }> {
     const client = credential ? await this.deps.clients.findByCredential(credential) : undefined;
     if (!client || client.status !== 'active' || !isServiceName(client.name))
       throw new WebError('service-credential-invalid');
+    return client;
+  }
+
+  /** A service-to-service token for an allowed caller → audience pair. */
+  async mintFor(
+    client: ServiceClient & { name: ServiceName },
+    audience: string,
+    tenantId: string,
+  ): Promise<{ caller: ServiceName; token: string; expiresAt: Date }> {
     if (!isServiceName(audience) || !audienceAllowed(client.name, audience, client.allowedAudiences))
       throw new WebError('audience-not-allowed', `${client.name} may not call ${audience}`);
     const { token, expiresAt } = await this.deps.signer.sign(
@@ -78,6 +83,10 @@ export class Tokens {
       TOKEN_TTL_SEC,
     );
     return { caller: client.name, token, expiresAt };
+  }
+
+  async mintForService(credential: string | undefined, audience: string, tenantId: string) {
+    return this.mintFor(await this.authenticateClient(credential), audience, tenantId);
   }
 
   jwks() {

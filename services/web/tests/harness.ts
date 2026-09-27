@@ -1,17 +1,35 @@
-import { randomUUID } from 'node:crypto';
 // Builds web's HTTP app on the in-memory adapters (contract tests with response validation on, NODE_ENV=test).
+import { randomBytes, randomUUID } from 'node:crypto';
 import { observe } from '@11e/observability';
 import { Sessions } from '../src/application/sessions';
+import type { StaffContext } from '../src/application/sessions';
 import { Tokens } from '../src/application/tokens';
+import { Keyring } from '../src/adapters/crypto';
 import { buildApi } from '../src/adapters/http/api';
 import type { ApiDeps } from '../src/adapters/http/api';
+import type { SupabaseSettings } from '../src/adapters/supabase';
 import { JoseSigner } from '../src/adapters/signer';
 import { FakeAuth, FakeClock, Memory, MemoryClients, MemoryKeyStore, MemoryUow, MemoryUsers } from './fakes';
 
 export const APP_ORIGIN = 'http://127.0.0.1:3000';
 export const CRON_SECRET = randomUUID();
+export const SUPABASE: SupabaseSettings = {
+  url: 'http://127.0.0.1:1',
+  anonKey: 'test-anon',
+  serviceRoleKey: undefined,
+  secureCookies: false,
+};
 
-export async function harness(extra: Partial<ApiDeps> = {}) {
+export interface Parts {
+  memory: Memory;
+  auth: FakeAuth;
+  clock: FakeClock;
+  sessions: Sessions;
+  tokens: Tokens;
+  keyring: Keyring;
+}
+
+export async function harness(extra: Partial<ApiDeps> | ((p: Parts) => Partial<ApiDeps>) = {}) {
   const memory = new Memory();
   const auth = new FakeAuth();
   const clock = new FakeClock(new Date());
@@ -22,22 +40,19 @@ export async function harness(extra: Partial<ApiDeps> = {}) {
   const signer = new JoseSigner(keys, clock);
   const clients = new MemoryClients();
   const tokens = new Tokens({ signer, keys, clients, clock });
+  const keyring = new Keyring(randomBytes(32));
+  const parts: Parts = { memory, auth, clock, sessions, tokens, keyring };
   const svc = buildApi({
     db: null,
     obs: observe('web', { level: 'fatal' }),
     sessions,
     tokens,
     signer,
-    supabase: {
-      url: 'http://127.0.0.1:1',
-      anonKey: 'test-anon',
-      serviceRoleKey: undefined,
-      secureCookies: false,
-    },
+    supabase: SUPABASE,
     appOrigin: APP_ORIGIN,
     cronSecret: CRON_SECRET,
     environment: { name: 'local', pilot: true, vocabularyVersion: null },
-    ...extra,
+    ...(typeof extra === 'function' ? extra(parts) : extra),
   });
   const as = (userId: string, init: RequestInit = {}): RequestInit => ({
     ...init,
@@ -46,5 +61,7 @@ export async function harness(extra: Partial<ApiDeps> = {}) {
       ...(init.headers as Record<string, string> | undefined),
     },
   });
-  return { memory, auth, clock, users, uow, sessions, keys, signer, clients, tokens, svc, app: svc.app, as };
+  const staff = (u: { id: string; tenantId: string; role: StaffContext['role']; isDataOperator: boolean }) =>
+    ({ tenantId: u.tenantId, userId: u.id, role: u.role, isDataOperator: u.isDataOperator, user: u }) as StaffContext;
+  return { ...parts, users, uow, keys, signer, clients, svc, app: svc.app, as, staff };
 }

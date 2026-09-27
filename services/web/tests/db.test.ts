@@ -9,6 +9,7 @@ import { DbAuditRepo } from '../src/adapters/db/audit';
 import { DbServiceClientRepo, DbSigningKeyStore } from '../src/adapters/db/keys';
 import { DbUnitOfWork, txRepos } from '../src/adapters/db/uow';
 import { DbUserRepo } from '../src/adapters/db/users';
+import { PgRateLimiter, PgStreamLeases } from '../src/adapters/db/limits';
 import { EXPECTED_MIGRATION } from '../src/config';
 import { verifyChain } from '../src/domain/audit';
 import { roleCatalogue } from '../src/domain/roles';
@@ -152,5 +153,38 @@ describe.skipIf(!hasDb)('web schema on Postgres', () => {
     expect(refused.allowed).toBe(false);
     await new Promise((r) => setTimeout(r, 120));
     expect((await take()).allowed).toBe(true);
+  });
+
+  it('PgRateLimiter: api takes blocks of 5 per round trip; a slow store falls back in memory', async () => {
+    const limiter = new PgRateLimiter(db, { timeoutMs: 2000 });
+    const subject = randomUUID();
+    const first = await limiter.take(tenant, subject, 'api');
+    expect(first).toMatchObject({ allowed: true, limit: 40 });
+    const row = await db
+      .selectFrom('rate_limit_bucket')
+      .select('tokens')
+      .where('tenant_id', '=', tenant)
+      .where('subject_key', '=', subject)
+      .executeTakeFirstOrThrow();
+    expect(Number(row.tokens)).toBeCloseTo(35, 0); // 40 − one block of 5
+    for (let i = 0; i < 4; i++) expect((await limiter.take(tenant, subject, 'api')).allowed).toBe(true);
+    const fallbacks: string[] = [];
+    const slow = new PgRateLimiter(db, { timeoutMs: 0, onFallback: (b) => fallbacks.push(b) });
+    expect((await slow.take(tenant, randomUUID(), 'upload')).allowed).toBe(true);
+    expect(fallbacks).toEqual(['upload']);
+    expect(await limiter.prune(new Date(Date.now() + 3600_000), 1000)).toBeGreaterThan(0);
+  });
+
+  it('PgStreamLeases: one live lease per user; released or expired leases can be taken again', async () => {
+    const leases = new PgStreamLeases(db);
+    const u = randomUUID();
+    const a = await leases.acquire(tenant, u, 20_000);
+    expect(a).toBeTruthy();
+    expect(await leases.acquire(tenant, u, 20_000)).toBeNull();
+    await leases.release(tenant, u, a!);
+    const b = await leases.acquire(tenant, u, 1);
+    expect(b).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await leases.acquire(tenant, u, 20_000)).toBeTruthy(); // the 1 ms lease expired
   });
 });

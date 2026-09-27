@@ -15,6 +15,12 @@ import { DbServiceClientRepo, DbSigningKeyStore } from './adapters/db/keys';
 import type { WebDb } from './adapters/db/schema';
 import { DbUnitOfWork } from './adapters/db/uow';
 import { DbUserRepo } from './adapters/db/users';
+import spec from '@11e/contracts/openapi/web.json' with { type: 'json' };
+import { Gateway } from './application/gateway';
+import { RouteTable } from './domain/routes';
+import type { RouteEntry } from './domain/routes';
+import { PgRateLimiter, PgStreamLeases } from './adapters/db/limits';
+import { HttpDownstream } from './adapters/downstream';
 import { buildApi } from './adapters/http/api';
 import type { WebService } from './adapters/http/api';
 import { JoseSigner } from './adapters/signer';
@@ -73,7 +79,24 @@ export function createRuntime(env: NodeJS.ProcessEnv = process.env): Runtime {
     pilot: config.pilot,
     vocabularyVersion: null,
   };
+  const limiter = new PgRateLimiter(db, {
+    onFallback: (bucket) => obs.logger.warn({ code: 'ratelimit_fallback', route: bucket }, 'rate limit store unavailable'),
+  });
+  const downstream = new HttpDownstream({ baseUrls: config.serviceUrls, onCall: obs.onCall });
+  const routes = new RouteTable((spec as unknown as { 'x-routes': { table: RouteEntry[] } })['x-routes'].table);
+  const gateway = new Gateway({
+    routes,
+    limiter,
+    leases: new PgStreamLeases(db),
+    downstream,
+    tokens,
+    publicTenantId: config.tenantId,
+  });
+  const staffAuth = { sessions, supabase, appOrigin: config.appOrigin };
   const svc = buildApi({
+    limiter,
+    readyChecks: () => downstream.states(),
+    gateway: { gateway, staffAuth, keyring },
     db,
     obs,
     sessions,

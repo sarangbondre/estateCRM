@@ -1,8 +1,45 @@
 // Ports (interfaces) the use cases depend on; adapters implement them (CLAUDE.md §3.1, web LLD §2).
 import type { AuditEntry, Producer, Via } from '../domain/audit';
 import type { RoleCode } from '../domain/roles';
+import type { Bucket } from '../domain/routes';
 import type { ServiceName, SigningKeyStatus } from '../domain/service-tokens';
 import type { User, UserStatus } from '../domain/users';
+
+/** Postgres token bucket with an in-memory fallback (web LLD §4.4). */
+export interface RateLimiter {
+  take(
+    tenantId: string,
+    subject: string,
+    bucket: Bucket,
+    cost?: number,
+  ): Promise<{ allowed: boolean; remaining: number; limit: number; retryAfterSec: number }>;
+}
+
+/** One concurrent chat stream per user (20 s lease > the 15 s stream cap). */
+export interface StreamLeases {
+  acquire(tenantId: string, userId: string, ttlMs: number): Promise<string | null>;
+  release(tenantId: string, userId: string, leaseId: string): Promise<void>;
+}
+
+export interface DownstreamRequest {
+  service: ServiceName;
+  method: string;
+  /** Path and query, unchanged from the client. */
+  pathAndQuery: string;
+  headers: Record<string, string>;
+  body: Uint8Array<ArrayBuffer> | null;
+  firstByteMs: number;
+  totalMs: number;
+  retry: boolean;
+}
+
+/** One hop to an owning service: timeouts, one jittered retry, a circuit breaker per downstream. */
+export interface Downstream {
+  /** Throws WebError('dependency-unavailable') on a timeout, a network error or an open breaker. */
+  send(req: DownstreamRequest): Promise<Response>;
+  /** Circuit state per downstream for /health/ready. */
+  states(): Record<string, string>;
+}
 
 export interface Clock {
   now(): Date;

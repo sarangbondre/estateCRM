@@ -5,7 +5,9 @@ import type { MiddlewareHandler } from 'hono';
 import { secretsEqual } from '@11e/auth';
 import { HttpError } from '@11e/http';
 import type { ServiceContext, ServiceEnv } from '@11e/http';
+import type { RateLimiter } from '../../application/ports';
 import type { Sessions, StaffContext } from '../../application/sessions';
+import type { Bucket } from '../../domain/routes';
 import { WebError } from '../../domain/errors';
 import { accessTokenOf } from '../supabase';
 import type { SupabaseSettings } from '../supabase';
@@ -53,9 +55,16 @@ export interface StaffAuthDeps {
  * Resolves the signed-in staff member for a request: bearer or cookie session (refreshed when near expiry; new
  * cookies are added to the response), CSRF origin check for cookie sessions, then Sessions.authenticate.
  */
-export async function authenticateStaff(c: ServiceContext, deps: StaffAuthDeps): Promise<StaffContext> {
+export async function authenticateStaff(
+  c: ServiceContext,
+  deps: StaffAuthDeps,
+  cookiesOut?: string[],
+): Promise<StaffContext> {
   const { token, setCookies, fromCookie } = await accessTokenOf(deps.supabase, c.req.raw.headers);
-  for (const sc of setCookies) c.header('set-cookie', sc, { append: true });
+  for (const sc of setCookies) {
+    c.header('set-cookie', sc, { append: true });
+    cookiesOut?.push(sc);
+  }
   if (fromCookie && MUTATING.has(c.req.method)) {
     const origin = c.req.header('origin');
     if (origin !== deps.appOrigin) throw new WebError('origin-not-allowed');
@@ -78,8 +87,25 @@ export function staffOf(c: ServiceContext): StaffContext {
   return p.staff;
 }
 
+/** Takes one token from a bucket or throws 429 with Retry-After; sets X-RateLimit-* on the response. */
+export async function limit(
+  c: ServiceContext,
+  limiter: RateLimiter | undefined,
+  tenantId: string,
+  subject: string,
+  bucket: Bucket,
+): Promise<void> {
+  if (!limiter) return;
+  const r = await limiter.take(tenantId, subject, bucket);
+  if (!r.allowed) throw new WebError('rate-limited', `${bucket} limit reached`, r.retryAfterSec);
+  if (bucket === 'api') {
+    c.header('x-ratelimit-limit', String(r.limit));
+    c.header('x-ratelimit-remaining', String(Math.max(0, Math.floor(r.remaining))));
+  }
+}
+
 export function securityMiddleware(
-  deps: StaffAuthDeps & { cronSecret: string },
+  deps: StaffAuthDeps & { cronSecret: string; limiter?: RateLimiter | undefined },
 ): MiddlewareHandler<ServiceEnv> {
   return async (c, next) => {
     const op = c.get('operation');
@@ -91,6 +117,7 @@ export function securityMiddleware(
       } else if (schemes.includes('staffSession')) {
         const staff = await authenticateStaff(c, deps);
         const roles = (op.raw['x-roles'] as string[] | undefined) ?? [];
+        await limit(c, deps.limiter, staff.tenantId, staff.userId, 'api');
         if (roles.length && !roles.includes(staff.role))
           throw new WebError('forbidden', `role ${staff.role} is not allowed`);
       } else if (schemes.includes('cronSecret')) {
