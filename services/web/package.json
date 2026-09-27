@@ -1,15 +1,32 @@
 {
   "name": "@11e/web",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "build": "echo \"build: not implemented yet (see docs/05-tasks.md)\"",
-    "test": "echo \"no tests yet\"",
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "test": "vitest run",
     "lint": "eslint . --no-error-on-unmatched-pattern",
-    "typecheck": "echo \"no sources yet\""
+    "typecheck": "next typegen && tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@11e/contracts": "workspace:*",
+    "next": "16.3.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "0.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "^24.19.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tailwindcss": "4.3.3",
+    "vitest": "^5.0.2"
   }
 }
