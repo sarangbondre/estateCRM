@@ -1,5 +1,5 @@
-Current stage: 6 — Implementation Rules Confirmation
-State: AWAITING APPROVAL (open decision D-10: execution mode)
+Current stage: 7 — Execution
+State: IN PROGRESS (service tracks in parallel; local-first, cloud provisioning deferred)
 
 | Stage | Status | Approved on | Artifacts |
 |---|---|---|---|
@@ -8,10 +8,15 @@ State: AWAITING APPROVAL (open decision D-10: execution mode)
 | 3 — HLD | APPROVED (v0.2) | 2026-09-24 | docs/03-hld.md, docs/03-hld.pdf, docs/adr/0001–0008 |
 | 4 — LLD | APPROVED (v0.1; Q4-1…Q4-4 defaults applied) | 2026-09-27 | contracts/openapi/*.yaml (240 ops), contracts/asyncapi/events.yaml (68 events), docs/04-lld/ (7 service LLDs, conventions, data-hosting, capacity-plan, stage4-summary.pdf) |
 | 5 — Task Breakdown | APPROVED (v0.1; execution mode decided in Stage 6) | 2026-09-27 | docs/05-tasks.md, docs/05-tasks.pdf (87 tasks) |
-| 6 — Implementation Rules | AWAITING APPROVAL (v0.1) | — | docs/06-implementation-rules.md, docs/06-implementation-rules.pdf |
-| 7 — Execution | NOT STARTED | — | — |
+| 6 — Implementation Rules | APPROVED (v0.1; dictated "approved stage six") | 2026-09-27 | docs/06-implementation-rules.md, docs/06-questionnaire.md, docs/runbooks/provisioning.md |
+| 7 — Execution | IN PROGRESS | — | tasks per docs/05-tasks.md |
 
 Inputs: docs/inputs/extractor-master-profile.md (PII-free profile of crm_master.xlsx; file not stored), docs/inputs/CRM-01-brd-v0.5.pdf, docs/inputs/CRM-01-brd-v0.6.pdf (client BRDs by Vinit), docs/inputs/vinit-journeys-artifact.md
+
+Environments:
+- Supabase pilot project ref: `xzizchbnejzxkhemmpie` (Mumbai, Free). Linking, bootstrap and deploy happen in the provisioning session (docs/runbooks/provisioning.md).
+
+Stage 7 task progress: none done yet (next: F-01).
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)

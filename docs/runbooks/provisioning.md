@@ -15,8 +15,8 @@ that session. You do every step that involves signing in, passwords or secrets. 
    - Database password: click **Generate a password**, then **save it in your password manager** (you'll type it once in step 7)
    - Region: **South Asia (Mumbai)**, i.e. `ap-south-1`
    - Plan: Free → **Create new project**. Wait until the status is *Healthy* (1–2 minutes).
-4. **Project Settings → General:** copy the **Reference ID** (about 20 lowercase letters). This is the *project ref*. It's
-   not secret, so you can send it in chat.
+4. ✅ Done 2026-09-27: project ref **`xzizchbnejzxkhemmpie`**. (**Project Settings → General:** copy the **Reference ID** (about 20 lowercase letters). This is the *project ref*. It's
+   not secret, so you can send it in chat.)
 5. **Database → Extensions:** search for and check that **pgmq**, **pg_cron** and **pg_net** are in the list (don't enable
    them; our migration does). If any is missing, tell Claude, because it triggers a CR (data-hosting §7).
 6. In your terminal, in the project folder:

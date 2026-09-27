@@ -5,7 +5,7 @@
 | Version | 0.1 (draft) |
 | Date | 2026-09-27 |
 | Based on | CLAUDE.md §3 and §5; BRD v0.6.1, PRD v0.6, HLD v0.2, LLD v0.1, Tasks v0.1 (all approved) |
-| Status | AWAITING APPROVAL (questionnaire answered 2026-09-27; see `docs/06-questionnaire.md`) |
+| Status | APPROVED 2026-09-27 (dictated "approved stage six"; frozen, changes via Change Request) |
 
 This document confirms **what we build with** and **the few places we deviate from CLAUDE.md §3**, with reasons.
 Everything not listed here follows CLAUDE.md §3 as written. Versions were checked against the npm registry on 2026-09-27. The
