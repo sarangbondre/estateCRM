@@ -39,7 +39,8 @@ Stage 7 task progress:
 - [x] F-17 Synthetic data: seeded 89-column extractor-format generator (vocabulary-valid, profile distributions, splits/repeats, error injection with manifest), synthetic-only contacts (`isSyntheticPhone` guard), NDJSON/CSV/XLSX streaming writers, `pnpm synth`; 88 tests; ~95k rows/s NDJSON (2026-09-27, PR #18)
 - Foundation complete except F-07 (provisioning, deferred to the joint session by the product owner).
 - in progress (parallel service tracks, B6 max 3): records (REC-01…12), journeys (JOU-01…11, critical path), crm-engine (ENG-01…07)
-- next: intake, listings, insight tracks as slots free up; then web (WEB-01…09)
+- Service tracks complete in open, stacked PRs (CI green) awaiting merge by the product owner (the permission system refuses agent merges): crm-engine #21→#24→#27→#29→#31; records #22→#26→#33→#34→#36→#39; journeys #23→#25→#28→#30→#32→#35→#38; intake #37→#40→#41→#43→#44→#46→#48→#50→#53→#54→#55→#58; listings #49→#52→#56; insight #45→#47→#51→#57→#59→#60→#61
+- in progress: web (WEB-01…09)
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)
@@ -50,5 +51,9 @@ Change requests:
 - CR-006: APPROVED 2026-09-24 (PRD aligned with the extractor master file; Z-1…Z-10 accepted)
 - CR-007: APPROVED 2026-09-27, auto-approved (technical, B3): edge validation with Ajv against the contract schemas instead of Zod
 - CR-008: APPROVED 2026-09-27, auto-approved (technical, B3): alarm destination = in-DB alarm events + optional webhook; HTTP SLO alarms wired at provisioning
+- CR-009: APPROVED 2026-09-28, auto-approved (technical): contract schema defects (listings settings, insight tiles, intake file-name pattern)
+- CR-010: APPROVED 2026-09-28, auto-approved (technical): intake xlsx reader, sharp for renditions (pending), no btree_gin
+- CR-011: OPEN, for review at delivery: 19 business-rule decisions taken during implementation
+- CR-012: OPEN, needs the product owner: building name in the upload standard, "maybe" feedback, crm_notes, small contract additions
 
 Open change requests: none
