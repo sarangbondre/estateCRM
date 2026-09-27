@@ -1,0 +1,9 @@
+extends:
+  - recommended
+rules:
+  # Our specs use x- extensions and shared _common.yaml refs by design.
+  operation-4xx-response: error
+  no-unused-components: warn
+  info-license: off
+  operation-summary: error
+  security-defined: error

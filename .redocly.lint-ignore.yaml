@@ -1,0 +1,141 @@
+# This file instructs Redocly's linter to ignore the rules contained for specific parts of your API.
+# See https://redocly.com/docs/cli/ for more information.
+contracts/openapi/_common.yaml:
+  no-empty-servers:
+    - '#/openapi'
+  no-unused-components:
+    - '#/components/parameters/CorrelationId'
+    - '#/components/parameters/IdempotencyKey'
+    - '#/components/parameters/IfMatch'
+    - '#/components/parameters/Limit'
+    - '#/components/parameters/Cursor'
+    - '#/components/parameters/IdOrCode'
+    - '#/components/schemas/PageMeta'
+    - '#/components/schemas/Money'
+    - '#/components/schemas/AreaBasis'
+    - '#/components/schemas/Side'
+    - '#/components/schemas/RecordScope'
+    - '#/components/schemas/PublicationLevel'
+    - '#/components/schemas/LifeStage'
+    - '#/components/schemas/VocabValue'
+    - '#/components/schemas/Health'
+    - '#/components/responses/BadRequest'
+    - '#/components/responses/Unauthenticated'
+    - '#/components/responses/Forbidden'
+    - '#/components/responses/NotFound'
+    - '#/components/responses/Conflict'
+    - '#/components/responses/PreconditionFailed'
+    - '#/components/responses/TooMany'
+    - '#/components/responses/ServerError'
+    - '#/components/securitySchemes/staffViaWeb'
+    - '#/components/securitySchemes/serviceToken'
+    - '#/components/securitySchemes/clientSecret'
+    - '#/components/securitySchemes/cronSecret'
+    - '#/components/securitySchemes/websiteApiKey'
+contracts/openapi/crm-engine.yaml:
+  tag-description:
+    - '#/tags/0/description'
+    - '#/tags/1/description'
+    - '#/tags/2/description'
+    - '#/tags/3/description'
+    - '#/tags/4/description'
+    - '#/tags/5/description'
+  operation-4xx-response:
+    - '#/paths/~1health~1live/get/responses'
+    - '#/paths/~1health~1ready/get/responses'
+  no-unused-components:
+    - '#/components/responses/Gone'
+contracts/openapi/insight.yaml:
+  tag-description:
+    - '#/tags/0/description'
+    - '#/tags/1/description'
+    - '#/tags/2/description'
+    - '#/tags/3/description'
+    - '#/tags/4/description'
+    - '#/tags/5/description'
+  no-illogical-composition-keywords:
+    - >-
+      #/components/schemas/Dashboard/properties/sections/items/properties/tiles/items/oneOf
+  operation-summary:
+    - '#/paths/~1health~1live/get/summary'
+    - '#/paths/~1health~1ready/get/summary'
+  operation-4xx-response:
+    - '#/paths/~1health~1live/get/responses'
+    - '#/paths/~1health~1ready/get/responses'
+contracts/openapi/intake.yaml:
+  tag-description:
+    - '#/tags/0/description'
+    - '#/tags/1/description'
+    - '#/tags/2/description'
+    - '#/tags/3/description'
+    - '#/tags/4/description'
+    - '#/tags/5/description'
+  operation-4xx-response:
+    - '#/paths/~1health~1live/get/responses'
+    - '#/paths/~1health~1ready/get/responses'
+contracts/openapi/journeys.yaml:
+  tag-description:
+    - '#/tags/0/description'
+    - '#/tags/1/description'
+    - '#/tags/2/description'
+    - '#/tags/3/description'
+    - '#/tags/4/description'
+    - '#/tags/5/description'
+    - '#/tags/6/description'
+    - '#/tags/7/description'
+    - '#/tags/8/description'
+    - '#/tags/9/description'
+    - '#/tags/10/description'
+    - '#/tags/11/description'
+    - '#/tags/12/description'
+    - '#/tags/13/description'
+    - '#/tags/14/description'
+  operation-4xx-response:
+    - '#/paths/~1health~1live/get/responses'
+    - '#/paths/~1health~1ready/get/responses'
+contracts/openapi/listings.yaml:
+  tag-description:
+    - '#/tags/4/description'
+  operation-summary:
+    - '#/paths/~1health~1live/get/summary'
+    - '#/paths/~1health~1ready/get/summary'
+  operation-4xx-response:
+    - '#/paths/~1health~1live/get/responses'
+    - '#/paths/~1health~1ready/get/responses'
+contracts/openapi/records.yaml:
+  tag-description:
+    - '#/tags/0/description'
+    - '#/tags/1/description'
+    - '#/tags/2/description'
+    - '#/tags/3/description'
+    - '#/tags/4/description'
+    - '#/tags/5/description'
+    - '#/tags/6/description'
+    - '#/tags/7/description'
+    - '#/tags/8/description'
+    - '#/tags/9/description'
+    - '#/tags/10/description'
+    - '#/tags/11/description'
+    - '#/tags/12/description'
+    - '#/tags/13/description'
+    - '#/tags/14/description'
+    - '#/tags/15/description'
+  operation-4xx-response:
+    - '#/paths/~1health~1live/get/responses'
+    - '#/paths/~1health~1ready/get/responses'
+contracts/openapi/web.yaml:
+  tag-description:
+    - '#/tags/0/description'
+    - '#/tags/1/description'
+    - '#/tags/2/description'
+    - '#/tags/3/description'
+    - '#/tags/4/description'
+    - '#/tags/5/description'
+    - '#/tags/6/description'
+  operation-4xx-response:
+    - '#/paths/~1.well-known~1jwks.json/get/responses'
+    - '#/paths/~1health~1live/get/responses'
+    - '#/paths/~1health~1ready/get/responses'
+  operation-summary:
+    - '#/paths/~1health~1live/get/summary'
+    - '#/paths/~1health~1ready/get/summary'

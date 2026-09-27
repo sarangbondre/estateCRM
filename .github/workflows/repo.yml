@@ -32,3 +32,23 @@ jobs:
       - run: pnpm exec depcruise services libs --config .dependency-cruiser.cjs
       - run: pnpm --filter "./libs/*" run typecheck
       - run: pnpm --filter "./libs/*" run test
+  contracts:
+    name: contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pnpm install --frozen-lockfile
+      - name: lint OpenAPI + validate AsyncAPI
+        run: pnpm contracts:lint
+      - name: generated artifacts match sources (no drift)
+        run: pnpm contracts:check
+      - run: pnpm --filter @11e/contracts run typecheck

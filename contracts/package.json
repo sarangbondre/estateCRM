@@ -1,0 +1,22 @@
+{
+  "name": "@11e/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Wire-contract types generated from OpenAPI/AsyncAPI (types only, no logic, no domain models).",
+  "exports": {
+    "./*": "./generated/ts/*.ts"
+  },
+  "scripts": {
+    "build": "echo generated",
+    "test": "echo none",
+    "lint": "echo none",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}
