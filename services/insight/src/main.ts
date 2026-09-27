@@ -6,6 +6,7 @@ import { buildApp } from './app.js';
 import { SCHEMA, SERVICE, loadConfig } from './config.js';
 import { configurePgTypes } from './adapters/db.js';
 import type { InsightDb } from './adapters/db.js';
+import { createHfClient, createHfPlanner } from './adapters/hfPlanner.js';
 import { createRecordsReference, recordsHttpClient } from './adapters/records.js';
 
 export function compose(env: NodeJS.ProcessEnv = process.env) {
@@ -23,7 +24,13 @@ export function compose(env: NodeJS.ProcessEnv = process.env) {
     ? createServiceTokenClient({ webUrl: config.webUrl, credential: config.serviceCredential })
     : null;
   const records = createRecordsReference(tokens ? recordsHttpClient(config.recordsUrl) : null, tokens);
-  const svc = buildApp({ config, db: handle.db, obs, auth, clock: { now: () => new Date() }, records });
+  const planner = createHfPlanner({
+    model: config.hfToken ? config.hfModel : null,
+    client: createHfClient(config.hfToken, config.hfBaseUrl),
+    endpointUrl: config.hfBaseUrl,
+    concurrency: config.hfConcurrency,
+  });
+  const svc = buildApp({ config, db: handle.db, obs, auth, clock: { now: () => new Date() }, records, planner });
   return {
     config,
     app: svc.app,

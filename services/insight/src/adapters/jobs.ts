@@ -60,6 +60,13 @@ export function jobs(
       wired.clearCaches();
       return r;
     },
+    // Conversations deleted by their author, or idle past the retention (A-I4: 180 days), with their messages.
+    'conversation-purge': async () => {
+      const n = await wired.conversations.purge(deps.clock.now(), 180, 500);
+      return { processed: n, remaining: n >= 500 ? 1 : 0 };
+    },
+    // Monthly: clear the "credits exhausted" flag once its time has come (the model is tried again).
+    'hf-credit-reset': async () => ({ processed: await wired.usage.resetCredits(deps.clock.now()), remaining: 0 }),
     ...extra,
   } as Record<string, () => Promise<JobResult>>;
 }

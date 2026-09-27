@@ -17,6 +17,12 @@ export interface Config {
   webUrl: string;
   /** records base URL (vocabulary, micromarkets, contacts for exports — service token, R-2/R-21). */
   recordsUrl: string;
+  /** Hugging Face planner (LLD §4.2): router or dedicated endpoint URL, model id, token (Vercel encrypted env). */
+  hfBaseUrl: string | undefined;
+  hfModel: string;
+  hfToken: string | undefined;
+  /** Concurrent model calls per instance: 5 pilot / 20 paid. */
+  hfConcurrency: number;
   environment: string;
 }
 
@@ -41,6 +47,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     serviceCredential: get('SERVICE_CREDENTIAL'),
     webUrl,
     recordsUrl: get('RECORDS_URL') ?? 'http://127.0.0.1:3002',
+    hfBaseUrl: get('HF_BASE_URL'),
+    hfModel: get('HF_MODEL') ?? 'Qwen/Qwen2.5-7B-Instruct',
+    hfToken: get('HF_TOKEN'),
+    hfConcurrency: Number(get('HF_CONCURRENCY') ?? 5),
     environment: get('ENVIRONMENT_NAME') ?? 'local',
   };
 }

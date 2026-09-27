@@ -1,5 +1,7 @@
 // Ports of the insight application layer (LLD §2). Adapters implement them; use cases depend only on these.
 import type { DemandDims, FactDims, OfferDims } from '../domain/readmodel/rollupKeys.js';
+import type { ResolvedSubject } from '../domain/cards/cardBuilder.js';
+import type { ChatMessage } from '../domain/chat/prompt.js';
 import type { DayRange } from '../domain/dates.js';
 import type { LocationIndex, ValidatedPlan, VocabularyView } from '../domain/plans/validator.js';
 import type { RmTable, RmTables } from '../domain/readmodel/rows.js';
@@ -105,6 +107,103 @@ export interface DashboardReader {
   reviewOpenByReason(tenantId: string): Promise<CountRow[]>;
   mergeCandidates(tenantId: string, range: DayRange): Promise<CountRow[]>;
   sideDefaulted(tenantId: string, range: DayRange): Promise<CountRow[]>;
+}
+
+// ------------------------------------------------------------------------------------------ chat (INS-04)
+
+export interface PlannerRequest {
+  tenantId: string;
+  messages: ChatMessage[];
+}
+
+export type PlannerResult =
+  | { ok: true; text: string; model: string; inputTokens: number; outputTokens: number }
+  | { ok: false; reason: 'not_configured' | 'timeout' | 'error' | 'credits' | 'rate_limited' | 'circuit_open' | 'busy' };
+
+/** The Hugging Face planner (ADR-0004). Sees only redacted text, the catalogue and the vocabulary. */
+export interface Planner {
+  readonly model: string | null;
+  plan(request: PlannerRequest): Promise<PlannerResult>;
+}
+
+/** hf_usage counters and the "credits exhausted" flag (LLD §4.2). */
+export interface UsageMeter {
+  creditsExhausted(tenantId: string, now: Date): Promise<boolean>;
+  record(tenantId: string, now: Date, result: PlannerResult): Promise<void>;
+  resetCredits(now: Date): Promise<number>;
+}
+
+export interface Redaction {
+  text: string;
+  counts: Record<string, number>;
+  /** placeholder → original. Request memory only: never stored, logged or sent. */
+  mapping: ReadonlyMap<string, string>;
+}
+
+export interface Redactor {
+  redact(text: string, allowTerms: Iterable<string>): Redaction;
+  restore(text: string, mapping: ReadonlyMap<string, string>): string;
+}
+
+export interface ConversationRow {
+  id: string;
+  code: string;
+  userId: string;
+  title: string;
+  messageCount: number;
+  lastMessageAt: Date;
+  createdAt: Date;
+}
+
+export interface StoredMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  cards: unknown[];
+  howIGotThis: unknown;
+  outcome: string | null;
+  fallbackUsed: boolean;
+  model: string | null;
+  timings: Record<string, number> | null;
+  createdAt: Date;
+}
+
+export interface NewMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  redactionCounts?: Record<string, number>;
+  plan?: unknown;
+  howIGotThis?: unknown;
+  cards?: unknown[];
+  outcome?: string;
+  fallbackUsed?: boolean;
+  model?: string | null;
+  timings?: Record<string, number>;
+  idempotencyKey?: string | null;
+}
+
+export interface ConversationRepo {
+  create(tenantId: string, userId: string, title: string, now: Date): Promise<ConversationRow>;
+  /** By id or CONV- code; soft-deleted conversations only with includeDeleted (then `deleted` is set). */
+  find(tenantId: string, idOrCode: string, includeDeleted?: boolean): Promise<(ConversationRow & { deleted?: boolean }) | null>;
+  list(tenantId: string, userId: string, limit: number, after: { k: string; id: string } | undefined): Promise<ConversationRow[]>;
+  softDelete(tenantId: string, id: string, now: Date): Promise<void>;
+  history(tenantId: string, conversationId: string, turns: number): Promise<{ role: 'user' | 'assistant'; text: string }[]>;
+  messages(tenantId: string, conversationId: string, limit: number, after: { k: string; id: string } | undefined): Promise<StoredMessage[]>;
+  message(tenantId: string, id: string): Promise<StoredMessage | null>;
+  /** User + assistant message in one transaction; counts, last_message_at and the default title. */
+  saveExchange(tenantId: string, conversationId: string, messages: NewMessage[], titleIfDefault: string, now: Date): Promise<void>;
+  /** conversation-purge: soft-deleted conversations and those idle past the retention (bounded batch). */
+  purge(now: Date, retentionDays: number, batch: number): Promise<number>;
+}
+
+export interface CodeLookup {
+  resolve(tenantId: string, codes: readonly string[]): Promise<Map<string, ResolvedSubject | null>>;
+}
+
+export interface Ids {
+  uuid(): string;
 }
 
 export interface VocabularyReleaseDoc {
