@@ -68,9 +68,11 @@ export async function ingestBatch(
   return { rows: batch.rows.length };
 }
 
-interface BatchCtx {
-  uploadId: string;
+export interface BatchCtx {
+  uploadId: string | null;
   batchNo: number;
+  /** Review resolution re-creates a record for a known person (no contacts in the rebuilt row). */
+  person?: PersonRow | null | undefined;
 }
 
 async function applyRows(app: App, tx: Tx, rows: readonly IntakeRow[], ctx: BatchCtx): Promise<void> {
@@ -196,7 +198,8 @@ function withoutStaffEdits<T extends Record<string, unknown>>(patch: T, edited: 
 
 // --- shared pieces --------------------------------------------------------------------------------------------
 
-async function contactPerson(app: App, tx: Tx, row: IntakeRow): Promise<PersonRow | null> {
+async function contactPerson(app: App, tx: Tx, row: IntakeRow, ctx?: BatchCtx): Promise<PersonRow | null> {
+  if (ctx?.person !== undefined) return ctx.person;
   const phones = (row.phones ?? []).filter((p) => normalisePhone(p));
   if (!phones.length && !row.whatsappPhone && !(row.emails ?? []).length && !row.contactName) return null;
   const r = await createPerson(
@@ -387,7 +390,7 @@ async function enquiryFor(
 
 // --- new refs --------------------------------------------------------------------------------------------------
 
-async function createFromRow(app: App, tx: Tx, row: IntakeRow, ctx: BatchCtx): Promise<void> {
+export async function createFromRow(app: App, tx: Tx, row: IntakeRow, ctx: BatchCtx): Promise<void> {
   const route = routeRow({ recordScope: row.recordScope, side: row.side, includesProperty: row.includesProperty });
   switch (route.kind) {
     case 'supply':
@@ -527,7 +530,7 @@ async function linkPerson(app: App, tx: Tx, subject: { type: 'property' | 'deman
 
 async function createSupplyFromRow(app: App, tx: Tx, row: IntakeRow, ctx: BatchCtx) {
   const ad = await sourceAdFor(app, tx, row, true);
-  const person = await contactPerson(app, tx, row);
+  const person = await contactPerson(app, tx, row, ctx);
   const { row: property, locationUnclear } = await propertyOfRow(app, tx, row);
   const dealTypes = row.dealTypes?.length ? row.dealTypes : [];
   const review = locationUnclear && !row.needsReview ? { needs_review: true, review_reason: LOCATION_UNCLEAR_REASON, review_reason_code: 'other' } : {};
@@ -717,7 +720,7 @@ async function demandOfRow(app: App, tx: Tx, row: IntakeRow, person: PersonRow |
 
 async function createDemandFromRow(app: App, tx: Tx, row: IntakeRow, ctx: BatchCtx) {
   const ad = await sourceAdFor(app, tx, row, true);
-  const person = await contactPerson(app, tx, row);
+  const person = await contactPerson(app, tx, row, ctx);
   const draft = await demandOfRow(app, tx, row, person);
   draft.source_ad_id = ad.id;
   const source = {
@@ -751,7 +754,7 @@ async function createDemandFromRow(app: App, tx: Tx, row: IntakeRow, ctx: BatchC
 
 async function createDeskFromRow(app: App, tx: Tx, row: IntakeRow, ctx: BatchCtx, route: Extract<Route, { kind: 'desk' }>) {
   const ad = await sourceAdFor(app, tx, row, true);
-  const person = await contactPerson(app, tx, row);
+  const person = await contactPerson(app, tx, row, ctx);
   const cities = await launchCitiesOf(app, tx);
   let linkedPropertyId: string | null = null;
   if (route.withProperty) {
@@ -821,7 +824,7 @@ async function createDeskFromRow(app: App, tx: Tx, row: IntakeRow, ctx: BatchCtx
 /** Market Participant (Network desk = people with a participant role; G-R13: deskItemId = person id). */
 async function createNetworkFromRow(app: App, tx: Tx, row: IntakeRow, ctx: BatchCtx) {
   const ad = await sourceAdFor(app, tx, row, true);
-  let person = await contactPerson(app, tx, row);
+  let person = await contactPerson(app, tx, row, ctx);
   if (!person) {
     person = (
       await createPerson(app, tx, { name: row.contactName ?? row.companyName ?? null, companyName: row.companyName ?? null, participantRole: row.participantRole ?? null, partyType: row.partyType ?? null }, { onExisting: 'reuse', strictPhones: false })

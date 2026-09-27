@@ -3,6 +3,7 @@ import type { operations } from '@11e/contracts/records';
 import type { Service } from '@11e/http';
 import type { AppDeps } from '../deps.js';
 import { registerDemandRoutes } from './http/demand.js';
+import { registerDeskRoutes } from './http/desks.js';
 import { registerMergeRoutes } from './http/merges.js';
 import { registerPrivacyRoutes } from './http/privacy.js';
 import { registerReferenceRoutes } from './http/reference.js';
@@ -14,4 +15,5 @@ export function registerRoutes(svc: Service<operations>, deps: AppDeps): void {
   registerDemandRoutes(svc, deps);
   registerMergeRoutes(svc, deps);
   registerPrivacyRoutes(svc, deps);
+  registerDeskRoutes(svc, deps);
 }
