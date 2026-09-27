@@ -3,7 +3,7 @@
 // fails, keeps the previous hierarchy copy and retries on the next call (CLAUDE.md §3.5).
 import type { components } from '@11e/contracts/records';
 import { createServiceTokenClient } from '@11e/auth';
-import { createHttpClient } from '@11e/http';
+import { DownstreamError, createHttpClient } from '@11e/http';
 import type { MicromarketSource } from '../application/ports.js';
 import type { MmSourceNode } from '../domain/micromarket.js';
 
@@ -33,7 +33,7 @@ export function recordsMicromarketSource(options: RecordsClientOptions): Microma
     : null;
   return {
     async fetchAll(tenantId) {
-      if (!tokens) throw new Error('SERVICE_CREDENTIAL is not configured: cannot read records micromarkets');
+      if (!tokens) throw new DownstreamError('records', undefined, 'SERVICE_CREDENTIAL is not configured');
       const out: MmSourceNode[] = [];
       let cursor: string | undefined;
       for (let page = 0; page < (options.maxPages ?? 500); page++) {

@@ -1,9 +1,9 @@
 // Postgres implementation of the application ports (src/application/ports.ts), bound to one transaction.
 // Business queries go through tenantScope (NFR-15); every query path is served by an index of migration 0002.
 import { randomUUID } from 'node:crypto';
-import { sql, tenantScope, withTransaction } from '@11e/db';
+import { expireIdempotencyKeys, sql, tenantScope, withTransaction } from '@11e/db';
 import type { Kysely, Transaction } from '@11e/db';
-import { queueSend, writeEvent } from '@11e/outbox';
+import { purgeProcessedEvents, purgePublishedOutbox, queueSend, writeEvent } from '@11e/outbox';
 import type { EventDataMap, EventType } from '@11e/outbox';
 import { Hierarchy } from '../domain/micromarket.js';
 import type { MmLevel } from '../domain/micromarket.js';
@@ -1014,6 +1014,53 @@ export function createStore(db: Db, ctx: StoreContext): Store {
       },
     },
 
+    retention: {
+      async closedMatches(t, olderThan, limit) {
+        const r = await sql`delete from ${sql.table('matches')} where id in (
+            select id from ${sql.table('matches')} where tenant_id = ${t} and status in ('Rejected', 'Closed')
+              and updated_at < ${olderThan} limit ${limit})`.execute(db);
+        return Number(r.numAffectedRows ?? 0);
+      },
+      async feedback(t, olderThan, limit) {
+        const r = await sql`delete from ${sql.table('feedback')} where id in (
+            select id from ${sql.table('feedback')} where tenant_id = ${t} and at < ${olderThan} limit ${limit})`.execute(
+          db,
+        );
+        return Number(r.numAffectedRows ?? 0);
+      },
+      async exclusions(t, olderThan, limit) {
+        const r = await sql`delete from ${sql.table('exclusions')} where id in (
+            select id from ${sql.table('exclusions')} where tenant_id = ${t} and computed_at < ${olderThan} limit ${limit})`.execute(
+          db,
+        );
+        return Number(r.numAffectedRows ?? 0);
+      },
+      async runs(t, olderThan, limit) {
+        const r = await sql`delete from ${sql.table('matching_runs')} where id in (
+            select id from ${sql.table('matching_runs')} where tenant_id = ${t} and created_at < ${olderThan} limit ${limit})`.execute(
+          db,
+        );
+        return Number(r.numAffectedRows ?? 0);
+      },
+      async mergedProjection(t, olderThan, limit) {
+        const a = await sql`delete from ${sql.table('offer_mx')} where id in (
+            select id from ${sql.table('offer_mx')} where tenant_id = ${t} and merged_into is not null
+              and updated_at < ${olderThan} limit ${limit})`.execute(db);
+        const b = await sql`delete from ${sql.table('demand_mx')} where id in (
+            select id from ${sql.table('demand_mx')} where tenant_id = ${t} and merged_into is not null
+              and updated_at < ${olderThan} limit ${limit})`.execute(db);
+        return Number(a.numAffectedRows ?? 0) + Number(b.numAffectedRows ?? 0);
+      },
+      async technical(now) {
+        const q = { db: db as Kysely<CrmEngineDb>, schema: SCHEMA };
+        return (
+          (await purgePublishedOutbox(q, 7)) +
+          (await purgeProcessedEvents(q, 30)) +
+          (await expireIdempotencyKeys(db as Kysely<CrmEngineDb>, now))
+        );
+      },
+    },
+
     hierarchy: {
       async version(t) {
         const r = await scope(t).selectFrom('reference_state').select('mm_version').executeTakeFirst();
@@ -1238,6 +1285,30 @@ export function createStore(db: Db, ctx: StoreContext): Store {
           .returning(['reasons', 'run_id'])
           .executeTakeFirst();
         return r ? { reasons: r.reasons, runId: r.run_id } : null;
+      },
+      async markDirtyMany(t, type, ids, reason) {
+        if (!ids.length) return 0;
+        const r = await sql<{ subject_id: string }>`insert into ${sql.table('rescore_pending')}
+              (id, tenant_id, subject_type, subject_id, reasons, run_id, enqueued_at)
+            select gen_random_uuid(), ${t}, ${type}, x, ${sql.val([reason])}::text[], null, ${ctx.now()}
+            from unnest(${sql.val([...ids])}::uuid[]) as x
+            on conflict (tenant_id, subject_type, subject_id) do nothing
+            returning subject_id`.execute(db);
+        const fresh = r.rows.map((x) => x.subject_id);
+        if (fresh.length) {
+          const payloads = fresh.map((id) =>
+            JSON.stringify({
+              kind: 'subject',
+              tenantId: t,
+              subjectType: type,
+              subjectId: id,
+              correlationId: ctx.correlationId,
+            }),
+          );
+          await sql`select ${sql.id(SCHEMA, 'queue_send')}(${RESCORE_QUEUE}, p, 0)
+              from unnest(${sql.val(payloads)}::jsonb[]) as p`.execute(db);
+        }
+        return fresh.length;
       },
       async enqueueJob(job, tenantId) {
         await queueSend(db, SCHEMA, RESCORE_QUEUE, {

@@ -17,6 +17,8 @@ export interface Config {
   webUrl: string;
   /** records base URL (GET /v1/micromarkets for micromarket-refresh, R-13). */
   recordsUrl: string;
+  /** journeys base URL (GET /internal/v1/subject-states for projection-reconcile). */
+  journeysUrl: string;
   environment: string;
 }
 
@@ -41,6 +43,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     serviceCredential: get('SERVICE_CREDENTIAL'),
     webUrl,
     recordsUrl: get('RECORDS_URL') ?? 'http://127.0.0.1:3002',
+    journeysUrl: get('JOURNEYS_URL') ?? 'http://127.0.0.1:3003',
     environment: get('ENVIRONMENT_NAME') ?? 'local',
   };
 }

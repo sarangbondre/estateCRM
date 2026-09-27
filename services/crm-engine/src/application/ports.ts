@@ -319,8 +319,21 @@ export interface RescoreQueue {
     type: SubjectType,
     id: string,
   ): Promise<{ reasons: string[]; runId: string | null } | null>;
+  /** Marks many subjects dirty in one statement (jobs); returns how many were newly queued. */
+  markDirtyMany(tenantId: string, type: SubjectType, ids: readonly string[], reason: string): Promise<number>;
   /** Queues a job continuation (full-rescore batches, micromarket-refresh) on the work queue. */
   enqueueJob(job: string, tenantId: string | null): Promise<void>;
+}
+
+/** Retention (LLD §7): bounded deletes, each returns the number of rows removed. */
+export interface RetentionRepository {
+  closedMatches(tenantId: string, olderThan: Date, limit: number): Promise<number>;
+  feedback(tenantId: string, olderThan: Date, limit: number): Promise<number>;
+  exclusions(tenantId: string, olderThan: Date, limit: number): Promise<number>;
+  runs(tenantId: string, olderThan: Date, limit: number): Promise<number>;
+  mergedProjection(tenantId: string, olderThan: Date, limit: number): Promise<number>;
+  /** Technical tables (R-4): published outbox 7 days, processed events 30 days, expired idempotency keys. */
+  technical(now: Date): Promise<number>;
 }
 
 export interface JobCursorStore {
@@ -350,6 +363,7 @@ export interface Store {
   hierarchy: HierarchyRepository;
   mergeLog: MergeLogRepository;
   queries: QueryRepository;
+  retention: RetentionRepository;
   events: EventPublisher;
   rescore: RescoreQueue;
   jobs: JobCursorStore;
@@ -371,6 +385,24 @@ export interface Clock {
 /** records' micromarket reference data (R-13), read with a service token; never on a request path. */
 export interface MicromarketSource {
   fetchAll(tenantId: string): Promise<MmSourceNode[]>;
+}
+
+/** journeys' GET /internal/v1/subject-states (life stage and Commercial axis per subject, projection rebuild). */
+export interface SubjectState {
+  subjectType: SubjectType;
+  subjectId: string;
+  commercialStatus: string;
+  exit: string | null;
+  lifeStage: string;
+  version: number;
+}
+
+export interface SubjectStateSource {
+  page(
+    tenantId: string,
+    subjectType: SubjectType,
+    cursor: string | null,
+  ): Promise<{ items: SubjectState[]; nextCursor: string | null }>;
 }
 
 export interface IdGenerator {

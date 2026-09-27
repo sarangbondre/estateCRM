@@ -19,6 +19,8 @@ import {
   applyPriceSheet,
   applyReferenceRelease,
 } from '../application/projection.js';
+import { onProposalFeedback } from '../application/feedback.js';
+import { resetMicromarketRefresh } from '../application/jobs.js';
 import type { Store } from '../application/ports.js';
 import {
   onDealCancelled,
@@ -61,7 +63,6 @@ export function eventHandlers(deps: Pick<AppDeps, 'clock'>): EventHandlers<CrmEn
     async (e: EventEnvelope<T>, ctx: { trx: Transaction<CrmEngineDb> }) => {
       await fn(createStore(ctx.trx, { correlationId: e.correlationId, now }), metaOf(e), e.data);
     };
-  const ignore = async () => undefined;
 
   const at = (e: EventEnvelope) => new Date(e.occurredAt);
   const onEnv =
@@ -84,12 +85,14 @@ export function eventHandlers(deps: Pick<AppDeps, 'clock'>): EventHandlers<CrmEn
     'demand.voided.v1': on<'demand.voided.v1'>(async (s, m, d) =>
       onDemandVoided(s, await applyDemandVoided(s, m, d)),
     ),
-    'vocabulary.released.v1': on<'vocabulary.released.v1'>((s, m, d) =>
-      applyReferenceRelease(s, m, { vocabulary: d }, vocabularyBody),
-    ),
-    'micromarkets.updated.v1': on<'micromarkets.updated.v1'>((s, m, d) =>
-      applyReferenceRelease(s, m, { micromarkets: d }, vocabularyBody),
-    ),
+    'vocabulary.released.v1': on<'vocabulary.released.v1'>(async (s, m, d) => {
+      await resetMicromarketRefresh(s, deps.clock, m.tenantId);
+      await applyReferenceRelease(s, m, { vocabulary: d }, vocabularyBody);
+    }),
+    'micromarkets.updated.v1': on<'micromarkets.updated.v1'>(async (s, m, d) => {
+      await resetMicromarketRefresh(s, deps.clock, m.tenantId);
+      await applyReferenceRelease(s, m, { micromarkets: d }, vocabularyBody);
+    }),
     'records.merged.v1': on<'records.merged.v1'>((s, m, d) => onRecordsMerged(s, m.tenantId, d)),
     'records.merge_undone.v1': on<'records.merge_undone.v1'>((s, m, d) => onMergeUndone(s, m.tenantId, d)),
     // journeys → life curve, commercial and status axes (direct effects on matches, LLD §4.6)
@@ -136,7 +139,9 @@ export function eventHandlers(deps: Pick<AppDeps, 'clock'>): EventHandlers<CrmEn
     'deal.opened.v1': on<'deal.opened.v1'>((s, m, d) => onDealOpened(s, m.tenantId, d)),
     'deal.closed.v1': on<'deal.closed.v1'>((s, m, d) => onDealClosed(s, m.tenantId, d)),
     'deal.cancelled.v1': on<'deal.cancelled.v1'>((s, m, d) => onDealCancelled(s, m.tenantId, d)),
-    // M6 feedback (ENG-06)
-    'proposal.feedback_recorded.v1': ignore,
+    // M6 feedback for weight tuning
+    'proposal.feedback_recorded.v1': onEnv<'proposal.feedback_recorded.v1'>((s, m, e) =>
+      onProposalFeedback(s, m.tenantId, e.data, at(e)),
+    ),
   };
 }

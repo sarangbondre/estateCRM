@@ -12,7 +12,7 @@ import type { AppDeps } from '../src/app.js';
 import { SCHEMA, SERVICE, loadConfig } from '../src/config.js';
 import type { CrmEngineDb } from '../src/adapters/db.js';
 import { createStore } from '../src/adapters/store.js';
-import type { MicromarketSource, Store } from '../src/application/ports.js';
+import type { MicromarketSource, Store, SubjectState, SubjectStateSource } from '../src/application/ports.js';
 import type { MmSourceNode } from '../src/domain/micromarket.js';
 
 const HOST = '127.0.0.1:54322/postgres';
@@ -39,7 +39,9 @@ export interface Harness {
   /** Runs fn with a store bound to a committed transaction. */
   tx<T>(fn: (store: Store, trx: Transaction<CrmEngineDb>) => Promise<T>): Promise<T>;
   now: { value: Date };
-  micromarkets: { nodes: MmSourceNode[] };
+  micromarkets: { nodes: MmSourceNode[]; calls: number };
+  /** journeys subject states served to projection-reconcile (2 per page). */
+  subjectStates: { items: SubjectState[] };
   close(): Promise<void>;
 }
 
@@ -65,8 +67,22 @@ export async function harness(options: { now?: Date } = {}): Promise<Harness> {
   };
   const auth = authenticate({ service: SERVICE, jwks, cronSecret: env.CRON_SECRET });
   const now = { value: options.now ?? new Date('2026-10-01T06:30:00Z') };
-  const micromarkets = { nodes: [] as MmSourceNode[] };
-  const source: MicromarketSource = { fetchAll: async () => micromarkets.nodes };
+  const micromarkets = { nodes: [] as MmSourceNode[], calls: 0 };
+  const source: MicromarketSource = {
+    fetchAll: async () => {
+      micromarkets.calls++;
+      return micromarkets.nodes;
+    },
+  };
+  const subjectStates = { items: [] as SubjectState[] };
+  const states: SubjectStateSource = {
+    page: async (_t, type, cursor) => {
+      const all = subjectStates.items.filter((x) => x.subjectType === type);
+      const from = cursor ? Number(cursor) : 0;
+      const next = from + 2 < all.length ? String(from + 2) : null;
+      return { items: all.slice(from, from + 2), nextCursor: next };
+    },
+  };
   const deps: AppDeps = {
     config,
     db: handle.db,
@@ -74,6 +90,7 @@ export async function harness(options: { now?: Date } = {}): Promise<Harness> {
     auth,
     clock: { now: () => now.value },
     micromarkets: source,
+    subjectStates: states,
   };
   const svc = buildApp(deps);
   const tenant = randomUUID();
@@ -95,6 +112,7 @@ export async function harness(options: { now?: Date } = {}): Promise<Harness> {
     user,
     now,
     micromarkets,
+    subjectStates,
     async staff(role = 'Demand agent', o = {}) {
       const t = o.tenant ?? tenant;
       const u = o.user ?? user;
