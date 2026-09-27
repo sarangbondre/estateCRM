@@ -149,3 +149,16 @@ describe('Hugging Face planner', () => {
     expect(nextMonthIst(new Date('2026-10-07T06:30:00.000Z')).toISOString()).toBe('2026-10-31T18:30:00.000Z');
   });
 });
+
+describe('redaction allow-list for questions', () => {
+  it('keeps business words after contact cues but still masks names and phones', async () => {
+    const { redactor } = await import('../../src/adapters/chatAdapters.js');
+    const { CHAT_ALLOW_TERMS } = await import('../../src/domain/chat/allowTerms.js');
+    expect(redactor.redact('How many offers did each supply agent verify this week?', CHAT_ALLOW_TERMS).text).toBe(
+      'How many offers did each supply agent verify this week?',
+    );
+    const r = redactor.redact('Call Sanjay Testkar on 90000 01234 about lease offers', CHAT_ALLOW_TERMS);
+    expect(r.text).toBe('Call ⟨NAME_1⟩ on ⟨PHONE_1⟩ about lease offers');
+    expect(redactor.restore(r.text, r.mapping)).toBe('Call Sanjay Testkar on 90000 01234 about lease offers');
+  });
+});

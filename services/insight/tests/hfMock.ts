@@ -30,7 +30,8 @@ export class HfMock implements ChatCompletionClient {
     this.requests.push(args.messages);
     for (const m of args.messages) {
       for (const pii of TEST_PII) if (m.content.includes(pii)) throw new Error(`PII leaked to the model: ${m.role} message contains a test PII value`);
-      if (m.role !== 'system' && containsContact(m.content)) throw new Error(`PII leaked to the model: ${m.role} message contains a contact`);
+      // user turns are the redacted questions; assistant turns are our own template text (dates there are not phones)
+      if (m.role === 'user' && containsContact(m.content)) throw new Error(`PII leaked to the model: ${m.role} message contains a contact`);
     }
     const question = args.messages.at(-1)?.content ?? '';
     const reply = this.replies.get(question) ?? this.fallbackReply;

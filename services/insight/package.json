@@ -14,7 +14,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint . --no-error-on-unmatched-pattern",
     "migrate": "node --env-file-if-exists=../../.env.local ../../libs/db/dist/cli/migrate.js --schema insight --dir migrations",
-    "migrate:check": "node ../../libs/db/dist/cli/migrate.js --check --dir migrations"
+    "migrate:check": "node ../../libs/db/dist/cli/migrate.js --check --dir migrations",
+    "benchmark": "vitest run tests/benchmark.int.test.ts"
   },
   "dependencies": {
     "@11e/auth": "workspace:*",

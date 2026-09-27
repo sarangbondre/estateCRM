@@ -7,6 +7,7 @@ import { buildActionCard, codesOf } from '../domain/cards/cardBuilder.js';
 import type { ProposedActionCard } from '../domain/cards/cardBuilder.js';
 import { parsePlannerOutput } from '../domain/chat/modelOutput.js';
 import type { PlannerDecision } from '../domain/chat/modelOutput.js';
+import { CHAT_ALLOW_TERMS } from '../domain/chat/allowTerms.js';
 import { buildPlannerMessages } from '../domain/chat/prompt.js';
 import { istDay } from '../domain/dates.js';
 import { parseKeywords } from '../domain/plans/keywordParser.js';
@@ -122,7 +123,7 @@ export async function askQuestion(
   const [vocabulary, locations] = await Promise.all([deps.query.refs.vocabulary(caller.tenantId), deps.query.refs.locations(caller.tenantId)]);
 
   // 1 redact (localities, vocabulary values and codes are allow-listed)
-  const allow = [...Object.values(vocabulary.values).flat(), ...[...locations.values()].map((l) => l.name)];
+  const allow = [...CHAT_ALLOW_TERMS, ...Object.values(vocabulary.values).flat(), ...[...locations.values()].map((l) => l.name)];
   const red = deps.redactor.redact(input.text, allow);
   timings.redactMs = Date.now() - started;
   const assistantId = deps.ids.uuid();
