@@ -292,6 +292,7 @@ export interface ProposalLinkRow extends Common {
   created_by: string;
   open_count: number;
   last_opened_at: Date | null;
+  url_hint: string | null;
 }
 
 export interface ProposalLinkOpenRow extends Common {
@@ -464,7 +465,7 @@ type DefaultedOf<T extends TableName> = T extends 'offer_view'
                       : T extends 'proposal_options'
                         ? 'feedback' | 'feedback_note'
                         : T extends 'proposal_links'
-                          ? 'revoked_at' | 'open_count' | 'last_opened_at'
+                          ? 'revoked_at' | 'open_count' | 'last_opened_at' | 'url_hint'
                           : T extends 'site_visits'
                             ? 'attendee_user_ids' | 'outcome' | 'visited_offer_ids' | 'preferred_offer_id' | 'notes' | 'completed_at'
                             : T extends 'deals'

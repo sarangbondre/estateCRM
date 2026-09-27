@@ -4,6 +4,7 @@ import { deriveDemandStatus, deriveOfferStatus } from '../domain/commercial.js';
 import type { DemandStatus, OfferStatus } from '../domain/commercial.js';
 import type { DemandJourneyRow, OfferJourneyRow } from './model.js';
 import type { Tx } from './ports.js';
+import { closeItems, openItem, resolveAssignee } from './queue-ops.js';
 
 export interface DeriveOptions {
   /** Force a terminal status (Closed / Inactive) or leave one (compensation, R-12 reactivation). */
@@ -70,8 +71,32 @@ export async function setDemandStatus(tx: Tx, dj: DemandJourneyRow, next: Demand
       { type: 'demand', id: dj.id },
       { demandId: dj.id, from: dj.commercial_status, to: next },
     );
+    await syncInSourcing(tx, dj.id, next);
   }
   return updated;
+}
+
+/** in_sourcing (LLD §4.3.1): open while the demand is Sourcing (due = the earliest open SRQ due date). */
+async function syncInSourcing(tx: Tx, demandId: string, status: DemandStatus) {
+  if (status !== 'Sourcing') {
+    await closeItems(tx, { subjectId: demandId, sections: ['in_sourcing'] }, 'done', `status_${status}`);
+    return;
+  }
+  const view = await tx.rows.get('demand_view', demandId);
+  if (!view || view.outside_launch_area) return;
+  const srqs = await tx.q.openSourcingRequestsOfDemand(demandId);
+  const due = srqs.map((s) => s.due_date).sort()[0];
+  await openItem(tx, {
+    section: 'in_sourcing',
+    subjectType: 'demand',
+    subjectId: demandId,
+    subjectCode: view.code,
+    demandId,
+    assignee: await resolveAssignee(tx, 'demand', view.owner_user_id),
+    reason: 'srq',
+    reasonRef: srqs[0]?.code ?? null,
+    dueAt: due ? new Date(`${due}T18:00:00+05:30`) : tx.now,
+  });
 }
 
 /** Re-derives a demand's Commercial status; `set` forces Closed, `reopen` leaves Closed (deal cancel compensation). */

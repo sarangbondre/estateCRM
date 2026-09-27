@@ -41,6 +41,19 @@ export function supabaseStorage(url: string, serviceKey: string, bucket: string)
       const body = (await res.json()) as { signedURL?: string };
       return `${base}${body.signedURL ?? ''}`;
     },
+    async signedUrls(paths, expiresInSec) {
+      if (!paths.length) return [];
+      const res = await fetch(`${base}/object/sign/${bucket}`, {
+        method: 'POST',
+        headers: { ...auth, 'content-type': 'application/json' },
+        body: JSON.stringify({ expiresIn: expiresInSec, paths }),
+        signal: AbortSignal.timeout(TIMEOUT),
+      });
+      if (!res.ok) throw new Error(`storage sign ${res.status}`);
+      const body = (await res.json()) as { path?: string; signedURL?: string | null }[];
+      const byPath = new Map(body.map((b) => [b.path, b.signedURL]));
+      return paths.map((p) => `${base}${byPath.get(p) ?? ''}`);
+    },
     async remove(paths) {
       if (!paths.length) return;
       const res = await fetch(`${base}/object/${bucket}`, {
@@ -76,6 +89,7 @@ export function localStorage(dir: string): FileStoragePort {
       await put(path, new Uint8Array(await res.arrayBuffer()));
     },
     signedUrl: async (path) => pathToFileURL(file(path)).href,
+    signedUrls: async (paths) => paths.map((p) => pathToFileURL(file(p)).href),
     async remove(paths) {
       for (const p of paths) await rm(file(p), { force: true });
     },

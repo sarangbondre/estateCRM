@@ -96,6 +96,8 @@ export interface FileStoragePort {
   /** Copies a remote file (e.g. a records photo signed URL) into the bucket. */
   copyFromUrl(url: string, path: string): Promise<void>;
   signedUrl(path: string, expiresInSec: number): Promise<string>;
+  /** Batch signing (one round trip); same order as `paths`. */
+  signedUrls(paths: readonly string[], expiresInSec: number): Promise<string[]>;
   remove(paths: readonly string[]): Promise<void>;
 }
 

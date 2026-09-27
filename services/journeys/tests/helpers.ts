@@ -65,6 +65,7 @@ export class MemoryStorage implements FileStoragePort {
     this.files.set(path, new TextEncoder().encode(url));
   };
   signedUrl = async (path: string, expiresInSec: number) => `https://storage.test/${path}?exp=${expiresInSec}`;
+  signedUrls = async (paths: readonly string[], expiresInSec: number) => paths.map((p) => `https://storage.test/${p}?exp=${expiresInSec}`);
   remove = async (paths: readonly string[]) => {
     for (const p of paths) this.files.delete(p);
   };
@@ -240,6 +241,8 @@ export function harness(opts: { clock?: TestClock; content?: FakeContent; storag
 
   return {
     svc,
+    runner,
+    integrations,
     app: svc.app,
     db: handle.db,
     close: () => handle.close(),
