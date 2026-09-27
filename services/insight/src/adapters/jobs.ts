@@ -7,7 +7,9 @@ import type { JobResult } from '@11e/http';
 import { purgeProcessedEvents, purgePublishedOutbox } from '@11e/outbox';
 import { SCHEMA } from '../config.js';
 import type { AppDeps } from '../deps.js';
+import { refreshReferenceData } from '../application/reference.js';
 import { reconcileRollups } from './reconcile.js';
+import type { Wired } from './wiring.js';
 
 export type JobName =
   | 'export-expire'
@@ -17,7 +19,11 @@ export type JobName =
   | 'idempotency-prune'
   | 'hf-credit-reset';
 
-export function jobs(deps: AppDeps, extra: Partial<Record<JobName, () => Promise<JobResult>>> = {}): Record<string, () => Promise<JobResult>> {
+export function jobs(
+  deps: AppDeps,
+  wired: Wired,
+  extra: Partial<Record<JobName, () => Promise<JobResult>>> = {},
+): Record<string, () => Promise<JobResult>> {
   const { db } = deps;
   return {
     // Rebuilds each tenant's rollups from the base tables (corrects any drift), within the time budget. Tenants are
@@ -42,6 +48,17 @@ export function jobs(deps: AppDeps, extra: Partial<Record<JobName, () => Promise
       const outbox = await purgePublishedOutbox({ db, schema: SCHEMA });
       const processed = keys + events + outbox;
       return { processed, remaining: keys >= 5000 || events >= 5000 || outbox >= 5000 ? 1 : 0 };
+    },
+    // Active vocabulary release + micromarket hierarchy from records after vocabulary.released / micromarkets.updated.
+    'vocabulary-refresh': async () => {
+      const unavailable = { available: false } as const;
+      const r = await refreshReferenceData(
+        deps.records ?? { ...unavailable, vocabulary: () => Promise.reject(new Error('n/a')), micromarkets: () => Promise.reject(new Error('n/a')) },
+        wired.referenceStore,
+        deps.jobBudgetMs ?? 50_000,
+      );
+      wired.clearCaches();
+      return r;
     },
     ...extra,
   } as Record<string, () => Promise<JobResult>>;

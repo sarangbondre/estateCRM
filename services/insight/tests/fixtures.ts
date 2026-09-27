@@ -3,11 +3,13 @@ import { randomUUID } from 'node:crypto';
 import type { EventDataMap } from '@11e/contracts/events';
 
 let seq = 0;
+type Loose<T> = { [K in keyof T]?: T[K] | undefined };
+const defined = <T extends object>(o: T): T => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
 const next = () => ++seq;
 
-export function offerCreated(over: Partial<EventDataMap['offer.created.v1']> = {}): EventDataMap['offer.created.v1'] {
+export function offerCreated(over: Loose<EventDataMap['offer.created.v1']> = {}): EventDataMap['offer.created.v1'] {
   const n = next();
-  return {
+  return defined({
     offerId: randomUUID(),
     code: `INV-${String(10_000 + n).padStart(5, '0')}`,
     propertyId: randomUUID(),
@@ -26,12 +28,12 @@ export function offerCreated(over: Partial<EventDataMap['offer.created.v1']> = {
     recordStage: 'Enriched',
     sourceType: 'Channel',
     ...over,
-  };
+  } as EventDataMap['offer.created.v1']);
 }
 
-export function demandCreated(over: Partial<EventDataMap['demand.created.v1']> = {}): EventDataMap['demand.created.v1'] {
+export function demandCreated(over: Loose<EventDataMap['demand.created.v1']> = {}): EventDataMap['demand.created.v1'] {
   const n = next();
-  return {
+  return defined({
     demandId: randomUUID(),
     code: `DEM-${String(100_000 + n).padStart(6, '0')}`,
     dealTypes: ['Lease'],
@@ -45,7 +47,7 @@ export function demandCreated(over: Partial<EventDataMap['demand.created.v1']> =
     recordStage: 'Enriched',
     sourceType: 'Channel',
     ...over,
-  };
+  } as EventDataMap['demand.created.v1']);
 }
 
 export function code(prefix: string): string {

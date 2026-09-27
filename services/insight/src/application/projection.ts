@@ -483,8 +483,9 @@ export const handlers: HandlerMap = {
   'lifecycle.stage_changed.v1': async (s, e) => {
     const d = e.data;
     if (!(await fresh(s, e, d.subjectId))) return;
-    if (d.subjectType === 'offer') await saveOffer(s, d.subjectId, { life_stage: d.to, life_day: d.day });
-    else await saveDemand(s, d.subjectId, { life_stage: d.to, life_day: d.day });
+    const patch = { life_stage: d.to, life_day: d.day, life_stage_since: e.occurredAt };
+    if (d.subjectType === 'offer') await saveOffer(s, d.subjectId, patch);
+    else await saveDemand(s, d.subjectId, patch);
   },
   'offer.commercial_status_changed.v1': async (s, e) => {
     if (!(await fresh(s, e))) return;

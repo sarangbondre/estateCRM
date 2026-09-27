@@ -13,6 +13,7 @@ import { eventHandlers } from './adapters/events.js';
 import { jobs } from './adapters/jobs.js';
 import { registerRoutes } from './adapters/routes.js';
 import { workHandlers } from './adapters/work.js';
+import { wire } from './adapters/wiring.js';
 
 export type { AppDeps } from './deps.js';
 
@@ -34,6 +35,7 @@ export function buildApp(deps: AppDeps): Service<operations> {
     onError: obs.onError,
   });
 
+  const wired = wire(deps);
   const queue = { db, schema: SCHEMA };
   const handlers = eventHandlers(deps);
   const work = workHandlers(deps);
@@ -55,10 +57,10 @@ export function buildApp(deps: AppDeps): Service<operations> {
     queue,
     routes: topology.routes,
     drains,
-    jobs: jobs(deps),
+    jobs: jobs(deps, wired),
     onRelay: (r) => obs.onRelay(r),
     onDrain: obs.drainHooks.onResult,
   });
-  registerRoutes(svc, deps);
+  registerRoutes(svc, deps, wired);
   return svc;
 }

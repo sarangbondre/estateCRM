@@ -51,6 +51,7 @@ export interface OfferRow {
   closing_price_inr: number | null;
   retired_reason: string | null;
   life_stage: string | null;
+  life_stage_since: Iso | null;
   life_day: number | null;
   last_confirmed_at: Iso | null;
   confirmed_how: string | null;
@@ -97,6 +98,7 @@ export interface DemandRow {
   revisit_date: string | null;
   qualified_at: Iso | null;
   life_stage: string | null;
+  life_stage_since: Iso | null;
   life_day: number | null;
   last_confirmed_at: Iso | null;
   publication_level: string | null;
