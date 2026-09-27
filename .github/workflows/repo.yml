@@ -30,8 +30,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec eslint .
       - run: pnpm exec depcruise services libs --config .dependency-cruiser.cjs
-      - run: pnpm --filter "./libs/*" run typecheck
-      - run: pnpm --filter "./libs/*" run test
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.118.0
+      - name: local Postgres for integration tests
+        run: supabase --workdir infra db start && node infra/scripts/local-roles.mjs --env > /dev/null
+      - run: pnpm turbo run build typecheck test --filter "./libs/*"
   contracts:
     name: contracts
     runs-on: ubuntu-latest
