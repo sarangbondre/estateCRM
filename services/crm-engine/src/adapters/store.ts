@@ -837,14 +837,12 @@ export function createStore(db: Db, ctx: StoreContext): Store {
             updated_at: ctx.now(),
           })
           .onConflict((oc) =>
-            oc
-              .column('id')
-              .doUpdateSet({
-                status: d.status,
-                units_booked: d.unitsBooked,
-                closed_at: d.closedAt,
-                updated_at: ctx.now(),
-              }),
+            oc.column('id').doUpdateSet({
+              status: d.status,
+              units_booked: d.unitsBooked,
+              closed_at: d.closedAt,
+              updated_at: ctx.now(),
+            }),
           )
           .execute();
       },
@@ -1019,14 +1017,12 @@ export function createStore(db: Db, ctx: StoreContext): Store {
             updated_at: now,
           })
           .onConflict((oc) =>
-            oc
-              .column('tenant_id')
-              .doUpdateSet({
-                mm_version: next,
-                mm_loaded_at: now,
-                mm_requested_version: null,
-                updated_at: now,
-              }),
+            oc.column('tenant_id').doUpdateSet({
+              mm_version: next,
+              mm_loaded_at: now,
+              mm_requested_version: null,
+              updated_at: now,
+            }),
           )
           .execute();
       },

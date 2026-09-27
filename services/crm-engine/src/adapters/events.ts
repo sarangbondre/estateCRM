@@ -20,6 +20,21 @@ import {
   applyReferenceRelease,
 } from '../application/projection.js';
 import type { Store } from '../application/ports.js';
+import {
+  onDealCancelled,
+  onDealClosed,
+  onDealOpened,
+  onDemandChange,
+  onDemandQualified,
+  onDemandVoided,
+  onMergeUndone,
+  onOfferCommercialChange,
+  onOfferLifeChange,
+  onOfferVoided,
+  onProposalSent,
+  onRecordsMerged,
+  onSiteVisit,
+} from '../application/propagation.js';
 import type { AppDeps } from '../deps.js';
 import type { CrmEngineDb } from './db.js';
 import { createStore } from './store.js';
@@ -48,54 +63,80 @@ export function eventHandlers(deps: Pick<AppDeps, 'clock'>): EventHandlers<CrmEn
     };
   const ignore = async () => undefined;
 
+  const at = (e: EventEnvelope) => new Date(e.occurredAt);
+  const onEnv =
+    <T extends EventType>(fn: (store: Store, meta: EventMeta, e: EventEnvelope<T>) => Promise<unknown>) =>
+    async (e: EventEnvelope<T>, ctx: { trx: Transaction<CrmEngineDb> }) => {
+      await fn(createStore(ctx.trx, { correlationId: e.correlationId, now }), metaOf(e), e);
+    };
+
   return {
     // records → projection facts
     'offer.created.v1': on<'offer.created.v1'>(applyOfferFacts),
     'offer.updated.v1': on<'offer.updated.v1'>(applyOfferFacts),
     'offer.price_changed.v1': on<'offer.price_changed.v1'>(applyOfferPriceChanged),
     'price_sheet.applied.v1': on<'price_sheet.applied.v1'>(applyPriceSheet),
-    'offer.voided.v1': on<'offer.voided.v1'>(applyOfferVoided),
+    'offer.voided.v1': on<'offer.voided.v1'>(async (s, m, d) =>
+      onOfferVoided(s, await applyOfferVoided(s, m, d)),
+    ),
     'demand.created.v1': on<'demand.created.v1'>(applyDemandFacts),
     'demand.updated.v1': on<'demand.updated.v1'>(applyDemandFacts),
-    'demand.voided.v1': on<'demand.voided.v1'>(applyDemandVoided),
+    'demand.voided.v1': on<'demand.voided.v1'>(async (s, m, d) =>
+      onDemandVoided(s, await applyDemandVoided(s, m, d)),
+    ),
     'vocabulary.released.v1': on<'vocabulary.released.v1'>((s, m, d) =>
       applyReferenceRelease(s, m, { vocabulary: d }, vocabularyBody),
     ),
     'micromarkets.updated.v1': on<'micromarkets.updated.v1'>((s, m, d) =>
       applyReferenceRelease(s, m, { micromarkets: d }, vocabularyBody),
     ),
-    // journeys → life curve, commercial and status axes
-    'lifecycle.stage_changed.v1': on<'lifecycle.stage_changed.v1'>((s, m, d) =>
+    'records.merged.v1': on<'records.merged.v1'>((s, m, d) => onRecordsMerged(s, m.tenantId, d)),
+    'records.merge_undone.v1': on<'records.merge_undone.v1'>((s, m, d) => onMergeUndone(s, m.tenantId, d)),
+    // journeys → life curve, commercial and status axes (direct effects on matches, LLD §4.6)
+    'lifecycle.stage_changed.v1': on<'lifecycle.stage_changed.v1'>(async (s, m, d) =>
       d.subjectType === 'offer'
-        ? applyOfferStage(s, m, d.subjectId, d.to)
-        : applyDemandStage(s, m, d.subjectId, d.to),
+        ? onOfferLifeChange(s, await applyOfferStage(s, m, d.subjectId, d.to))
+        : onDemandChange(s, await applyDemandStage(s, m, d.subjectId, d.to)),
     ),
-    'offer.confirmed.v1': on<'offer.confirmed.v1'>(applyOfferConfirmed),
-    'offer.commercial_status_changed.v1': on<'offer.commercial_status_changed.v1'>((s, m, d) =>
-      applyOfferCommercial(s, m, d.offerId, d.to, 'offer.commercial_status_changed'),
+    'offer.confirmed.v1': on<'offer.confirmed.v1'>(async (s, m, d) =>
+      onOfferLifeChange(s, await applyOfferConfirmed(s, m, d)),
     ),
-    'offer.retired.v1': on<'offer.retired.v1'>((s, m, d) =>
-      applyOfferCommercial(s, m, d.offerId, 'Inactive', 'offer.retired'),
+    'offer.commercial_status_changed.v1': on<'offer.commercial_status_changed.v1'>(async (s, m, d) =>
+      onOfferCommercialChange(
+        s,
+        await applyOfferCommercial(s, m, d.offerId, d.to, 'offer.commercial_status_changed'),
+      ),
+    ),
+    'offer.retired.v1': on<'offer.retired.v1'>(async (s, m, d) =>
+      onOfferCommercialChange(s, await applyOfferCommercial(s, m, d.offerId, 'Inactive', 'offer.retired')),
     ),
     'demand.confirmed.v1': on<'demand.confirmed.v1'>(applyDemandConfirmed),
-    'demand.status_changed.v1': on<'demand.status_changed.v1'>((s, m, d) =>
-      applyDemandStatus(s, m, d.demandId, { commercialStatus: d.to }, 'demand.status_changed'),
+    'demand.qualified.v1': on<'demand.qualified.v1'>((s, m, d) =>
+      onDemandQualified(s, deps.clock, m, d.demandId),
     ),
-    'demand.exited.v1': on<'demand.exited.v1'>((s, m, d) =>
-      applyDemandStatus(s, m, d.demandId, { exitType: d.exit }, 'demand.exited'),
+    'demand.status_changed.v1': on<'demand.status_changed.v1'>(async (s, m, d) =>
+      onDemandChange(
+        s,
+        await applyDemandStatus(s, m, d.demandId, { commercialStatus: d.to }, 'demand.status_changed'),
+      ),
+    ),
+    'demand.exited.v1': on<'demand.exited.v1'>(async (s, m, d) =>
+      onDemandChange(s, await applyDemandStatus(s, m, d.demandId, { exitType: d.exit }, 'demand.exited')),
     ),
     'demand.reactivated.v1': on<'demand.reactivated.v1'>((s, m, d) =>
       applyDemandStatus(s, m, d.demandId, { exitType: null }, 'demand.reactivated'),
     ),
-    // handled by the matching pipeline (ENG-04 / ENG-06)
-    'demand.qualified.v1': ignore,
-    'records.merged.v1': ignore,
-    'records.merge_undone.v1': ignore,
-    'proposal.sent.v1': ignore,
-    'site_visit.completed.v1': ignore,
-    'deal.opened.v1': ignore,
-    'deal.closed.v1': ignore,
-    'deal.cancelled.v1': ignore,
+    // journeys → engagement and deals
+    'proposal.sent.v1': onEnv<'proposal.sent.v1'>((s, m, e) =>
+      onProposalSent(s, m.tenantId, e.data.matchIds, at(e)),
+    ),
+    'site_visit.completed.v1': onEnv<'site_visit.completed.v1'>((s, m, e) =>
+      onSiteVisit(s, m.tenantId, e.data.demandId, e.data.offerIds, at(e)),
+    ),
+    'deal.opened.v1': on<'deal.opened.v1'>((s, m, d) => onDealOpened(s, m.tenantId, d)),
+    'deal.closed.v1': on<'deal.closed.v1'>((s, m, d) => onDealClosed(s, m.tenantId, d)),
+    'deal.cancelled.v1': on<'deal.cancelled.v1'>((s, m, d) => onDealCancelled(s, m.tenantId, d)),
+    // M6 feedback (ENG-06)
     'proposal.feedback_recorded.v1': ignore,
   };
 }
