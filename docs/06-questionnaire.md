@@ -54,3 +54,19 @@
 | C17 | An owner who refuses to work with 11 Estates ("unwilling") | The offer is retired and the person is flagged "unwilling" |
 | C18 | When the extractor re-splits an ad | CRM work stays on the first child record |
 | C19 | Vinit's journeys artifact shows WhatsApp (n8n) and Meta webhooks | Still next phase (Phase 1 = file upload + manual entry) |
+
+## Answers (product owner, 2026-09-27)
+| Item | Answer |
+|---|---|
+| A1 | Done: the repo is **private** (verified). |
+| A2 | Vercel **personal** account. Set up later. |
+| A3, A4, A5 | **Deferred:** Supabase project, Google OAuth, API keys and Hugging Face token are set up **together after implementation** (`docs/runbooks/provisioning.md`). Stage 7 builds and tests on the local stack until then. |
+| A6 | **Sarang is the only user (Admin)** for now. Inviting other users is provided in the app (Settings → Users). |
+| A7 | **No MahaRERA number yet.** Pilot (internal, anonymised data): publishing is allowed, with the listing showing "MahaRERA registration pending". **Production gate:** the number is mandatory before any listing is served (BRD §4.6, R14). |
+| A8 | Product name **"11estates CRM"**. Company website **https://www.11estates.in**. CRM host assumed to be **crm.11estates.in** (change at provisioning if different). Listings API allowed origins: `https://www.11estates.in`, `https://11estates.in`. |
+| A9 | Not provided. Build against the 89-column schema plus a generic lead-form mapping. |
+| A10 | A simple **"11estates" wordmark** is created as a placeholder logo (replaceable), with the prototype look. |
+| A11 | Install local tools: **yes**. |
+| B1–B7 | **All defaults accepted.** |
+| C1–C19 | **All defaults accepted.** |
+| Git | Push, one PR per task, self-merge on green CI: **yes** (pushing needs a permission rule, see below). |
