@@ -15,6 +15,7 @@ import {
 } from '../domain/upload.js';
 import type { SourceType, Upload } from '../domain/upload.js';
 import type { App, StaffActor } from './context.js';
+import { enqueueInspection } from './inspection.js';
 import { SYSTEM_USER_ID } from './context.js';
 import type {
   MigrationAction,
@@ -171,8 +172,16 @@ export async function patchUpload(
       }
       changes.sheetName = patch.sheetName;
     }
+    // A different sheet after inspection means a different header: inspect again (mapping is reset).
+    const reinspect =
+      changes.sheetName !== undefined &&
+      changes.sheetName !== upload.sheetName &&
+      upload.header !== null &&
+      upload.status !== 'inspecting';
+    if (reinspect) Object.assign(changes, { status: 'inspecting', columnMap: null, suggestedMapping: null });
     const updated = await tx.repos.uploads.update(actor.tenantId, upload.id, changes, upload.version);
     if (!updated) throw new IntakeError('version-mismatch');
+    if (reinspect) await enqueueInspection(tx, updated, actor.correlationId);
     return updated;
   });
 }

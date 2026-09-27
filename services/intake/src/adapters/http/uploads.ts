@@ -7,6 +7,8 @@ import type { IntakeDb } from '../db.js';
 import type { Kysely } from '@11e/db';
 import type { App } from '../../application/context.js';
 import * as uploads from '../../application/uploads.js';
+import { requestInspection } from '../../application/inspection.js';
+import { putMapping, startUpload } from '../../application/mapping.js';
 import { presentRowError, presentUpload } from './presenters.js';
 import { cursorOf, guard, staffActor } from './support.js';
 
@@ -74,6 +76,36 @@ export function registerUploadRoutes(svc: Service<operations>, app: App, db: Kys
       guard(async () => ({
         status: 200,
         body: presentUpload(await uploads.cancelUpload(app, actor, params.idOrCode)),
+      })),
+    );
+  });
+
+  svc.op('inspectUpload', (c, { params }) => {
+    const actor = staffActor(c);
+    return idempotent(c, db, actor, { idOrCode: params.idOrCode }, () =>
+      guard(async () => {
+        const r = await requestInspection(app, actor, params.idOrCode);
+        return { status: r.queued ? 202 : 200, body: presentUpload(r.upload) };
+      }),
+    );
+  });
+
+  svc.op('putUploadMapping', (c, { params, body }) =>
+    guard(async () => {
+      const actor = staffActor(c);
+      const u = await putMapping(app, actor, params.idOrCode, body, ifMatchVersion(c));
+      c.header('etag', `"${u.version}"`);
+      return c.json(presentUpload(u));
+    }),
+  );
+
+  svc.op('startUpload', (c, { params, body }) => {
+    const actor = staffActor(c);
+    const input = body ?? {};
+    return idempotent(c, db, actor, { idOrCode: params.idOrCode, ...input }, () =>
+      guard(async () => ({
+        status: 202,
+        body: presentUpload(await startUpload(app, actor, params.idOrCode, input)),
       })),
     );
   });

@@ -1,6 +1,6 @@
 // What every use case receives: ports, policy and the acting principal.
 import type { StaffRoleName } from '../domain/upload.js';
-import type { Clock, FileStore, IdGenerator, UnitOfWork } from './ports.js';
+import type { Clock, FileStore, IdGenerator, SpreadsheetReader, UnitOfWork } from './ports.js';
 
 /** Tenant policy from configuration (intake LLD §4.3, §4.9, §7; R-15, R-22). */
 export interface IntakePolicy {
@@ -30,6 +30,7 @@ export const DEFAULT_POLICY: IntakePolicy = {
 export interface App {
   uow: UnitOfWork;
   files: FileStore;
+  sheets: SpreadsheetReader;
   clock: Clock;
   ids: IdGenerator;
   policy: IntakePolicy;

@@ -10,6 +10,7 @@ import type { Config } from './config.js';
 import type { App, IntakePolicy } from './application/context.js';
 import type { FileStore } from './application/ports.js';
 import type { IntakeDb } from './adapters/db.js';
+import { spreadsheetReader } from './adapters/spreadsheet.js';
 import { supabaseFileStore } from './adapters/storage.js';
 import { unitOfWork } from './adapters/uow.js';
 
@@ -42,6 +43,7 @@ export function composeApp(config: Config, db: Kysely<IntakeDb>, overrides: Over
   return {
     uow: unitOfWork(db),
     files,
+    sheets: spreadsheetReader(files),
     clock: { now: () => new Date() },
     ids: { uuid: () => uuidv7() },
     policy: policyFrom(config),

@@ -1,5 +1,6 @@
 // Ports the use cases depend on (intake LLD §2). Adapters implement them; src/main.ts wires them (CLAUDE.md §3.1).
 import type { EventDataMap, EventType } from '@11e/contracts/events';
+import type { Template } from '../domain/template.js';
 import type { Upload, UploadCounts, UploadStatus, IntakeMode, SourceType } from '../domain/upload.js';
 
 // ---- infrastructure ports ---------------------------------------------------------------------------------------
@@ -31,6 +32,31 @@ export interface FileStore {
   put(path: string, body: Uint8Array | string, contentType: string): Promise<void>;
   /** Deletes objects; missing ones are ignored. */
   remove(paths: readonly string[]): Promise<void>;
+}
+
+/** One non-empty row of a sheet. `rowNo` is the sheet row number (1 = first row, usually the header). */
+export interface SheetRow {
+  /** Worksheet name; null for CSV. */
+  sheet: string | null;
+  rowNo: number;
+  cells: (string | null)[];
+}
+
+export interface WorkbookScan {
+  kind: 'xlsx' | 'csv';
+  /** Every non-empty row of every sheet, in file order. Iterate once. */
+  rows: AsyncIterable<SheetRow>;
+  /** sha256 and size of the bytes read; complete once `rows` is exhausted. */
+  summary(): { sha256: string; sizeBytes: number };
+}
+
+export class UnreadableFileError extends Error {
+  override readonly name = 'UnreadableFileError';
+}
+
+/** Streaming xlsx/csv reader over the FileStore (exceljs, approved). */
+export interface SpreadsheetReader {
+  open(path: string): Promise<WorkbookScan>;
 }
 
 // ---- repositories -----------------------------------------------------------------------------------------------
@@ -135,10 +161,62 @@ export interface MigrationMapRepository {
   countByAction(tenantId: string, uploadId: string): Promise<Record<MigrationAction, number>>;
 }
 
+export interface TemplateListFilter {
+  sourceType?: SourceType | undefined;
+  headerFingerprint?: string | undefined;
+}
+
+export interface TemplateRepository {
+  /** False when the name is taken (409 template-name-taken). */
+  insert(t: Template): Promise<boolean>;
+  find(tenantId: string, id: string): Promise<Template | undefined>;
+  findByFingerprint(tenantId: string, fingerprint: string): Promise<Template | undefined>;
+  list(
+    tenantId: string,
+    filter: TemplateListFilter,
+    after: Position | undefined,
+    limit: number,
+  ): Promise<Template[]>;
+  /** Replaces the editable fields; 'name-taken' on a duplicate name, undefined when missing or version differs. */
+  replace(
+    t: Omit<Template, 'createdBy' | 'createdAt' | 'version'>,
+    expectedVersion: number | undefined,
+  ): Promise<Template | 'name-taken' | undefined>;
+  softDelete(tenantId: string, id: string): Promise<void>;
+}
+
+export interface VocabularyRelease {
+  version: string;
+  checksum: string;
+  content: Record<string, unknown>;
+}
+
+export interface LegacyTermRow {
+  field: string;
+  termNorm: string;
+  maps: Record<string, string>;
+}
+
+export interface VocabularyRepository {
+  active(tenantId: string): Promise<VocabularyRelease | undefined>;
+  get(tenantId: string, version: string): Promise<VocabularyRelease | undefined>;
+  /** Stores a release (no-op when the version exists) with its legacy terms; activates it when `activate`. */
+  save(
+    tenantId: string,
+    release: VocabularyRelease,
+    terms: readonly LegacyTermRow[],
+    activate: boolean,
+    id: string,
+  ): Promise<void>;
+  legacyTerms(tenantId: string, version: string): Promise<LegacyTermRow[]>;
+}
+
 export interface Repositories {
   uploads: UploadRepository;
   rowErrors: RowErrorRepository;
   migration: MigrationMapRepository;
+  templates: TemplateRepository;
+  vocabulary: VocabularyRepository;
 }
 
 // ---- transactions, events and work queues ------------------------------------------------------------------------

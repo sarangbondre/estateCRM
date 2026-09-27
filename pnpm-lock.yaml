@@ -471,9 +471,15 @@ importers:
       '@11e/outbox':
         specifier: workspace:*
         version: link:../../libs/outbox
+      '@11e/vocabulary':
+        specifier: workspace:*
+        version: link:../../libs/vocabulary
       '@hono/node-server':
         specifier: ^2.1.1
         version: 2.1.1(hono@4.13.9)
+      exceljs:
+        specifier: ~4.4.0
+        version: 4.4.0
       hono:
         specifier: ~4.13.9
         version: 4.13.9
