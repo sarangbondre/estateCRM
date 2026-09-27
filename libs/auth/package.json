@@ -7,9 +7,18 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "echo \"build: not implemented yet\"",
-    "test": "echo \"no tests yet\"",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run --passWithNoTests",
     "lint": "eslint . --no-error-on-unmatched-pattern",
-    "typecheck": "echo \"no sources yet\""
-  }
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ]
 }
