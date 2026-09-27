@@ -36,8 +36,10 @@ Stage 7 task progress:
 - [x] F-16 Backups and runbooks: nightly encrypted per-schema pg_dump + queue export to the private Mumbai `backups` bucket (14 days) and a monthly restore check (workflows dormant until BACKUPS_ENABLED at provisioning); backup/restore round trip tested locally (owners, grants, queue messages); `dlq.mjs` and `rotate-db-password.mjs`; runbooks deploy, rollback, rotate-secrets, dlq-replay, restore (2026-09-27)
 - [x] F-12 libs/observability: pino logger with a PII allow-list (33 PII tests), OpenTelemetry traces across HTTP and events, RED metrics, alarm rules, `observe()` one-call wiring; 51 tests (2026-09-27, PR #16)
 - [x] Foundation addendum (part of each *-01 task): service runtime scaffold for the 6 backend services via `tools/scaffold-service.mjs` (composition root, env config, local server, Vercel entry, platform relay/drain/jobs endpoints in the contract's response style, job leases, 0001 technical tables, platform tests); libs gain app-level middleware, principal ids in request metrics, relay lag, client correlation IDs; service CI builds deps via turbo with local Postgres (2026-09-27)
-- in progress (parallel agent): F-17 synthetic data
-- next: service tracks in parallel (records, journeys, crm-engine), then intake, listings, insight, then web
+- [x] F-17 Synthetic data: seeded 89-column extractor-format generator (vocabulary-valid, profile distributions, splits/repeats, error injection with manifest), synthetic-only contacts (`isSyntheticPhone` guard), NDJSON/CSV/XLSX streaming writers, `pnpm synth`; 88 tests; ~95k rows/s NDJSON (2026-09-27, PR #18)
+- Foundation complete except F-07 (provisioning, deferred to the joint session by the product owner).
+- in progress (parallel service tracks, B6 max 3): records (REC-01…12), journeys (JOU-01…11, critical path), crm-engine (ENG-01…07)
+- next: intake, listings, insight tracks as slots free up; then web (WEB-01…09)
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)
