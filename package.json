@@ -26,7 +26,8 @@
     "db:reset": "supabase --workdir infra db reset && node infra/scripts/local-roles.mjs",
     "db:env": "node infra/scripts/local-roles.mjs --env",
     "db:verify": "node infra/scripts/verify-platform.mjs",
-    "dev": "pnpm db:start && turbo run dev"
+    "dev": "pnpm db:start && turbo run dev",
+    "synth": "node libs/testing/dist/cli/synth.js"
   },
   "devDependencies": {
     "@asyncapi/parser": "^3.6.3",
