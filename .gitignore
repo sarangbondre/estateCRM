@@ -13,3 +13,6 @@ dist/
 .vercel/
 coverage/
 *.env.local
+
+# Agent worktrees (local only)
+.claude/worktrees/
