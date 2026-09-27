@@ -203,6 +203,12 @@ importers:
         specifier: 8.70.1
         version: 8.70.1(eslint@10.11.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
 
+  contracts:
+    devDependencies:
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
   libs/auth: {}
 
   libs/db: {}
