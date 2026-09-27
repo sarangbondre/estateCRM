@@ -9,8 +9,9 @@ import { WebError } from '@/domain/errors';
 import type { Me } from '@/ui/shell/types';
 
 export async function currentUser(): Promise<Me> {
-  const rt = runtime();
+  // Read the cookies first: it marks the page dynamic (never prerendered at build time, when no env is set).
   const store = await cookies();
+  const rt = runtime();
   const client = createServerClient(rt.supabase.url, rt.supabase.anonKey, {
     cookies: {
       getAll: () => store.getAll(),
