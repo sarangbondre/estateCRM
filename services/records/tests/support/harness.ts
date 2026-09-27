@@ -12,6 +12,8 @@ import { composeApp } from '../../src/main.js';
 import type { App, AppPorts } from '../../src/application/context.js';
 import type { RecordsDb } from '../../src/adapters/db/schema.js';
 import { validateEvent } from './events.js';
+import { systemActor } from '../../src/application/context.js';
+import { activateVocabulary } from '../../src/application/reference.js';
 
 const HOST = '127.0.0.1:54322/postgres';
 export const env = {
@@ -115,3 +117,10 @@ export async function createHarness(overrides: Partial<AppPorts> = {}): Promise<
 }
 
 export const newTenant = () => randomUUID();
+
+/** A fresh tenant with its reference data (vocabulary v0.6 active, MMR hierarchy, launch area). */
+export async function readyTenant(h: Harness): Promise<string> {
+  const t = randomUUID();
+  await activateVocabulary(h.appCtx, systemActor(t, 'test-setup'));
+  return t;
+}

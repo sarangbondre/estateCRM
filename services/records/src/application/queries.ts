@@ -258,7 +258,7 @@ export interface Queries {
   listSourceAds(filter: SourceAdFilter, page: PageRequest): Promise<SourceAdRow[]>;
   listSightings(subjects: readonly { type: string; id: string }[], page: PageRequest): Promise<SightingRow[]>;
   listSecondSources(
-    filter: { propertyId?: string; status?: string; priceGap?: boolean },
+    filter: { propertyId?: string | undefined; status?: string | undefined; priceGap?: boolean | undefined },
     page: PageRequest,
   ): Promise<SecondSourceRow[]>;
   listPhotos(propertyId: string, page: PageRequest): Promise<PhotoRow[]>;

@@ -31,7 +31,8 @@ export type RecordsErrorCode =
   | 'range-inverted'
   | 'reveal-not-applicable'
   | 'version-mismatch'
-  | 'rate-limited';
+  | 'rate-limited'
+  | 'dependency-unavailable';
 
 const STATUS: Record<RecordsErrorCode, number> = {
   'validation-failed': 400,
@@ -66,6 +67,7 @@ const STATUS: Record<RecordsErrorCode, number> = {
   'reveal-not-applicable': 400,
   'version-mismatch': 412,
   'rate-limited': 429,
+  'dependency-unavailable': 503,
 };
 
 export interface FieldIssue {
