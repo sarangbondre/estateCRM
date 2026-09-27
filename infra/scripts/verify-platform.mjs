@@ -2,9 +2,10 @@
 // queue-wrapper permissions, as the rules in data-hosting §2–3 require. Exit code 1 on any failure.
 // Local:  node infra/scripts/verify-platform.mjs
 // Pilot:  ADMIN_DATABASE_URL=... VERIFY_ROLE_URL_<SCHEMA>=... node infra/scripts/verify-platform.mjs
-import pg from 'pg';
+import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
-import { SERVICES, adminUrl, localUrl, schemaOf } from './db-roles.mjs';
+import pg from 'pg';
+import { LOCAL_ADMIN_URL, SERVICES, adminUrl, localCronSecret, localUrl, schemaOf } from './db-roles.mjs';
 
 const topology = JSON.parse(
   readFileSync(new URL('../../contracts/generated/event-topology.json', import.meta.url), 'utf8'),
@@ -163,6 +164,88 @@ for (const svc of SERVICES) {
     await c.query('rollback').catch(() => {});
     await c.end();
   }
+}
+
+// Schedules and alarms (F-15, CR-008). Read-only checks everywhere; active checks (a real pg_cron → pg_net → HTTP call,
+// an alarm fire/resolve cycle) only on the local stack, because they change endpoint config and queue contents.
+const sched = await connect(adminUrl());
+try {
+  await check('pg_cron jobs scheduled and active (relay, drains, jobs, alarms)', async () => {
+    const { rows } = await sched.query(
+      "select count(*)::int as n, bool_and(active) as active from cron.job where jobname like 'estatecrm:%'",
+    );
+    const expected =
+      2 + SERVICES.length + Object.values(topology.services).reduce((n, t) => n + 1 + t.workQueues.length, 0);
+    if (rows[0].n < expected || !rows[0].active)
+      throw new Error(`found ${rows[0].n} (expected ≥ ${expected}), active=${rows[0].active}`);
+  });
+  await check('every service has a cron secret in Vault', async () => {
+    const { rows } = await sched.query("select name from vault.secrets where name like 'cron_secret_%'");
+    const names = new Set(rows.map((r) => r.name));
+    const missing = SERVICES.filter((s) => !names.has(`cron_secret_${schemaOf(s)}`));
+    if (missing.length) throw new Error(`missing: ${missing.join(', ')}`);
+  });
+  await check('service roles cannot touch the platform schema', async () => {
+    const { rows } = await sched.query(
+      "select r from unnest($1::text[]) r where has_schema_privilege(r, 'platform', 'usage')",
+      [SERVICES.map((s) => `${schemaOf(s)}_svc`)],
+    );
+    if (rows.length) throw new Error(rows.map((r) => r.r).join(', '));
+  });
+
+  if (adminUrl() === LOCAL_ADMIN_URL && !process.env['VERIFY_SKIP_ACTIVE']) {
+    await check(
+      'scheduler call reaches the service with its X-Cron-Secret (pg_cron path, local)',
+      async () => {
+        const received = [];
+        const server = createServer((req, res) => {
+          received.push({ url: req.url, secret: req.headers['x-cron-secret'] });
+          res.writeHead(200, { 'content-type': 'application/json' }).end('{"processed":0,"durationMs":0}');
+        });
+        await new Promise((r) => server.listen(0, '0.0.0.0', r));
+        const port = server.address().port;
+        const { rows: before } = await sched.query(
+          "select base_url, enabled from platform.service_endpoints where service = 'records'",
+        );
+        try {
+          await sched.query(
+            "update platform.service_endpoints set base_url = $1, enabled = true where service = 'records'",
+            [`http://host.docker.internal:${port}`],
+          );
+          await sched.query("select platform.invoke('records', '/internal/v1/relay')");
+          for (let i = 0; i < 40 && !received.length; i++) await new Promise((r) => setTimeout(r, 250));
+          if (!received.length)
+            throw new Error('no request arrived (is host.docker.internal reachable from the DB container?)');
+          if (received[0].url !== '/internal/v1/relay' || received[0].secret !== localCronSecret('records')) {
+            throw new Error(`unexpected call ${JSON.stringify(received[0])}`);
+          }
+        } finally {
+          await sched.query(
+            "update platform.service_endpoints set base_url = $1, enabled = $2 where service = 'records'",
+            [before[0].base_url, before[0].enabled],
+          );
+          server.close();
+        }
+      },
+    );
+    await check('DLQ depth raises an alarm and resolves when drained (local)', async () => {
+      await sched.query("select pgmq.send('q_web_dlq', '{\"probe\":true}'::jsonb)");
+      await sched.query('select platform.check_alarms()');
+      const firing = await sched.query(
+        "select service from platform.alarm_events where alarm = 'dlq-depth' and subject = 'q_web_dlq' and status = 'firing'",
+      );
+      await sched.query("select pgmq.purge_queue('q_web_dlq')");
+      await sched.query('select platform.check_alarms()');
+      const after = await sched.query(
+        "select status from platform.alarm_events where alarm = 'dlq-depth' and subject = 'q_web_dlq' order by id desc limit 1",
+      );
+      await sched.query("delete from platform.alarm_events where subject = 'q_web_dlq'");
+      if (firing.rows[0]?.service !== 'web') throw new Error('alarm did not fire for web');
+      if (after.rows[0]?.status !== 'resolved') throw new Error('alarm did not resolve');
+    });
+  }
+} finally {
+  await sched.end();
 }
 
 for (const r of results)

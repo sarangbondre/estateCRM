@@ -12,6 +12,7 @@ type Json = Record<string, unknown>;
 export interface OpenApiDoc {
   paths: Record<string, Record<string, unknown>>;
   components?: Json;
+  security?: Record<string, string[]>[];
 }
 
 interface ParamDef {
@@ -32,6 +33,8 @@ export interface Operation {
   params: ParamDef[];
   body?: { required: boolean; mediaTypes: string[]; pointerByMediaType: Record<string, string> };
   responses: Record<string, string | undefined>;
+  /** Effective security requirements (operation-level, else document-level). [] = no auth. */
+  security: Record<string, string[]>[];
   raw: Json;
 }
 
@@ -127,6 +130,7 @@ export class Contract {
           honoPath: path.replace(/\{([^}]+)\}/g, ':$1'),
           params: [...params.values()],
           responses,
+          security: (op['security'] as Record<string, string[]>[] | undefined) ?? this.#doc.security ?? [],
           raw: op,
         };
         if (body) operation.body = body;
