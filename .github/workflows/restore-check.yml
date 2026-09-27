@@ -1,0 +1,45 @@
+# Monthly restore check (data-hosting §4, F-16): restores the latest pilot backup into a throwaway local Supabase
+# Postgres on the runner (bootstrap migrations applied first) and runs the platform verifier + sanity counts.
+# Dormant until BACKUPS_ENABLED is 'true'.
+name: restore-check
+on:
+  schedule:
+    - cron: '0 22 1 * *' # 1st of the month, 03:30 IST
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  restore:
+    if: vars.BACKUPS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.118.0
+      - name: postgres 17 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - run: pnpm install --frozen-lockfile
+      - name: throwaway Postgres with the platform bootstrap
+        run: supabase --workdir infra db start && node infra/scripts/local-roles.mjs --env > /dev/null
+      - name: restore the latest backup
+        run: bash infra/scripts/restore.sh latest postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      - name: verify platform + sanity counts
+        run: |
+          VERIFY_SKIP_ACTIVE=1 pnpm db:verify
+          psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -c "select n.nspname as schema, count(c.*) as tables, sum(c.reltuples)::bigint as approx_rows from pg_namespace n left join pg_class c on c.relnamespace = n.oid and c.relkind = 'r' where n.nspname in ('web','intake','records','journeys','crm_engine','listings','insight') group by 1 order by 1" | tee -a "$GITHUB_STEP_SUMMARY"

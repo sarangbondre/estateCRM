@@ -1,7 +1,15 @@
 name: journeys
 on:
   pull_request:
-    paths: ['services/journeys/**', 'libs/**', 'contracts/**', 'pnpm-lock.yaml', '.github/workflows/_service-ci.yml', '.github/workflows/svc-journeys.yml']
+    paths:
+      [
+        'services/journeys/**',
+        'libs/**',
+        'contracts/**',
+        'pnpm-lock.yaml',
+        '.github/workflows/_service-ci.yml',
+        '.github/workflows/svc-journeys.yml',
+      ]
   push:
     branches: [main]
     paths: ['services/journeys/**', 'libs/**', 'contracts/**', 'pnpm-lock.yaml']

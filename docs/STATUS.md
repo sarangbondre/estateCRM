@@ -33,7 +33,8 @@ Stage 7 task progress:
 - in progress (parallel agents): F-12 libs/observability, F-17 synthetic data
 - [x] F-14 libs/redaction: redact/restore/detect with PHONE/EMAIL/URL/NAME/UNIT/ID, placeholder maps kept in memory only, residual-risk post-check; 0 leaks on 171 annotated synthetic ads, 50 hard negatives untouched (2026-09-27, PR #12)
 - [x] F-15 Schedules and alarms: `infra/schedules.yaml` catalogue (checked against every contract jobs enum) → generated pg_cron jobs (60 scheduler calls + alarms + prune), `platform.invoke` via pg_net with Vault cron secrets, in-DB alarms (DLQ depth, relay/queue lag, failed jobs/calls) + optional webhook (CR-008 auto-approved technical); `configure-environment.mjs` for the provisioning session; verifier 73/73 incl. a real pg_cron→HTTP call (2026-09-27)
-- next: F-16 runbooks + backups
+- [x] F-16 Backups and runbooks: nightly encrypted per-schema pg_dump + queue export to the private Mumbai `backups` bucket (14 days) and a monthly restore check (workflows dormant until BACKUPS_ENABLED at provisioning); backup/restore round trip tested locally (owners, grants, queue messages); `dlq.mjs` and `rotate-db-password.mjs`; runbooks deploy, rollback, rotate-secrets, dlq-replay, restore (2026-09-27)
+- next: service tracks (records first), after F-12/F-17 land
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)

@@ -1,7 +1,15 @@
 name: records
 on:
   pull_request:
-    paths: ['services/records/**', 'libs/**', 'contracts/**', 'pnpm-lock.yaml', '.github/workflows/_service-ci.yml', '.github/workflows/svc-records.yml']
+    paths:
+      [
+        'services/records/**',
+        'libs/**',
+        'contracts/**',
+        'pnpm-lock.yaml',
+        '.github/workflows/_service-ci.yml',
+        '.github/workflows/svc-records.yml',
+      ]
   push:
     branches: [main]
     paths: ['services/records/**', 'libs/**', 'contracts/**', 'pnpm-lock.yaml']
