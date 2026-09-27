@@ -64,6 +64,8 @@ export async function beginIdempotent<DB>(
   ref: IdempotencyRef,
   requestHash: string,
   now: Date = new Date(),
+  /** An in-progress claim older than this was abandoned (crashed instance) and may be taken over. */
+  staleAfterMs = 120_000,
 ): Promise<IdempotencyBegin> {
   const k = db_(db);
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_WINDOW_MS);
@@ -96,15 +98,28 @@ export async function beginIdempotent<DB>(
 
   const row = await k
     .selectFrom('idempotency_keys')
-    .select(['request_hash', 'status_code', 'response_body'])
+    .select(['request_hash', 'status_code', 'response_body', 'created_at'])
     .where('tenant_id', '=', ref.tenantId)
     .where('user_id', '=', ref.userId)
     .where('route', '=', ref.route)
     .where('key', '=', ref.key)
     .executeTakeFirst();
-  if (!row) return beginIdempotent(db, ref, requestHash, now); // released concurrently: claim again
+  if (!row) return beginIdempotent(db, ref, requestHash, now, staleAfterMs); // released concurrently: claim again
   if (row.request_hash !== requestHash) return { outcome: 'conflict' };
-  if (row.status_code === null) return { outcome: 'in-progress' };
+  if (row.status_code === null) {
+    if (now.getTime() - new Date(row.created_at).getTime() < staleAfterMs) return { outcome: 'in-progress' };
+    const taken = await k
+      .updateTable('idempotency_keys')
+      .set({ created_at: now })
+      .where('tenant_id', '=', ref.tenantId)
+      .where('user_id', '=', ref.userId)
+      .where('route', '=', ref.route)
+      .where('key', '=', ref.key)
+      .where('status_code', 'is', null)
+      .where('created_at', '=', row.created_at)
+      .executeTakeFirst();
+    return Number(taken.numUpdatedRows) === 1 ? { outcome: 'new' } : { outcome: 'in-progress' };
+  }
   return { outcome: 'replay', statusCode: row.status_code, body: row.response_body };
 }
 

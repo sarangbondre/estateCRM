@@ -16,7 +16,7 @@
     "secrets": "gitleaks detect --no-banner --redact",
     "format": "prettier --check .",
     "contracts:lint": "redocly lint contracts/openapi/*.yaml && node tools/contracts/validate-asyncapi.mjs && node tools/contracts/check-event-fixtures.mjs",
-    "contracts:gen": "python3 tools/gen_events.py && python3 tools/gen_tasks.py && node tools/gen_gate_tables.mjs && node tools/contracts/gen-types.mjs && node tools/contracts/gen-event-fixtures.mjs && node tools/gen-db-bootstrap.mjs",
+    "contracts:gen": "python3 tools/gen_events.py && python3 tools/gen_tasks.py && node tools/gen_gate_tables.mjs && node tools/contracts/gen-types.mjs && node tools/contracts/gen-bundles.mjs && node tools/contracts/gen-event-fixtures.mjs && node tools/gen-db-bootstrap.mjs",
     "contracts:check": "pnpm contracts:gen && git diff --exit-code -- contracts docs tools infra",
     "mock": "node tools/contracts/mock.mjs",
     "mock:event": "node tools/contracts/publish-event.mjs",
