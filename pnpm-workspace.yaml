@@ -1,3 +1,8 @@
 packages:
   - services/*
   - libs/*
+  - contracts
+
+# Deny install scripts we don't need (analytics/telemetry).
+allowBuilds:
+  '@scarf/scarf': false

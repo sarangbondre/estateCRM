@@ -1060,3 +1060,4 @@ components:
     staffViaWeb: { $ref: './_common.yaml#/components/securitySchemes/staffViaWeb' }
     cronSecret: { $ref: './_common.yaml#/components/securitySchemes/cronSecret' }
     websiteApiKey: { $ref: './_common.yaml#/components/securitySchemes/websiteApiKey' }
+    serviceToken: { $ref: './_common.yaml#/components/securitySchemes/serviceToken' }
