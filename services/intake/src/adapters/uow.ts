@@ -8,6 +8,7 @@ import type { NewEvent, Repositories, Tx, UnitOfWork } from '../application/port
 import { SCHEMA, SERVICE } from '../config.js';
 import type { IntakeDb } from './db.js';
 import { migrationMapRepository, rowErrorRepository } from './repositories/reports.js';
+import { chunkRepository, fingerprintRepository, rawRowRepository } from './repositories/processing.js';
 import { templateRepository, vocabularyRepository } from './repositories/templates.js';
 import { uploadRepository } from './repositories/uploads.js';
 
@@ -16,6 +17,9 @@ type Db = Kysely<IntakeDb> | Transaction<IntakeDb>;
 export function repositories(db: Db): Repositories {
   return {
     uploads: uploadRepository(db),
+    chunks: chunkRepository(db),
+    fingerprints: fingerprintRepository(db),
+    rawRows: rawRowRepository(db),
     rowErrors: rowErrorRepository(db),
     migration: migrationMapRepository(db),
     templates: templateRepository(db),

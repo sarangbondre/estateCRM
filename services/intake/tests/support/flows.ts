@@ -2,6 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect } from 'vitest';
 import { runInspection } from '../../src/application/inspection.js';
+import { runSplit } from '../../src/application/split.js';
 import type { Harness } from './harness.js';
 import { XLSX_MIME } from './files.js';
 
@@ -44,6 +45,26 @@ export async function uploadFile(
   const upload = r.body['upload'] as { id: string; code: string };
   await h.files.put(`intake-uploads/${tenant}/${upload.id}/source`, bytes);
   return { id: upload.id, code: upload.code, headers };
+}
+
+/** Upload + inspect (+ mapping) + start + the split handler: the upload is `processing` with its chunk plan. */
+export async function uploadAndSplit(
+  h: Harness,
+  tenant: string,
+  bytes: Uint8Array,
+  options: Parameters<typeof uploadFile>[3] & { mapping?: Record<string, unknown> } = {},
+): Promise<Uploaded> {
+  const u = await uploadFile(h, tenant, bytes, options);
+  await inspect(h, tenant, u);
+  if (options.mapping) {
+    const m = await h.call('PUT', `/v1/uploads/${u.id}/mapping`, u.headers, options.mapping);
+    expect(m.status).toBe(200);
+  }
+  if (!(await h.app.uow.repos.vocabulary.active(tenant))) await seedVocabulary(h, tenant);
+  const s = await h.call('POST', `/v1/uploads/${u.id}/start`, u.headers, { allowDuplicate: true });
+  expect(s.status).toBe(202);
+  await runSplit(h.app, { tenantId: tenant, uploadId: u.id, correlationId: 'test' });
+  return u;
 }
 
 /** POST /inspect then the q_intake_inspect handler (called directly: tests never depend on shared queue state). */

@@ -47,6 +47,7 @@ export function composeApp(config: Config, db: Kysely<IntakeDb>, overrides: Over
     clock: { now: () => new Date() },
     ids: { uuid: () => uuidv7() },
     policy: policyFrom(config),
+    anonymiser: () => (cells) => [...cells],
   };
 }
 

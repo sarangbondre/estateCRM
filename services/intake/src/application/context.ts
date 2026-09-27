@@ -27,6 +27,9 @@ export const DEFAULT_POLICY: IntakePolicy = {
   rawRowRetentionDays: 30,
 };
 
+/** Replaces contact values of one row with consistent fakes (pilot anonymise switch, LLD §4.9). */
+export type RowAnonymiser = (cells: readonly (string | null)[]) => (string | null)[];
+
 export interface App {
   uow: UnitOfWork;
   files: FileStore;
@@ -34,6 +37,8 @@ export interface App {
   clock: Clock;
   ids: IdGenerator;
   policy: IntakePolicy;
+  /** Builds the anonymiser for one upload's header (tenant-keyed, deterministic). */
+  anonymiser(tenantId: string, header: readonly string[]): RowAnonymiser;
 }
 
 export interface StaffActor {

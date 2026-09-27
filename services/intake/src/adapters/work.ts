@@ -2,6 +2,7 @@
 // Each handler dedupes on its own work key (the upload status / chunk lease), so a redelivered message is harmless.
 import type { WorkHandler } from '@11e/outbox';
 import { runInspection } from '../application/inspection.js';
+import { runSplit } from '../application/split.js';
 import type { InspectMessage } from '../application/inspection.js';
 import type { AppDeps } from '../deps.js';
 import type { IntakeDb } from './db.js';
@@ -26,5 +27,6 @@ export function workHandlers(deps: AppDeps): Record<string, WorkHandler<IntakeDb
   const { app } = deps;
   return {
     q_intake_inspect: (payload) => runInspection(app, app.sheets, uploadMessage(payload)),
+    q_intake_split: (payload) => runSplit(app, uploadMessage(payload)),
   };
 }

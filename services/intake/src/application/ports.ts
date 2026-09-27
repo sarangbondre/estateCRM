@@ -1,5 +1,6 @@
 // Ports the use cases depend on (intake LLD §2). Adapters implement them; src/main.ts wires them (CLAUDE.md §3.1).
 import type { EventDataMap, EventType } from '@11e/contracts/events';
+import type { MigrationAction, MigrationEntry } from '../domain/migration.js';
 import type { Template } from '../domain/template.js';
 import type { Upload, UploadCounts, UploadStatus, IntakeMode, SourceType } from '../domain/upload.js';
 
@@ -135,13 +136,69 @@ export interface RowErrorRepository {
   rejectionReasons(tenantId: string, uploadId: string): Promise<Record<string, number>>;
 }
 
-export type MigrationAction = 'kept' | 'merged' | 'split';
+export type { MigrationAction, MigrationEntry };
 
-export interface MigrationEntry {
-  entryNo: number;
-  oldRef: string;
-  newRefs: string[];
-  action: MigrationAction;
+export type ChunkStatus = 'queued' | 'leased' | 'done' | 'failed' | 'cancelled';
+
+export interface ChunkRecord {
+  id: string;
+  tenantId: string;
+  uploadId: string;
+  chunkNo: number;
+  rowFrom: number;
+  rowTo: number;
+  path: string;
+  status: ChunkStatus;
+  attempts: number;
+}
+
+export type LeaseResult =
+  | { outcome: 'leased'; chunk: ChunkRecord }
+  | { outcome: 'busy' }
+  | { outcome: 'not-available'; status: ChunkStatus | 'missing' };
+
+export interface ChunkRepository {
+  insertMany(chunks: readonly ChunkRecord[]): Promise<void>;
+  /**
+   * LLD §4.3 step 1: leases the chunk when queued or its lease expired, unless the tenant already holds
+   * `maxLive` live leases (semaphore). Increments attempts.
+   */
+  lease(
+    tenantId: string,
+    uploadId: string,
+    chunkNo: number,
+    leaseSec: number,
+    maxLive: number,
+  ): Promise<LeaseResult>;
+  finish(
+    tenantId: string,
+    uploadId: string,
+    chunkNo: number,
+    counts: { accepted: number; rejected: number; unchanged: number; needsReview: number },
+  ): Promise<void>;
+  fail(tenantId: string, uploadId: string, chunkNo: number, errorCode: string): Promise<void>;
+  /** Releases a lease early (transient failure) so the retry does not wait for the lease to expire. */
+  release(tenantId: string, uploadId: string, chunkNo: number): Promise<void>;
+  cancelQueued(tenantId: string, uploadId: string): Promise<number>;
+  paths(tenantId: string, uploadId: string): Promise<string[]>;
+  /** reap-chunk-leases: expired leases across tenants (bounded). */
+  expiredLeases(now: Date, limit: number): Promise<ChunkRecord[]>;
+}
+
+export interface Fingerprint {
+  externalRef: string;
+  contentHash: string;
+}
+
+export interface FingerprintRepository {
+  getMany(tenantId: string, source: string, refs: readonly string[]): Promise<Map<string, string>>;
+  upsertMany(
+    tenantId: string,
+    source: string,
+    rows: readonly { externalRef: string; contentHash: string; uploadId: string; rowId: string }[],
+  ): Promise<void>;
+  /** migration_map re-key (LLD §4.10): kept → rename old→new; merged/split → delete old. */
+  rekey(tenantId: string, entries: readonly MigrationEntry[]): Promise<void>;
 }
 
 export interface MigrationMapRepository {
@@ -211,8 +268,16 @@ export interface VocabularyRepository {
   legacyTerms(tenantId: string, version: string): Promise<LegacyTermRow[]>;
 }
 
+export interface RawRowRepository {
+  /** Creates the month partition of raw_rows (split job, before any chunk writes rows). */
+  ensurePartition(month: Date): Promise<void>;
+}
+
 export interface Repositories {
   uploads: UploadRepository;
+  chunks: ChunkRepository;
+  fingerprints: FingerprintRepository;
+  rawRows: RawRowRepository;
   rowErrors: RowErrorRepository;
   migration: MigrationMapRepository;
   templates: TemplateRepository;
