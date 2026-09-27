@@ -40,7 +40,9 @@ Stage 7 task progress:
 - Foundation complete except F-07 (provisioning, deferred to the joint session by the product owner).
 - in progress (parallel service tracks, B6 max 3): records (REC-01…12), journeys (JOU-01…11, critical path), crm-engine (ENG-01…07)
 - Service tracks complete in open, stacked PRs (CI green) awaiting merge by the product owner (the permission system refuses agent merges): crm-engine #21→#24→#27→#29→#31; records #22→#26→#33→#34→#36→#39; journeys #23→#25→#28→#30→#32→#35→#38; intake #37→#40→#41→#43→#44→#46→#48→#50→#53→#54→#55→#58; listings #49→#52→#56; insight #45→#47→#51→#57→#59→#60→#61
-- in progress: web (WEB-01…09)
+; web #63→#64→#65→#66→#67→#68→#69→#70→#71
+- All 7 tracks are code-complete (WEB-09: 369 unit tests, 38/39 Playwright E2E, axe WCAG 2.1 AA clean, gateway overhead p95 10 ms).
+- next: product owner merges the stacks → QA-01 end-to-end acceptance on merged main → provisioning session (F-07) → QA-02 pilot → QA-03 benchmarks
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)
