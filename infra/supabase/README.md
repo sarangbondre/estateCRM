@@ -29,6 +29,24 @@ pnpm dev          # db:start + every service's dev task
 Service tables are **not** created here. Each service's own migrations (`services/<svc>/migrations`) create them,
 run by its migrator (F-08).
 
+## Schedules and alarms (F-15, CR-008)
+
+`migrations/20260927000100_platform_schedules.sql` is **generated** by `tools/gen-schedules.mjs` from
+[`infra/schedules.yaml`](../schedules.yaml) (every `/internal/v1/jobs/{name}` must be listed, and CI checks this) and the
+event topology. It adds:
+
+- **pg_cron jobs**, each calling `platform.invoke(service, path)`: the relay and every drain queue each minute, plus
+  every catalogue job at its UTC schedule. That's 60 scheduler calls plus `platform:alarms` (every minute) and
+  `platform:prune`.
+- **`platform.invoke`**: a pg_net POST to `platform.service_endpoints.base_url + path` with `X-Cron-Secret` from Vault
+  (`cron_secret_<schema>`). It's a no-op until the service is `enabled` in that environment.
+- **`platform.check_alarms()`**: DLQ depth, relay lag, queue lag, failed jobs and failed scheduler calls, recorded in
+  `platform.alarm_events` (firing/resolved). An optional webhook is read from Vault `alarm_webhook_url`.
+
+Locally, `pnpm db:schedules on` makes pg_cron call the services on their dev ports (via `host.docker.internal`), and
+`pnpm db:schedules off` stops it. The default after a reset is off. Cloud environments are configured with
+`infra/scripts/configure-environment.mjs` in the provisioning session.
+
 ## Local-only credentials
 
 Local role passwords are deterministic (`local_<role>`) and set by `infra/scripts/local-roles.mjs`. The migration never
