@@ -1,7 +1,7 @@
 import { detectEmails, detectIds, detectUrls } from './detectors/contact.js';
 import { detectNames } from './detectors/name.js';
 import { detectPhones } from './detectors/phone.js';
-import type { Span } from './detectors/span.js';
+import { execAll, type Span } from './detectors/span.js';
 import { detectUnits } from './detectors/unit.js';
 import { digitsOf, shadow } from './normalize.js';
 import { hasResidualRisk } from './residual.js';
@@ -77,7 +77,7 @@ export function detect(text: string, options: Pick<RedactOptions, 'kinds' | 'all
   const urls = detectUrls(s);
   const phones = detectPhones(s);
   const existing: Span[] = [];
-  for (const m of s.matchAll(PLACEHOLDER)) {
+  for (const m of execAll(PLACEHOLDER, s)) {
     const kind = m[1] as PiiKind;
     if (kind === 'PHONE' || kind === 'EMAIL')
       existing.push({ kind, start: m.index, end: m.index + m[0].length });
@@ -92,7 +92,7 @@ export function detect(text: string, options: Pick<RedactOptions, 'kinds' | 'all
     ...detectNames(s, anchors, lowerWords(options.allowTerms)),
   ];
   // Never mask inside an existing placeholder.
-  const placeholders = [...s.matchAll(PLACEHOLDER)].map((m) => [m.index, m.index + m[0].length] as const);
+  const placeholders = [...execAll(PLACEHOLDER, s)].map((m) => [m.index, m.index + m[0].length] as const);
   const kept = all.filter(
     (sp) => kinds.has(sp.kind) && !placeholders.some(([a, b]) => sp.start < b && sp.end > a),
   );
@@ -108,7 +108,7 @@ export function redact(text: string, options: RedactOptions = {}): RedactionResu
   const detections = detect(text, options);
   const counts: Record<PiiKind, number> = { PHONE: 0, EMAIL: 0, URL: 0, NAME: 0, UNIT: 0, ID: 0 };
   const next: Record<PiiKind, number> = { PHONE: 1, EMAIL: 1, URL: 1, NAME: 1, UNIT: 1, ID: 1 };
-  for (const m of text.matchAll(PLACEHOLDER)) {
+  for (const m of execAll(PLACEHOLDER, text)) {
     const kind = m[1] as PiiKind;
     next[kind] = Math.max(next[kind], Number(m[2]) + 1);
   }

@@ -1,5 +1,5 @@
 import { digitsOf } from '../normalize.js';
-import type { Span } from './span.js';
+import { execAll, type Span } from './span.js';
 
 /**
  * A run of digit groups: starts with an optional `+`, then a digit; groups are separated by up to 3 spaces, dashes,
@@ -49,11 +49,11 @@ function phoneShape(d: string, hasCue: boolean, strongOnly: boolean): boolean {
 /** Detects Indian phone numbers in the shadow text. */
 export function detectPhones(text: string): Span[] {
   const spans: Span[] = [];
-  for (const m of text.matchAll(RUN)) {
+  for (const m of execAll(RUN, text)) {
     const runStart = m.index;
     const run = m[0];
     const groups: Group[] = [];
-    for (const g of run.matchAll(GROUP)) {
+    for (const g of execAll(GROUP, run)) {
       const digits = digitsOf(g[0]);
       groups.push({ start: runStart + g.index, end: runStart + g.index + g[0].length, digits });
     }

@@ -57,7 +57,9 @@ function failures(c: AdCase): string[] {
   return problems;
 }
 
-describe('test set', () => {
+// Generous wall-clock timeout: CI runs every lib's build/typecheck/test concurrently next to a local Postgres stack.
+// Speed is asserted separately in CPU time.
+describe('test set', { timeout: 60_000 }, () => {
   it('has at least 150 ads', () => {
     expect(PII_ADS.length + CLEAN_ADS.length).toBeGreaterThanOrEqual(150);
   });

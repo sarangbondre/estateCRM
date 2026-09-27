@@ -1,6 +1,6 @@
 import { NON_NAME_WORDS, NON_PERSON_SUFFIXES } from '../lexicon.js';
 import { ciAlt } from './regex-util.js';
-import type { Span } from './span.js';
+import { execAll, type Span } from './span.js';
 
 /**
  * Person names are only masked **next to a contact cue**: an honorific, a contact phrase, a phone/e-mail, or a
@@ -127,6 +127,8 @@ const AFTER_ANCHOR_LOWER = new RegExp(
   'du',
 );
 
+const WORD = /[^\s]+/gu;
+
 interface Tok {
   readonly start: number;
   readonly end: number;
@@ -135,7 +137,7 @@ interface Tok {
 
 function tokenize(s: string, offset: number): Tok[] {
   const out: Tok[] = [];
-  for (const m of s.matchAll(/[^\s]+/gu)) {
+  for (const m of execAll(WORD, s)) {
     const word = m[0].replace(/[.,:;]+$/u, '');
     if (word.length > 0) out.push({ start: offset + m.index, end: offset + m.index + word.length, word });
   }
@@ -191,7 +193,7 @@ function fromLookahead(
   max: number,
 ): Span[] {
   const out: Span[] = [];
-  for (const m of text.matchAll(re)) {
+  for (const m of execAll(re, text)) {
     const c = m.indices?.groups?.['c'];
     if (c === undefined) continue;
     const span = pick(tokenize(text.slice(c[0], c[1]), c[0]), stop, skip, max);
@@ -203,7 +205,7 @@ function fromLookahead(
 /** Suffix form picks from the right: the words closest to "bhai"/"ji" are the name. */
 function fromSuffix(text: string, stop: ReadonlySet<string>): Span[] {
   const out: Span[] = [];
-  for (const m of text.matchAll(SUFFIX_RE)) {
+  for (const m of execAll(SUFFIX_RE, text)) {
     const c = m.indices?.groups?.['c'];
     if (c === undefined) continue;
     const toks = tokenize(text.slice(c[0], c[1]), c[0]);
@@ -223,7 +225,7 @@ function fromSuffix(text: string, stop: ReadonlySet<string>): Span[] {
 
 function fromDevanagari(text: string): Span[] {
   const out: Span[] = [];
-  for (const m of text.matchAll(DEVANAGARI_RE)) {
+  for (const m of execAll(DEVANAGARI_RE, text)) {
     const c = m.indices?.groups?.['c'];
     if (c === undefined) continue;
     const toks = tokenize(text.slice(c[0], c[1]), c[0]).filter((t) => !DEVANAGARI_STOP.has(t.word));
