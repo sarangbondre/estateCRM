@@ -20,5 +20,16 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@11e/contracts": "workspace:*",
+    "@11e/db": "workspace:*",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "hono": "~4.13.9"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "pg": "~8.23.0"
+  }
 }

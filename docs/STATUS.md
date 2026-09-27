@@ -27,8 +27,14 @@ Stage 7 task progress:
 - [x] Lib template (tsconfig/build/Vitest) for all libs (2026-09-27)
 - [x] F-13 libs/vocabulary: release v0.6 data + types, R-11 validators (issue codes = intake RowError codes), For/Wants label generator (65 combinations tested), legacy translation, release document; 228 tests; assumptions in libs/vocabulary/README.md (2026-09-27, PR #10)
 - [x] F-09 libs/outbox: typed transactional outbox write, relay (SKIP LOCKED, atomic fan-out to pgmq), event drains (processed_events dedupe in the handler transaction, backoff via visibility timeout, DLQ after 5), work drains, DLQ replay, retention purges; platform bootstrap extended with private work queues (32 queues) + queue-argument wrappers; `contracts/generated/event-topology.json`; 9 integration tests on real pgmq (2026-09-27)
+- [x] F-10 libs/http: contract-driven Hono service factory (Ajv validation against bundled OpenAPI, CR-007 auto-approved technical), RFC 7807 errors, correlation ID, health, response contract checks, Idempotency-Key helper (+ stale-claim takeover in libs/db), If-Match, cursor pagination, outbound client with timeout/retry/circuit breaker; 22 tests (2026-09-27)
 - in progress (parallel agent): F-14 libs/redaction
-- next: F-10 libs/http
+- [x] F-11 libs/auth: contract-driven authenticate middleware (staff JWT + header/claim match + x-roles, service tokens + x-callers, cron secret, website API key hook), principals, tenant/role re-checks (other tenant → 404), service-token client with caching; libs/http gains per-operation middleware + effective security; 11 tests (2026-09-27)
+- in progress (parallel agents): F-12 libs/observability, F-17 synthetic data
+- [x] F-14 libs/redaction: redact/restore/detect with PHONE/EMAIL/URL/NAME/UNIT/ID, placeholder maps kept in memory only, residual-risk post-check; 0 leaks on 171 annotated synthetic ads, 50 hard negatives untouched (2026-09-27, PR #12)
+- [x] F-15 Schedules and alarms: `infra/schedules.yaml` catalogue (checked against every contract jobs enum) → generated pg_cron jobs (60 scheduler calls + alarms + prune), `platform.invoke` via pg_net with Vault cron secrets, in-DB alarms (DLQ depth, relay/queue lag, failed jobs/calls) + optional webhook (CR-008 auto-approved technical); `configure-environment.mjs` for the provisioning session; verifier 73/73 incl. a real pg_cron→HTTP call (2026-09-27)
+- [x] F-16 Backups and runbooks: nightly encrypted per-schema pg_dump + queue export to the private Mumbai `backups` bucket (14 days) and a monthly restore check (workflows dormant until BACKUPS_ENABLED at provisioning); backup/restore round trip tested locally (owners, grants, queue messages); `dlq.mjs` and `rotate-db-password.mjs`; runbooks deploy, rollback, rotate-secrets, dlq-replay, restore (2026-09-27)
+- next: service tracks (records first), after F-12/F-17 land
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)
@@ -37,5 +43,7 @@ Change requests:
 - CR-004: APPROVED 2026-09-24 (BRD A-10 clarified)
 - CR-005: APPROVED 2026-09-24 (PRD §8.4 pilot on free plans + paid-plan gate)
 - CR-006: APPROVED 2026-09-24 (PRD aligned with the extractor master file; Z-1…Z-10 accepted)
+- CR-007: APPROVED 2026-09-27, auto-approved (technical, B3): edge validation with Ajv against the contract schemas instead of Zod
+- CR-008: APPROVED 2026-09-27, auto-approved (technical, B3): alarm destination = in-DB alarm events + optional webhook; HTTP SLO alarms wired at provisioning
 
 Open change requests: none

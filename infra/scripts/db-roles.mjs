@@ -13,3 +13,6 @@ export const localUrl = (role) => {
   u.password = localPassword(role);
   return u.toString();
 };
+
+// Local stack only: the X-Cron-Secret pg_cron sends to each locally running service.
+export const localCronSecret = (svc) => `local_cron_${schemaOf(svc)}`;

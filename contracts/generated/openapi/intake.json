@@ -1,0 +1,5043 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "11 Estates CRM — intake service",
+    "version": "0.1.0",
+    "description": "Intake (S1, HLD §2): uploads, strict/mapping modes, templates, validation, classification, review queue, free-text parse. Conventions: docs/04-lld/conventions.md. LLD: docs/04-lld/intake.md.\nAll staff routes are reached through web (one hop). Extensions on every operation: x-roles, x-rate-limit, x-timeout-ms, x-idempotency, x-emits, x-paginated."
+  },
+  "servers": [
+    {
+      "url": "https://intake.internal.11estates.in",
+      "description": "Vercel project intake (bom1); called by web and pg_cron only"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Uploads"
+    },
+    {
+      "name": "Templates"
+    },
+    {
+      "name": "Review"
+    },
+    {
+      "name": "Parse"
+    },
+    {
+      "name": "Internal"
+    },
+    {
+      "name": "Health"
+    }
+  ],
+  "paths": {
+    "/v1/uploads": {
+      "post": {
+        "operationId": "createUpload",
+        "summary": "Create an upload and get a signed storage URL",
+        "tags": [
+          "Uploads"
+        ],
+        "description": "Validates name, type and size (≤ 50 MB). Anonymise defaults to true in pilot mode (CR-006 Z-9); anonymise=false in pilot → 409 anonymise-required.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created. The browser PUTs the file to uploadUrl, then calls /inspect.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "5 uploads/hour per user (conventions §4), plus 20 req/s per user on reads",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Idempotency-Key (24 h, per user+route); replay returns the original status and body; same key + different body → 409 idempotency-key-reused.",
+        "x-emits": [],
+        "x-paginated": false
+      },
+      "get": {
+        "operationId": "listUploads",
+        "summary": "List uploads (newest first)",
+        "tags": [
+          "Uploads"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "awaiting_file",
+                "inspecting",
+                "awaiting_mapping",
+                "ready",
+                "awaiting_duplicate_confirmation",
+                "queued",
+                "processing",
+                "completed",
+                "failed",
+                "cancelled"
+              ]
+            }
+          },
+          {
+            "name": "sourceType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Channel",
+                "Digi",
+                "Direct"
+              ]
+            }
+          },
+          {
+            "name": "uploadedBy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "strict",
+                "mapping"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of uploads",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": true
+      }
+    },
+    "/v1/uploads/{idOrCode}": {
+      "parameters": [
+        {
+          "name": "idOrCode",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Upload UUID or code (UPL-…)"
+        }
+      ],
+      "get": {
+        "operationId": "getUpload",
+        "summary": "Get an upload (status, mode, counts, suggested mapping)",
+        "tags": [
+          "Uploads"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Upload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": false
+      },
+      "patch": {
+        "operationId": "patchUpload",
+        "summary": "Change pre-start options (anonymise switch, source detail, sheet)",
+        "tags": [
+          "Uploads"
+        ],
+        "description": "Only the uploader, Admin or Manager. 409 upload-not-editable after start; 409 anonymise-required when turning anonymise off in pilot mode.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadPatch"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "JSON Merge Patch, idempotent by design; If-Match: <version> → 412 version-mismatch on mismatch.",
+        "x-emits": [],
+        "x-paginated": false
+      }
+    },
+    "/v1/uploads/{idOrCode}/inspect": {
+      "parameters": [
+        {
+          "name": "idOrCode",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Upload UUID or code (UPL-…)"
+        }
+      ],
+      "post": {
+        "operationId": "inspectUpload",
+        "summary": "Confirm the file is in storage and inspect it asynchronously",
+        "tags": [
+          "Uploads"
+        ],
+        "description": "Checks the storage object exists and matches sizeBytes, then enqueues q_intake_inspect: sheet list, header row, sha256, strict/mapping detection (D-15), migration_map sheet detection, suggested mapping, duplicate detection. 409 file-missing if the object is not in storage.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Already inspected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Inspection queued (status inspecting). Poll GET /v1/uploads/{id}.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Naturally idempotent: a repeat while inspecting or after inspection returns the current upload (202/200); Idempotency-Key also honoured.",
+        "x-emits": [],
+        "x-paginated": false
+      }
+    },
+    "/v1/uploads/{idOrCode}/mapping": {
+      "parameters": [
+        {
+          "name": "idOrCode",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Upload UUID or code (UPL-…)"
+        }
+      ],
+      "put": {
+        "operationId": "putUploadMapping",
+        "summary": "Set the column mapping (mapping mode) and optionally save it as a template",
+        "tags": [
+          "Uploads"
+        ],
+        "description": "Allowed in awaiting_mapping or ready. Every required target (record_scope or a constant, and at least one of raw_text / property_type / deal_type) must be mapped; each target may be used once. In strict mode 409 mapping-not-allowed.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mapping"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mapping stored; status ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Full replacement, idempotent by design; If-Match: <version> optional.",
+        "x-emits": [],
+        "x-paginated": false
+      }
+    },
+    "/v1/uploads/{idOrCode}/start": {
+      "parameters": [
+        {
+          "name": "idOrCode",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Upload UUID or code (UPL-…)"
+        }
+      ],
+      "post": {
+        "operationId": "startUpload",
+        "summary": "Start background processing",
+        "tags": [
+          "Uploads"
+        ],
+        "description": "Pins the active vocabulary version, fixes chunk size (500 pilot / 2,000 paid) and enqueues the split job. 409 upload-not-ready (not inspected or mapping missing), 409 duplicate-upload (identical file already processed; send allowDuplicate=true), 409 vocabulary-unavailable.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued; upload.started.v1 is emitted when splitting begins",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Idempotency-Key (24 h, per user+route); replay returns the original status and body; same key + different body → 409 idempotency-key-reused.",
+        "x-emits": [
+          "upload.started.v1",
+          "rows.classified.v1",
+          "review_item.created.v1",
+          "upload.completed.v1",
+          "upload.failed.v1"
+        ],
+        "x-paginated": false
+      }
+    },
+    "/v1/uploads/{idOrCode}/cancel": {
+      "parameters": [
+        {
+          "name": "idOrCode",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Upload UUID or code (UPL-…)"
+        }
+      ],
+      "post": {
+        "operationId": "cancelUpload",
+        "summary": "Cancel an upload that has not completed",
+        "tags": [
+          "Uploads"
+        ],
+        "description": "Stops queued chunks. Batches already emitted stay applied in records (re-upload is idempotent). Emits upload.failed.v1 (reason cancelled) if processing had started. Uploader, Admin or Manager only.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Idempotency-Key (24 h, per user+route); replay returns the original status and body; same key + different body → 409 idempotency-key-reused.",
+        "x-emits": [
+          "upload.failed.v1"
+        ],
+        "x-paginated": false
+      }
+    },
+    "/v1/uploads/{idOrCode}/progress": {
+      "parameters": [
+        {
+          "name": "idOrCode",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Upload UUID or code (UPL-…)"
+        }
+      ],
+      "get": {
+        "operationId": "getUploadProgress",
+        "summary": "Processing progress per stage",
+        "tags": [
+          "Uploads"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Progress"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": false
+      }
+    },
+    "/v1/uploads/{idOrCode}/row-errors": {
+      "parameters": [
+        {
+          "name": "idOrCode",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Upload UUID or code (UPL-…)"
+        }
+      ],
+      "get": {
+        "operationId": "listRowErrors",
+        "summary": "Row errors (rejected rows) with field, code and non-PII value",
+        "tags": [
+          "Uploads"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "field",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of row errors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RowErrorPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": true
+      }
+    },
+    "/v1/uploads/{idOrCode}/rejected-rows": {
+      "parameters": [
+        {
+          "name": "idOrCode",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Upload UUID or code (UPL-…)"
+        }
+      ],
+      "get": {
+        "operationId": "getRejectedRowsLink",
+        "summary": "Signed link to download the rejected rows file (CSV, original values)",
+        "tags": [
+          "Uploads"
+        ],
+        "description": "Uploader, Admin, Manager or Data operator only (re-checked). 409 rejected-file-not-ready until the upload completes. The file itself is built by the finalize job; it holds the original cells (anonymised when the switch was on) plus an error column.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed link, valid 15 min",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedLink"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe; each call mints a new short-lived link and records one audit entry (file contains contact PII).",
+        "x-emits": [
+          "audit.recorded.v1"
+        ],
+        "x-paginated": false
+      }
+    },
+    "/v1/uploads/{idOrCode}/migration-map": {
+      "parameters": [
+        {
+          "name": "idOrCode",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Upload UUID or code (UPL-…)"
+        }
+      ],
+      "get": {
+        "operationId": "getUploadMigrationMap",
+        "summary": "Parsed migration_map sheet (CR-006 Z-5)",
+        "tags": [
+          "Uploads"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "kept",
+                "merged",
+                "split"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Summary and page of entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MigrationMapSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": true
+      }
+    },
+    "/v1/templates": {
+      "get": {
+        "operationId": "listTemplates",
+        "summary": "List saved mapping templates",
+        "tags": [
+          "Templates"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "sourceType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Channel",
+                "Digi",
+                "Direct"
+              ]
+            }
+          },
+          {
+            "name": "headerFingerprint",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Find the template for a header set"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplatePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": true
+      },
+      "post": {
+        "operationId": "createTemplate",
+        "summary": "Create a mapping template",
+        "tags": [
+          "Templates"
+        ],
+        "description": "409 template-name-taken.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Template"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Idempotency-Key (24 h, per user+route); replay returns the original status and body; same key + different body → 409 idempotency-key-reused.",
+        "x-emits": [],
+        "x-paginated": false
+      }
+    },
+    "/v1/templates/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "Template id"
+        }
+      ],
+      "get": {
+        "operationId": "getTemplate",
+        "summary": "Get a template",
+        "tags": [
+          "Templates"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Template"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": false
+      },
+      "put": {
+        "operationId": "putTemplate",
+        "summary": "Replace a template",
+        "tags": [
+          "Templates"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Template"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Full replacement, idempotent by design; If-Match: <version> → 412 version-mismatch.",
+        "x-emits": [],
+        "x-paginated": false
+      },
+      "delete": {
+        "operationId": "deleteTemplate",
+        "summary": "Delete (soft) a template",
+        "tags": [
+          "Templates"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Idempotent: deleting an already-deleted item returns 204.",
+        "x-emits": [],
+        "x-paginated": false
+      }
+    },
+    "/v1/review-items": {
+      "get": {
+        "operationId": "listReviewItems",
+        "summary": "Classification review queue, filterable by reason code",
+        "tags": [
+          "Review"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "reasonCode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "side_defaulted",
+                "deal_type_missing",
+                "side_unclear",
+                "property_type_missing",
+                "value_not_translatable",
+                "model_unavailable",
+                "low_confidence",
+                "other"
+              ],
+              "description": "Reason code derived for grouping (PRD US-07a AC5). Matches rows.classified.v1 reviewReasonCode."
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "resolved",
+                "skipped"
+              ],
+              "default": "open"
+            }
+          },
+          {
+            "name": "uploadId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "detailCode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "extractor_flag",
+                "value_not_translatable",
+                "model_unavailable",
+                "low_confidence",
+                "redaction_uncertain",
+                "side_missing",
+                "scope_unclear"
+              ],
+              "description": "Finer intake-side cause (stored; not in the event)."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of review items, oldest first within the group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewItemPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": true
+      }
+    },
+    "/v1/review-items/summary": {
+      "get": {
+        "operationId": "getReviewSummary",
+        "summary": "Open review items grouped by reason code (C-05 group headers)",
+        "tags": [
+          "Review"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "name": "uploadId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": false
+      }
+    },
+    "/v1/review-items/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getReviewItem",
+        "summary": "Get one review item with redacted context",
+        "tags": [
+          "Review"
+        ],
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Review item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewItem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": false
+      }
+    },
+    "/v1/review-items/{id}/resolve": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "resolveReviewItem",
+        "summary": "Resolve a review item (set / confirm / skip)",
+        "tags": [
+          "Review"
+        ],
+        "description": "Values are validated against the upload's pinned vocabulary version (scope → deal_type, segment → property_type, market only with Sale). set/confirm/discard emit review_item.resolved.v1 (with uploadId and action); skip emits nothing. 409 review-item-closed if already resolved.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewResolve"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Idempotency-Key (24 h, per user+route); replay returns the original status and body; same key + different body → 409 idempotency-key-reused.",
+        "x-emits": [
+          "review_item.resolved.v1"
+        ],
+        "x-paginated": false
+      }
+    },
+    "/v1/review-items/bulk-resolve": {
+      "post": {
+        "operationId": "bulkResolveReviewItems",
+        "summary": "Resolve up to 100 review items with one classification (e.g. accept defaulted side)",
+        "tags": [
+          "Review"
+        ],
+        "description": "One event per resolved item. Items already closed are reported in failed[] with review-item-closed.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkResolve"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-item outcome",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkResolveResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Data operator"
+        ],
+        "x-rate-limit": "20 req/s per user, burst 40 (enforced at web, conventions §4)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Idempotency-Key (24 h, per user+route); replay returns the original status and body; same key + different body → 409 idempotency-key-reused.",
+        "x-emits": [
+          "review_item.resolved.v1"
+        ],
+        "x-paginated": false
+      }
+    },
+    "/v1/parse": {
+      "post": {
+        "operationId": "parseFreeText",
+        "summary": "Parse typed free text into a suggested classification (quick add prefill)",
+        "tags": [
+          "Parse"
+        ],
+        "description": "Rules first; only text that rules cannot classify is redacted (phones, emails, names near contact phrases, unit numbers → placeholders) and sent to the Hugging Face model (ADR-0004). The text is never persisted or logged.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Suggestion (never stored)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParseResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent"
+        ],
+        "x-rate-limit": "30 req/min per user (bounds model spend; conventions §4 default otherwise)",
+        "x-timeout-ms": 4000,
+        "x-timeout-justification": "Approved exception R-5 (conventions §10): rules (~50 ms) + one redacted model call capped at 2 s, no retry; web uses a 4 s per-route timeout.",
+        "x-idempotency": "Stateless and side-effect free; Idempotency-Key not required (nothing is stored).",
+        "x-emits": [],
+        "x-paginated": false
+      }
+    },
+    "/internal/v1/uploads/{uploadId}/rows": {
+      "get": {
+        "operationId": "internalGetUploadRows",
+        "summary": "Rows of one emitted batch, with PII and raw text (records ingestion)",
+        "tags": [
+          "Internal"
+        ],
+        "description": "Service token minted by web (R-2, POST /internal/v1/service-tokens; verified against web JWKS) with aud=intake, sub=records and the tenant's tid. Response is never cached or logged. 404 batch-not-found if the batch was not emitted (or raw rows were purged).",
+        "security": [
+          {
+            "serviceToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "name": "uploadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "batch",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "batchNo from rows.classified.v1"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch (≤ 500 rows)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeRowBatch"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "records drainers only (≤ 8 concurrent); no user limit",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": false,
+        "x-callers": [
+          "records"
+        ]
+      }
+    },
+    "/internal/v1/uploads/{uploadId}/migration-map": {
+      "get": {
+        "operationId": "internalGetMigrationMap",
+        "summary": "Migration map entries for records to apply before any batch of this upload",
+        "tags": [
+          "Internal"
+        ],
+        "security": [
+          {
+            "serviceToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "name": "uploadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 1000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of entries (in entryNo order)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalMigrationMap"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "records drainers only; no user limit",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": true,
+        "x-callers": [
+          "records"
+        ]
+      }
+    },
+    "/internal/v1/relay": {
+      "post": {
+        "operationId": "intakeRelay",
+        "summary": "Relay unpublished outbox rows to consumer pgmq queues",
+        "tags": [
+          "Internal"
+        ],
+        "description": "Reads up to 5,000 outbox rows where published_at is null and enqueues one copy per subscribed consumer queue (subscriptions from contracts/asyncapi/events.yaml).",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Relay run summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "processed": {
+                      "type": "integer"
+                    },
+                    "remaining": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "durationMs": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "processed",
+                    "durationMs"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "n/a: pg_cron/pg_net only (1 call/min per job plus pokes)",
+        "x-timeout-ms": 60000,
+        "x-timeout-justification": "Background work, not on a request path: function max duration 60 s pilot; chunk drains up to 300 s on Pro (capacity plan §2).",
+        "x-idempotency": "Safe to repeat: rows are claimed with FOR UPDATE SKIP LOCKED and marked published_at in the same transaction; consumers dedupe on eventId.",
+        "x-emits": [],
+        "x-paginated": false,
+        "x-callers": [
+          "pg_cron (every minute)",
+          "post-commit poke (pg_net)"
+        ]
+      }
+    },
+    "/internal/v1/drain/{queue}": {
+      "post": {
+        "operationId": "intakeDrain",
+        "summary": "Drain one of this service's pgmq queues",
+        "tags": [
+          "Internal"
+        ],
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "name": "queue",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "q_intake",
+                "q_intake_inspect",
+                "q_intake_split",
+                "q_intake_chunks",
+                "q_intake_finalize"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Drain run summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "processed": {
+                      "type": "integer"
+                    },
+                    "remaining": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "durationMs": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "processed",
+                    "durationMs"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "n/a: pg_cron/pg_net only (1 call/min per job plus pokes)",
+        "x-timeout-ms": 60000,
+        "x-timeout-justification": "Background work, not on a request path: function max duration 60 s pilot; chunk drains up to 300 s on Pro (capacity plan §2).",
+        "x-idempotency": "Safe to repeat: messages are read with a visibility timeout; handlers dedupe on eventId (processed_events) or on their own work key; after 5 failed reads a message moves to <queue>_dlq.",
+        "x-emits": [],
+        "x-paginated": false,
+        "x-callers": [
+          "pg_cron (every minute)",
+          "self re-poke while the queue is non-empty (pg_net)"
+        ]
+      }
+    },
+    "/internal/v1/jobs/{name}": {
+      "post": {
+        "operationId": "intakeJob",
+        "summary": "Run a scheduled job",
+        "tags": [
+          "Internal"
+        ],
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "retention-purge",
+                "expire-idempotency-keys",
+                "reap-chunk-leases",
+                "delete-processed-files"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job run summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "processed": {
+                      "type": "integer"
+                    },
+                    "remaining": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "durationMs": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "processed",
+                    "durationMs"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "n/a: pg_cron/pg_net only (1 call/min per job plus pokes)",
+        "x-timeout-ms": 60000,
+        "x-timeout-justification": "Background work, not on a request path: function max duration 60 s pilot; chunk drains up to 300 s on Pro (capacity plan §2).",
+        "x-idempotency": "Jobs are idempotent: each works from persisted state and a per-job advisory lock prevents overlapping runs (a second call returns 409 conflict).",
+        "x-emits": [],
+        "x-paginated": false,
+        "x-callers": [
+          "pg_cron"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "intakeHealthLive",
+        "summary": "Liveness (process up)",
+        "tags": [
+          "Health"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "none (health probe)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": false,
+        "x-callers": [
+          "platform probe",
+          "uptime monitor"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "intakeHealthReady",
+        "summary": "Readiness (DB reachable, migrations at expected version)",
+        "tags": [
+          "Health"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "none (health probe)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": false,
+        "x-callers": [
+          "platform probe",
+          "uptime monitor"
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "staffViaWeb": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Service token minted by web for a signed-in staff user (aud=<service>, sub=web, tid, 5 min), plus headers X-User-Id, X-User-Role, X-Tenant-Id. Services re-check role and tenant.\n"
+      },
+      "serviceToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Service-to-service JWT (aud=<service>, sub=<caller>, tid, 5 min). Issued by web at POST /internal/v1/service-tokens; verify with web GET /.well-known/jwks.json (conventions R-2). Internal routes only."
+      },
+      "cronSecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Cron-Secret",
+        "description": "Per-service secret used by Supabase pg_cron/pg_net for /internal/v1/relay, /internal/v1/drain/*, /internal/v1/jobs/*."
+      }
+    },
+    "schemas": {
+      "Classification": {
+        "type": "object",
+        "properties": {
+          "recordScope": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "Property",
+              "Business",
+              "Capital",
+              "Equipment",
+              "Market Participant",
+              "Market Signal",
+              null
+            ]
+          },
+          "side": {
+            "$ref": "#/components/schemas/Side"
+          },
+          "dealTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-vocabulary": "deal_type"
+            }
+          },
+          "market": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "market"
+          },
+          "segment": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "segment"
+          },
+          "propertyTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-vocabulary": "property_type"
+            }
+          }
+        },
+        "description": "Classification in BRD §4.2 order. Blank = null (never 'Unknown')."
+      },
+      "UploadCounts": {
+        "type": "object",
+        "properties": {
+          "read": {
+            "type": "integer"
+          },
+          "accepted": {
+            "type": "integer"
+          },
+          "rejected": {
+            "type": "integer"
+          },
+          "needsReview": {
+            "type": "integer"
+          },
+          "unchanged": {
+            "type": "integer",
+            "description": "Rows skipped because externalRef + contentHash were already ingested"
+          },
+          "unclassified": {
+            "type": "integer"
+          },
+          "migrationEntries": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "read",
+          "accepted",
+          "rejected",
+          "needsReview",
+          "unchanged"
+        ]
+      },
+      "Upload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "UPL-000123"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "sheetNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sheetName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "awaiting_file",
+              "inspecting",
+              "awaiting_mapping",
+              "ready",
+              "awaiting_duplicate_confirmation",
+              "queued",
+              "processing",
+              "completed",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "stage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "parsing",
+              "normalising",
+              "classifying",
+              "emitting",
+              null
+            ]
+          },
+          "mode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "strict",
+              "mapping",
+              null
+            ],
+            "description": "Set by inspection (D-15)"
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "Channel",
+              "Digi",
+              "Direct"
+            ]
+          },
+          "sourceDetail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "templateId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "anonymise": {
+            "type": "boolean",
+            "description": "Pilot anonymise-on-import switch (CR-006 Z-9)"
+          },
+          "importCrmNotes": {
+            "type": "boolean",
+            "description": "One-time initial import: carry crm_notes as a note (CR-006 Z-8)"
+          },
+          "vocabularyVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasMigrationMap": {
+            "type": "boolean"
+          },
+          "duplicateOfUploadId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "chunkSize": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "chunkCount": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "chunksDone": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "batchCount": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "counts": {
+            "$ref": "#/components/schemas/UploadCounts"
+          },
+          "header": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Column headers as read (no cell values)"
+          },
+          "suggestedMapping": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "description": "sourceHeader → target field (mapping mode). Never contains cell values."
+          },
+          "columnMap": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "rejectedFileReady": {
+            "type": "boolean"
+          },
+          "failureReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uploadedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "fileName",
+          "status",
+          "sourceType",
+          "anonymise",
+          "counts",
+          "uploadedBy",
+          "createdAt",
+          "version"
+        ]
+      },
+      "UploadCreate": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "maxLength": 255,
+            "pattern": "(?i)\\.(xlsx|xls|csv)$"
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "text/csv",
+              "application/vnd.ms-excel",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ]
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 52428800,
+            "description": "≤ 50 MB (PRD A-19)"
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "Channel",
+              "Digi",
+              "Direct"
+            ]
+          },
+          "sourceDetail": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "templateId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "anonymise": {
+            "type": "boolean",
+            "description": "Default true while the tenant is in pilot mode; false is refused with 409 anonymise-required until the paid-plan gate."
+          },
+          "importCrmNotes": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "fileName",
+          "contentType",
+          "sizeBytes",
+          "sourceType"
+        ],
+        "additionalProperties": false
+      },
+      "UploadCreated": {
+        "type": "object",
+        "properties": {
+          "upload": {
+            "$ref": "#/components/schemas/Upload"
+          },
+          "uploadUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "Supabase Storage signed upload URL (PUT), bucket intake-uploads, single use"
+          },
+          "uploadUrlExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "upload",
+          "uploadUrl",
+          "uploadUrlExpiresAt"
+        ]
+      },
+      "UploadPatch": {
+        "type": "object",
+        "properties": {
+          "anonymise": {
+            "type": "boolean"
+          },
+          "importCrmNotes": {
+            "type": "boolean"
+          },
+          "sourceDetail": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "sheetName": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Allowed only before start (status awaiting_file…ready); otherwise 409 upload-not-editable."
+      },
+      "Mapping": {
+        "type": "object",
+        "properties": {
+          "sheetName": {
+            "type": "string"
+          },
+          "columnMap": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "route_to",
+                "needs_review",
+                "review_reason",
+                "record_id",
+                "parent_record_id",
+                "split_index",
+                "record_scope",
+                "deal_type",
+                "market",
+                "segment",
+                "property_type",
+                "property_detail",
+                "land_use",
+                "side",
+                "side_evidence",
+                "sale_mode",
+                "deadline_date",
+                "tenancy_status",
+                "tenure",
+                "agreement_form",
+                "is_jodi",
+                "possession_status",
+                "possession_date",
+                "furnishing",
+                "sector",
+                "includes_property",
+                "business_description",
+                "participant_role",
+                "signal_type",
+                "project_name",
+                "developer_name",
+                "bhk_min",
+                "bhk_max",
+                "features",
+                "locality",
+                "city",
+                "state",
+                "landmark",
+                "location_text",
+                "area_sqft_min",
+                "area_sqft_max",
+                "area_basis",
+                "land_area_value",
+                "land_area_unit",
+                "land_area_sqft",
+                "area_text",
+                "price_text",
+                "sale_price_inr_min",
+                "sale_price_inr_max",
+                "sale_rate_inr",
+                "sale_rate_unit",
+                "price_negotiable",
+                "rent_monthly_inr_min",
+                "rent_monthly_inr_max",
+                "rent_rate_psf",
+                "deposit_inr",
+                "deposit_months",
+                "current_rent_inr",
+                "yield_pct",
+                "contact_name",
+                "company_name",
+                "party_type",
+                "phones",
+                "whatsapp_phone",
+                "emails",
+                "rera_number",
+                "other_contact",
+                "source_channel",
+                "source_name",
+                "source_edition",
+                "source_supplement",
+                "source_date",
+                "source_page",
+                "source_files",
+                "first_seen_date",
+                "last_seen_date",
+                "times_seen",
+                "possible_repeat_of",
+                "raw_text",
+                "source_language",
+                "ocr_used",
+                "extraction_confidence",
+                "extractor_notes",
+                "sender_name",
+                "sender_phone",
+                "text_variants",
+                "external_id",
+                "campaign_ref",
+                "form_ref",
+                "listing_ref",
+                "project_ref",
+                "enquiry_message",
+                "enquiry_received_at",
+                "photo_urls",
+                "free_text",
+                null
+              ]
+            },
+            "description": "sourceHeader → target field (Appendix C snake_case name) or null to ignore"
+          },
+          "constants": {
+            "type": "object",
+            "properties": {
+              "sourceType": {
+                "type": "string",
+                "enum": [
+                  "Channel",
+                  "Digi",
+                  "Direct"
+                ]
+              },
+              "sourceName": {
+                "type": "string"
+              },
+              "sourceChannel": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "x-vocabulary": "source_channel"
+              },
+              "recordScope": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "templateId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "saveAsTemplate": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 100
+              }
+            },
+            "required": [
+              "name"
+            ]
+          }
+        },
+        "required": [
+          "columnMap"
+        ],
+        "additionalProperties": false
+      },
+      "StartRequest": {
+        "type": "object",
+        "properties": {
+          "allowDuplicate": {
+            "type": "boolean",
+            "default": false,
+            "description": "Required when status is awaiting_duplicate_confirmation"
+          },
+          "reprocessUnchanged": {
+            "type": "boolean",
+            "default": false,
+            "description": "Re-emit rows whose externalRef + contentHash were already ingested (recovery after a records DLQ incident). Admin/Manager only."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Progress": {
+        "type": "object",
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "awaiting_file",
+              "inspecting",
+              "awaiting_mapping",
+              "ready",
+              "awaiting_duplicate_confirmation",
+              "queued",
+              "processing",
+              "completed",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "stage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "chunkCount": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "chunksDone": {
+            "type": "integer"
+          },
+          "chunksFailed": {
+            "type": "integer"
+          },
+          "batchesEmitted": {
+            "type": "integer"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/UploadCounts"
+          },
+          "etaSeconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "uploadId",
+          "status",
+          "chunksDone",
+          "counts",
+          "updatedAt"
+        ]
+      },
+      "RowError": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rowNo": {
+            "type": "integer"
+          },
+          "sheetName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "field": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "description": "error = row rejected; warning = row loaded, value dropped"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "value-not-in-list",
+              "invalid-type",
+              "invalid-date",
+              "required-missing",
+              "range-inverted",
+              "invalid-phone",
+              "scope-deal-type-mismatch",
+              "segment-property-type-mismatch",
+              "market-on-non-sale",
+              "side-scope-mismatch",
+              "duplicate-external-ref",
+              "migration-entry-invalid",
+              "parse-error"
+            ]
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Offending value; null when the field is a PII field"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "rowNo",
+          "field",
+          "severity",
+          "code",
+          "message"
+        ]
+      },
+      "SignedLink": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rowCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt",
+          "rowCount"
+        ]
+      },
+      "MigrationMapEntry": {
+        "type": "object",
+        "properties": {
+          "entryNo": {
+            "type": "integer"
+          },
+          "oldRef": {
+            "type": "string"
+          },
+          "newRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "kept",
+              "merged",
+              "split"
+            ]
+          }
+        },
+        "required": [
+          "entryNo",
+          "oldRef",
+          "newRefs",
+          "action"
+        ]
+      },
+      "MigrationMapSummary": {
+        "type": "object",
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entries": {
+            "type": "integer"
+          },
+          "byAction": {
+            "type": "object",
+            "properties": {
+              "kept": {
+                "type": "integer"
+              },
+              "merged": {
+                "type": "integer"
+              },
+              "split": {
+                "type": "integer"
+              }
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MigrationMapEntry"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "uploadId",
+          "entries",
+          "byAction",
+          "items",
+          "nextCursor"
+        ]
+      },
+      "Template": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "Channel",
+              "Digi",
+              "Direct"
+            ]
+          },
+          "sourceDetail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "headerFingerprint": {
+            "type": "string"
+          },
+          "columnMap": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "constants": {
+            "type": "object"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sourceType",
+          "headerFingerprint",
+          "columnMap",
+          "version"
+        ]
+      },
+      "TemplateInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "Channel",
+              "Digi",
+              "Direct"
+            ]
+          },
+          "sourceDetail": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 200
+          },
+          "columnMap": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "route_to",
+                "needs_review",
+                "review_reason",
+                "record_id",
+                "parent_record_id",
+                "split_index",
+                "record_scope",
+                "deal_type",
+                "market",
+                "segment",
+                "property_type",
+                "property_detail",
+                "land_use",
+                "side",
+                "side_evidence",
+                "sale_mode",
+                "deadline_date",
+                "tenancy_status",
+                "tenure",
+                "agreement_form",
+                "is_jodi",
+                "possession_status",
+                "possession_date",
+                "furnishing",
+                "sector",
+                "includes_property",
+                "business_description",
+                "participant_role",
+                "signal_type",
+                "project_name",
+                "developer_name",
+                "bhk_min",
+                "bhk_max",
+                "features",
+                "locality",
+                "city",
+                "state",
+                "landmark",
+                "location_text",
+                "area_sqft_min",
+                "area_sqft_max",
+                "area_basis",
+                "land_area_value",
+                "land_area_unit",
+                "land_area_sqft",
+                "area_text",
+                "price_text",
+                "sale_price_inr_min",
+                "sale_price_inr_max",
+                "sale_rate_inr",
+                "sale_rate_unit",
+                "price_negotiable",
+                "rent_monthly_inr_min",
+                "rent_monthly_inr_max",
+                "rent_rate_psf",
+                "deposit_inr",
+                "deposit_months",
+                "current_rent_inr",
+                "yield_pct",
+                "contact_name",
+                "company_name",
+                "party_type",
+                "phones",
+                "whatsapp_phone",
+                "emails",
+                "rera_number",
+                "other_contact",
+                "source_channel",
+                "source_name",
+                "source_edition",
+                "source_supplement",
+                "source_date",
+                "source_page",
+                "source_files",
+                "first_seen_date",
+                "last_seen_date",
+                "times_seen",
+                "possible_repeat_of",
+                "raw_text",
+                "source_language",
+                "ocr_used",
+                "extraction_confidence",
+                "extractor_notes",
+                "sender_name",
+                "sender_phone",
+                "text_variants",
+                "external_id",
+                "campaign_ref",
+                "form_ref",
+                "listing_ref",
+                "project_ref",
+                "enquiry_message",
+                "enquiry_received_at",
+                "photo_urls",
+                "free_text",
+                null
+              ]
+            }
+          },
+          "constants": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "sourceType",
+          "headers",
+          "columnMap"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploadCode": {
+            "type": "string"
+          },
+          "rowId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rowNo": {
+            "type": "integer"
+          },
+          "externalRef": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string",
+            "enum": [
+              "side_defaulted",
+              "deal_type_missing",
+              "side_unclear",
+              "property_type_missing",
+              "value_not_translatable",
+              "model_unavailable",
+              "low_confidence",
+              "other"
+            ],
+            "description": "Reason code derived for grouping (PRD US-07a AC5). Matches rows.classified.v1 reviewReasonCode."
+          },
+          "detailCode": {
+            "type": "string",
+            "enum": [
+              "extractor_flag",
+              "value_not_translatable",
+              "model_unavailable",
+              "low_confidence",
+              "redaction_uncertain",
+              "side_missing",
+              "scope_unclear"
+            ],
+            "description": "Finer intake-side cause (stored; not in the event)."
+          },
+          "reviewReasonText": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Extractor's review_reason text, kept verbatim"
+          },
+          "current": {
+            "$ref": "#/components/schemas/Classification"
+          },
+          "suggested": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Classification"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "context": {
+            "type": "object",
+            "properties": {
+              "locality": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "city": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priceText": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "areaText": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sideEvidence": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "redactedText": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "raw_text with contacts redacted"
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "resolved",
+              "skipped"
+            ]
+          },
+          "resolution": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "set",
+              "confirm",
+              "discard",
+              null
+            ]
+          },
+          "resolvedBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "resolvedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "uploadId",
+          "rowId",
+          "externalRef",
+          "reasonCode",
+          "status",
+          "current",
+          "createdAt",
+          "version"
+        ]
+      },
+      "ReviewSummary": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "reasonCode": {
+                  "type": "string",
+                  "enum": [
+                    "side_defaulted",
+                    "deal_type_missing",
+                    "side_unclear",
+                    "property_type_missing",
+                    "value_not_translatable",
+                    "model_unavailable",
+                    "low_confidence",
+                    "other"
+                  ],
+                  "description": "Reason code derived for grouping (PRD US-07a AC5). Matches rows.classified.v1 reviewReasonCode."
+                },
+                "open": {
+                  "type": "integer"
+                },
+                "oldestAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "reasonCode",
+                "open"
+              ]
+            }
+          }
+        },
+        "required": [
+          "groups"
+        ]
+      },
+      "ReviewResolve": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "set",
+              "confirm",
+              "discard",
+              "skip"
+            ],
+            "description": "set = apply the given classification; confirm = accept current values; discard = the row is not a real record (records voids it); skip = defer (stays visible, no event)"
+          },
+          "classification": {
+            "$ref": "#/components/schemas/Classification"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "BulkResolve": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "set",
+              "confirm",
+              "discard"
+            ]
+          },
+          "classification": {
+            "$ref": "#/components/schemas/Classification"
+          }
+        },
+        "required": [
+          "ids",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "BulkResolveResult": {
+        "type": "object",
+        "properties": {
+          "resolved": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "code": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "resolved",
+          "failed"
+        ]
+      },
+      "ParseRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 2000
+          },
+          "sideHint": {
+            "$ref": "#/components/schemas/Side"
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "Channel",
+              "Digi",
+              "Direct"
+            ],
+            "default": "Direct"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "ParseResult": {
+        "type": "object",
+        "properties": {
+          "classification": {
+            "$ref": "#/components/schemas/Classification"
+          },
+          "fields": {
+            "type": "object",
+            "properties": {
+              "bhkMin": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "bhkMax": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "areaSqftMin": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "areaSqftMax": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "areaBasis": {
+                "$ref": "#/components/schemas/AreaBasis"
+              },
+              "salePriceInrMin": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "description": "INR, whole rupees"
+              },
+              "salePriceInrMax": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "description": "INR, whole rupees"
+              },
+              "rentMonthlyInrMin": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "description": "INR, whole rupees"
+              },
+              "rentMonthlyInrMax": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "description": "INR, whole rupees"
+              },
+              "locality": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "micromarketHint": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "moveInText": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "furnishing": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "x-vocabulary": "furnishing"
+              },
+              "tenancyStatus": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "x-vocabulary": "tenancy_status"
+              },
+              "saleMode": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "x-vocabulary": "sale_mode"
+              },
+              "companyName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "referrerText": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "contacts": {
+            "type": "object",
+            "properties": {
+              "phones": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "E.164, extracted by rules from the caller's own text; returned to the caller only, never stored or logged"
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "nameCandidate": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "needsReview": {
+            "type": "boolean"
+          },
+          "usedModel": {
+            "type": "boolean"
+          },
+          "modelUnavailable": {
+            "type": "boolean",
+            "description": "true when the model was skipped (credits, timeout, breaker open): rules-only result"
+          },
+          "vocabularyVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "classification",
+          "fields",
+          "contacts",
+          "confidence",
+          "usedModel",
+          "vocabularyVersion"
+        ]
+      },
+      "IntakeRow": {
+        "type": "object",
+        "properties": {
+          "rowId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rowNo": {
+            "type": "integer"
+          },
+          "sheetName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "externalSource": {
+            "type": "string",
+            "enum": [
+              "extractor",
+              "upload"
+            ]
+          },
+          "externalRef": {
+            "type": "string"
+          },
+          "parentExternalRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "splitIndex": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contentHash": {
+            "type": "string"
+          },
+          "routeTo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "route_to"
+          },
+          "needsReview": {
+            "type": "boolean"
+          },
+          "reviewReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewReasonCode": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "side_defaulted",
+                  "deal_type_missing",
+                  "side_unclear",
+                  "property_type_missing",
+                  "value_not_translatable",
+                  "model_unavailable",
+                  "low_confidence",
+                  "other"
+                ],
+                "description": "Reason code derived for grouping (PRD US-07a AC5). Matches rows.classified.v1 reviewReasonCode."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recordScope": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dealTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-vocabulary": "deal_type"
+            }
+          },
+          "market": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "market"
+          },
+          "segment": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "segment"
+          },
+          "propertyTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-vocabulary": "property_type"
+            }
+          },
+          "propertyDetail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "landUse": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "land_use"
+          },
+          "side": {
+            "$ref": "#/components/schemas/Side"
+          },
+          "sideEvidence": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "saleMode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "sale_mode"
+          },
+          "deadlineDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "tenancyStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "tenancy_status"
+          },
+          "tenure": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "tenure"
+          },
+          "agreementForm": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "agreement_form"
+          },
+          "isJodi": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "possessionStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "possession_status"
+          },
+          "possessionDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}(-\\d{2}(-\\d{2})?)?$"
+          },
+          "furnishing": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "furnishing"
+          },
+          "sector": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "sector"
+          },
+          "includesProperty": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "includes_property"
+          },
+          "businessDescription": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "participantRole": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "participant_role"
+          },
+          "signalType": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "signal_type"
+          },
+          "projectName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "developerName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bhkMin": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "bhkMax": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "features": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locality": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "landmark": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locationText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "areaSqftMin": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "areaSqftMax": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "areaBasis": {
+            "$ref": "#/components/schemas/AreaBasis"
+          },
+          "landAreaValue": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "landAreaUnit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "land_area_unit"
+          },
+          "landAreaSqft": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "areaText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priceText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "salePriceInrMin": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "INR, whole rupees"
+          },
+          "salePriceInrMax": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "INR, whole rupees"
+          },
+          "saleRateInr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "INR, whole rupees"
+          },
+          "saleRateUnit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "sale_rate_unit"
+          },
+          "priceNegotiable": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "rentMonthlyInrMin": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "INR, whole rupees"
+          },
+          "rentMonthlyInrMax": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "INR, whole rupees"
+          },
+          "rentRatePsf": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "depositInr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "INR, whole rupees"
+          },
+          "depositMonths": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "currentRentInr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "INR, whole rupees"
+          },
+          "yieldPct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "contactName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PII"
+          },
+          "companyName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "partyType": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "party_type"
+          },
+          "phones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "PII, E.164"
+          },
+          "whatsappPhone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PII, E.164"
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "PII"
+          },
+          "reraNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "otherContact": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PII"
+          },
+          "sourceChannel": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-vocabulary": "source_channel"
+          },
+          "sourceName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceEdition": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceSupplement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "sourcePage": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sourceFiles": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "firstSeenDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "lastSeenDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "timesSeen": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "possibleRepeatOf": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rawText": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PII"
+          },
+          "sourceLanguage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ocrUsed": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "extractionConfidence": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "extractorNotes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "senderName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PII"
+          },
+          "senderPhone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PII, E.164"
+          },
+          "textVariants": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PII"
+          },
+          "crmNotes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PII; present only when the upload has importCrmNotes = true"
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "Channel",
+              "Digi",
+              "Direct"
+            ]
+          },
+          "captureMode": {
+            "type": "string",
+            "enum": [
+              "uploaded"
+            ]
+          },
+          "campaignRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "formRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "listingRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "projectRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enquiryMessage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PII"
+          },
+          "enquiryReceivedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "photoUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "anonymised": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "rowId",
+          "rowNo",
+          "externalSource",
+          "externalRef",
+          "contentHash",
+          "needsReview",
+          "sourceType",
+          "captureMode",
+          "anonymised"
+        ],
+        "description": "One normalised row in the Appendix C field set (camelCase). lead_status and follow_up_date are never included (CR-006 Z-8)."
+      },
+      "IntakeRowBatch": {
+        "type": "object",
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batchNo": {
+            "type": "integer"
+          },
+          "anonymised": {
+            "type": "boolean"
+          },
+          "vocabularyVersion": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IntakeRow"
+            },
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "uploadId",
+          "batchNo",
+          "anonymised",
+          "vocabularyVersion",
+          "rows"
+        ]
+      },
+      "InternalMigrationMap": {
+        "type": "object",
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MigrationMapEntry"
+            },
+            "maxItems": 1000
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "uploadId",
+          "items",
+          "nextCursor"
+        ]
+      },
+      "UploadPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Upload"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "TemplatePage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Template"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "ReviewItemPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "RowErrorPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RowError"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "Problem": {
+        "type": "object",
+        "description": "RFC 7807 problem details.",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "correlationId"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://errors.11estates.in/validation-failed"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable kebab-case error code"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "field",
+                "code"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Side": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "enum": [
+          "Supply",
+          "Demand",
+          "None",
+          null
+        ]
+      },
+      "AreaBasis": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "enum": [
+          "Carpet",
+          "Builtup",
+          "Saleable",
+          null
+        ]
+      },
+      "Health": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "down"
+            ]
+          },
+          "checks": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "PayloadTooLarge": {
+        "description": "payload-too-large",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "UnsupportedMediaType": {
+        "description": "unsupported-media-type",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Validation failed",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Unauthenticated": {
+        "description": "Missing or invalid credentials",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Role or tenant not allowed",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "TooMany": {
+        "description": "rate-limited",
+        "headers": {
+          "Retry-After": {
+            "$ref": "#/components/headers/RetryAfter"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "internal or dependency-unavailable",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Conflict (state or idempotency-key-reused)",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Not found",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "PreconditionFailed": {
+        "description": "version-mismatch",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "CorrelationId": {
+        "name": "X-Correlation-Id",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 25
+        }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "description": "UUID; 24 h replay window per user+route. Same key with a different body → 409 idempotency-key-reused.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": false,
+        "description": "Row version for optimistic concurrency; mismatch → 412 version-mismatch.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "headers": {
+      "RetryAfter": {
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Seconds to wait before retrying."
+      }
+    }
+  }
+}

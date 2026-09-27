@@ -1,0 +1,2242 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "11 Estates CRM — web (edge BFF)",
+    "version": "0.1.0",
+    "description": "Next.js app on Vercel (bom1). Responsibilities: Google sign-in (Supabase Auth), session and JWT validation, role\nchecks (coarse, per route), minting short-lived **service tokens**, routing (one hop), rate limiting (Postgres token\nbucket), correlation IDs, users and roles (publishes `user.changed.v1` via its outbox), the immutable **audit log\nsink**, and upload/export/user notifications (conventions R-6).\n**No business rules** (ADR-0007): the owning service always re-checks role, tenant and resource permissions.\n\n### Auth flow\n1. Browser → `/auth/sign-in` (page) → Supabase Auth `signInWithOAuth({ provider: 'google' })` → Google consent.\n2. Google → Supabase → `/auth/callback?code=…` (Next.js route handler) exchanges the code (PKCE) for a Supabase\n   session. Session cookies: httpOnly, Secure, SameSite=Lax. Sign-ups are disabled in Supabase; only invited emails\n   exist.\n3. web looks up `web.users` by the Supabase user id: missing or `deactivated` → sign out and `403 not-invited` /\n   `user-deactivated`. First sign-in of an invited user flips status `invited → active`.\n4. Every API call: Next.js middleware validates the Supabase access token (JWKS, `aud=authenticated`, `exp`), loads\n   the user's role/tenant (cached 60 s in memory, invalidated on role change), enforces the 12 h idle timeout\n   (`last_seen_at`), checks Origin on mutating requests (CSRF), takes a rate-limit token, then forwards.\n5. Forwarding: web mints a **service token** (ES256 JWT, 5 min, `iss=web`, `aud=<service>`, `sub=web`, `tid`,\n   `uid`, `role`, `dop` (data-operator flag), `jti`), cached per (user, audience) for 4 min, and sends\n   `Authorization: Bearer <service token>`, `X-User-Id`, `X-User-Role`, `X-Tenant-Id`, `X-Correlation-Id`,\n   `traceparent`, and the client's `Idempotency-Key` / `If-Match` unchanged. Client-supplied `X-User-*`/`X-Tenant-*`\n   headers are stripped. Services verify signature (web JWKS), `aud`, `exp`, and that headers equal the claims.\n6. Outbound call policy: 2 s timeout (chat stream: 15 s), 1 retry with jittered backoff (100–400 ms) on idempotent\n   methods only, circuit breaker per downstream (50% errors over 20 calls → open 30 s).\n\n### Rate limits (Postgres token bucket in the `web` schema; conventions §4)\n| Bucket | Key | Rate | Burst |\n|---|---|---|---|\n| `api` | user | 20 req/s | 40 |\n| `chat_msg` | user | 30 / min | 30 |\n| `chat_stream` | user | 1 concurrent (lease, 20 s max) | — |\n| `upload` | user | 5 / hour (POST /v1/uploads) | 5 |\n| `public_page` | client IP | 60 / min (GET /p/{token}) | 60 |\n429 responses carry `Retry-After` and `code: rate-limited`. Headers `X-RateLimit-Limit` / `X-RateLimit-Remaining`\non every proxied response. If the bucket store is unavailable, web falls back to a per-instance in-memory limiter\n(fail-open with a lower local limit) and raises an alarm.\nThe website's Listings API (API key) is **not** routed through web; listings enforces its per-key limit itself.\n\n### Correlation IDs\n`X-Correlation-Id` is accepted if it matches `^[A-Za-z0-9-]{8,64}$`, otherwise a UUIDv7 is generated. It is returned\non every response, forwarded on every hop, logged on every line and copied into events by the services.\n"
+  },
+  "servers": [
+    {
+      "url": "https://crm.11estates.in",
+      "description": "Staff app (web Vercel project, bom1)"
+    }
+  ],
+  "security": [],
+  "tags": [
+    {
+      "name": "session"
+    },
+    {
+      "name": "users"
+    },
+    {
+      "name": "audit"
+    },
+    {
+      "name": "notifications"
+    },
+    {
+      "name": "platform"
+    },
+    {
+      "name": "internal"
+    },
+    {
+      "name": "health"
+    }
+  ],
+  "paths": {
+    "/v1/me": {
+      "get": {
+        "operationId": "getMe",
+        "tags": [
+          "session"
+        ],
+        "summary": "Signed-in user, role, tenant, permissions, session expiry and environment flags (drives the UI)",
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "api bucket (20 req/s, burst 40 per user)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "description": "not-invited or user-deactivated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/v1/me/session": {
+      "delete": {
+        "operationId": "signOut",
+        "tags": [
+          "session"
+        ],
+        "summary": "Sign out (revokes the Supabase refresh token, clears cookies, drops cached service tokens)",
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "api bucket",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "DELETE is idempotent by design",
+        "x-emits": [],
+        "x-audit": "session.signed_out (written locally)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Signed out"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/v1/me/notifications": {
+      "get": {
+        "operationId": "listMyNotifications",
+        "tags": [
+          "notifications"
+        ],
+        "summary": "The caller's upload, export and user notifications (web-owned, R-6); journeys owns /v1/notifications for work notifications",
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "api bucket",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "unreadOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page sorted by createdAt desc, id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "nextCursor",
+                    "unreadCount"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Notification"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "unreadCount": {
+                      "type": "integer",
+                      "description": "Capped at 99"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/v1/me/notifications/read": {
+      "post": {
+        "operationId": "markMyNotificationsRead",
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark notifications read (listed ids, or everything up to a time)",
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "api bucket",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Naturally idempotent (setting read_at twice is a no-op); Idempotency-Key also accepted",
+        "x-emits": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "upTo": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Marked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "updated",
+                    "unreadCount"
+                  ],
+                  "properties": {
+                    "updated": {
+                      "type": "integer"
+                    },
+                    "unreadCount": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/v1/roles": {
+      "get": {
+        "operationId": "listRoles",
+        "tags": [
+          "users"
+        ],
+        "summary": "The five staff roles and their permission codes (PRD §2.3), read-only",
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "api bucket",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Roles (fixed list, ≤ 10 items, not paginated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "maxItems": 10,
+                      "items": {
+                        "$ref": "#/components/schemas/Role"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/v1/users": {
+      "get": {
+        "operationId": "listUsers",
+        "tags": [
+          "users"
+        ],
+        "summary": "Users of the tenant (Settings → Users & roles). Non-admins get a directory view (id, name, role, status) for pickers.",
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ],
+        "x-rate-limit": "api bucket",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/RoleCode"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "invited",
+                "active",
+                "deactivated"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page sorted by displayName, id (Admin sees email and audit fields)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/User"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/v1/users/invitations": {
+      "post": {
+        "operationId": "inviteUser",
+        "tags": [
+          "users"
+        ],
+        "summary": "Invite a Google account by email with a role (Supabase Auth invite; expires in 7 days)",
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "x-roles": [
+          "Admin"
+        ],
+        "x-rate-limit": "api bucket; plus 20 invitations per hour per tenant",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Idempotency-Key accepted (24 h, per user+route); replay returns the original invitation. Re-inviting an email with a pending invitation → 409 email-already-invited.",
+        "x-emits": [
+          "user.changed.v1"
+        ],
+        "x-audit": "user.invited (written locally)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "email",
+                  "role"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "role": {
+                    "$ref": "#/components/schemas/RoleCode"
+                  },
+                  "isDataOperator": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Adds the Data operator permission to an agent (A-15)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invited (user row created with status invited)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "email-already-invited, user-exists or idempotency-key-reused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "description": "dependency-unavailable (Supabase Auth)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/invitations/{userId}": {
+      "delete": {
+        "operationId": "revokeInvitation",
+        "tags": [
+          "users"
+        ],
+        "summary": "Revoke a pending invitation (the user row is marked deactivated; the Supabase invite is deleted)",
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "x-roles": [
+          "Admin"
+        ],
+        "x-rate-limit": "api bucket",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "DELETE is idempotent by design",
+        "x-emits": [
+          "user.changed.v1"
+        ],
+        "x-audit": "user.invitation_revoked (written locally)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "invitation-already-accepted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/v1/users/{userId}": {
+      "patch": {
+        "operationId": "updateUser",
+        "tags": [
+          "users"
+        ],
+        "summary": "Change role, data-operator flag, display name, or deactivate / reactivate (JSON Merge Patch)",
+        "description": "Deactivation revokes all Supabase sessions for the user, evicts cached role and service tokens, and blocks\nnew tokens immediately (tokens already minted expire within 5 min). The last active Admin cannot be demoted or\ndeactivated (409 last-admin). Users cannot change their own role.\n",
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "x-roles": [
+          "Admin"
+        ],
+        "x-rate-limit": "api bucket",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "PATCH (JSON Merge Patch) is idempotent by design; If-Match with the row version → 412 on mismatch",
+        "x-emits": [
+          "user.changed.v1"
+        ],
+        "x-audit": "user.role_changed | user.deactivated | user.reactivated | user.updated (written locally)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                  "role": {
+                    "$ref": "#/components/schemas/RoleCode"
+                  },
+                  "isDataOperator": {
+                    "type": "boolean"
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "deactivated"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "last-admin or cannot-change-own-role",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "415": {
+            "description": "unsupported-media-type",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/v1/audit-log": {
+      "get": {
+        "operationId": "listAuditLog",
+        "tags": [
+          "audit"
+        ],
+        "summary": "Immutable audit log (US-35), newest first; filters on stored fields",
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "x-roles": [
+          "Admin"
+        ],
+        "x-rate-limit": "api bucket",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "actorUserId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "Exact action or a prefix ending in \".*\" (e.g. \"export.*\")",
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          {
+            "name": "subjectType",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          {
+            "name": "subjectId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "producer",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "intake",
+                "records",
+                "journeys",
+                "crm-engine",
+                "listings",
+                "insight"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page sorted by occurredAt desc, id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuditEntry"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/.well-known/jwks.json": {
+      "get": {
+        "operationId": "getJwks",
+        "tags": [
+          "platform"
+        ],
+        "summary": "Public keys that verify web-minted service tokens (current + previous during rotation)",
+        "security": [],
+        "x-roles": [
+          "service"
+        ],
+        "x-rate-limit": "none (CDN cached, max-age=600)",
+        "x-timeout-ms": 500,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "responses": {
+          "200": {
+            "description": "JWK set (ES256)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "keys"
+                  ],
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "maxItems": 3,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/internal/v1/service-tokens": {
+      "post": {
+        "operationId": "mintServiceToken",
+        "tags": [
+          "internal"
+        ],
+        "summary": "Mint a service-to-service token (aud=<target>, sub=<caller>, tid, 5 min) for projection rebuilds and background jobs",
+        "description": "Callers authenticate with their per-service credential. Allowed (caller → audience) pairs are fixed in config:\nlistings→records, journeys→records, insight→records, records→intake, crm-engine→records, and every service→records\nfor the vocabulary fetch (conventions R-2). Anything else → 403 audience-not-allowed. Tokens are never minted for\nuser-facing request chains between services.\n",
+        "security": [
+          {
+            "serviceCredential": []
+          }
+        ],
+        "x-roles": [
+          "service"
+        ],
+        "x-rate-limit": "60 per minute per caller service",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Not idempotent by nature (each call mints a new jti) and has no side effects beyond an issuance counter; Idempotency-Key is not needed — callers cache the token for 4 min",
+        "x-emits": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "audience",
+                  "tenantId"
+                ],
+                "properties": {
+                  "audience": {
+                    "type": "string",
+                    "enum": [
+                      "intake",
+                      "records",
+                      "journeys",
+                      "crm-engine",
+                      "listings",
+                      "insight"
+                    ]
+                  },
+                  "tenantId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "token",
+                    "expiresAt"
+                  ],
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "service-credential-invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "audience-not-allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/internal/v1/relay": {
+      "post": {
+        "operationId": "relayOutbox",
+        "tags": [
+          "internal"
+        ],
+        "summary": "Publish unpublished outbox rows (user.changed.v1) to consumer queues (pg_cron every minute + poke after commit)",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "x-roles": [
+          "scheduler"
+        ],
+        "x-rate-limit": "none (scheduler only; single-flight via advisory lock)",
+        "x-timeout-ms": 55000,
+        "x-idempotency": "Idempotent (FOR UPDATE SKIP LOCKED; published_at set in the same transaction as pgmq.send)",
+        "x-emits": [
+          "user.changed.v1"
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "processed"
+                  ],
+                  "properties": {
+                    "processed": {
+                      "type": "integer"
+                    },
+                    "more": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/internal/v1/drain/{queue}": {
+      "post": {
+        "operationId": "drainQueue",
+        "tags": [
+          "internal"
+        ],
+        "summary": "Consume q_web: audit.recorded.v1 → audit_log; upload.completed.v1 / upload.failed.v1 / export.completed.v1 / export.failed.v1 → notifications",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "x-roles": [
+          "scheduler"
+        ],
+        "x-rate-limit": "none (scheduler only; every minute + poke from producer relays)",
+        "x-timeout-ms": 55000,
+        "x-idempotency": "Idempotent (processed_events dedupe; audit_log unique on event_id)",
+        "x-emits": [],
+        "parameters": [
+          {
+            "name": "queue",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "q_web"
+              ]
+            }
+          },
+          {
+            "name": "batch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "processed"
+                  ],
+                  "properties": {
+                    "processed": {
+                      "type": "integer"
+                    },
+                    "failed": {
+                      "type": "integer"
+                    },
+                    "deadLettered": {
+                      "type": "integer"
+                    },
+                    "more": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/internal/v1/jobs/{name}": {
+      "post": {
+        "operationId": "runJob",
+        "tags": [
+          "internal"
+        ],
+        "summary": "Scheduled jobs",
+        "description": "- `invitation-expire` (hourly): pending invitations older than 7 days → expired.\n- `idle-session-sweep` (every 15 min): revoke Supabase sessions idle > 12 h (NFR-16).\n- `notification-prune` (daily): delete notifications older than 90 days.\n- `rate-limit-prune` / `idempotency-prune` (hourly).\n- `audit-chain-verify` (daily): re-verify the audit hash chain for the last 48 h; alarm on a break.\n- `signing-key-rotate` (every 90 days): publish a new service-token key in JWKS, keep the previous one for 1 h.\n- `keep-alive` (pilot only, every 12 h): trivial query so the free Supabase project is not paused.\n",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "x-roles": [
+          "scheduler"
+        ],
+        "x-rate-limit": "none (scheduler only; single-flight per job)",
+        "x-timeout-ms": 55000,
+        "x-idempotency": "Idempotent; resumable",
+        "x-emits": [],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "invitation-expire",
+                "idle-session-sweep",
+                "notification-prune",
+                "rate-limit-prune",
+                "idempotency-prune",
+                "audit-chain-verify",
+                "signing-key-rotate",
+                "keep-alive"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "processed": {
+                      "type": "integer"
+                    },
+                    "more": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "live",
+        "tags": [
+          "health"
+        ],
+        "security": [],
+        "x-roles": [
+          "anonymous"
+        ],
+        "x-rate-limit": "none",
+        "x-timeout-ms": 500,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "responses": {
+          "200": {
+            "description": "Process up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "ready",
+        "tags": [
+          "health"
+        ],
+        "security": [],
+        "x-roles": [
+          "anonymous"
+        ],
+        "x-rate-limit": "none",
+        "x-timeout-ms": 1000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "responses": {
+          "200": {
+            "description": "DB reachable, migrations current, signing key loaded, Supabase Auth JWKS cached; checks lists each downstream circuit state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "staffSession": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Supabase Auth access token for a signed-in, invited staff user (from the httpOnly session cookie via Next.js middleware, or an Authorization header)."
+      },
+      "serviceCredential": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Service-Credential",
+        "description": "Per-service client secret (Vercel env of the caller; hashed in web.service_clients). Only for /internal/v1/service-tokens."
+      },
+      "cronSecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Cron-Secret",
+        "description": "Per-service secret used by Supabase pg_cron/pg_net for /internal/v1/relay, /internal/v1/drain/*, /internal/v1/jobs/*."
+      }
+    },
+    "schemas": {
+      "RoleCode": {
+        "type": "string",
+        "enum": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent",
+          "Data operator"
+        ]
+      },
+      "Role": {
+        "type": "object",
+        "required": [
+          "code",
+          "description",
+          "permissions"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/RoleCode"
+          },
+          "description": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Permission codes from PRD §2.3, e.g. publication.set, users.manage, audit.read"
+          }
+        }
+      },
+      "Me": {
+        "type": "object",
+        "required": [
+          "userId",
+          "tenantId",
+          "email",
+          "displayName",
+          "role",
+          "isDataOperator",
+          "permissions",
+          "sessionIdleExpiresAt",
+          "environment"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleCode"
+          },
+          "isDataOperator": {
+            "type": "boolean"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sessionIdleExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "environment": {
+            "type": "object",
+            "required": [
+              "name",
+              "pilot"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": [
+                  "local",
+                  "pilot",
+                  "dev",
+                  "staging",
+                  "production"
+                ]
+              },
+              "pilot": {
+                "type": "boolean",
+                "description": "Phase 1a: shows the \"sample/anonymised data only\" banner (CR-005)"
+              },
+              "vocabularyVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": [
+          "userId",
+          "displayName",
+          "role",
+          "status"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email",
+            "description": "Admin view only (PII)"
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleCode"
+          },
+          "isDataOperator": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "invited",
+              "active",
+              "deactivated"
+            ]
+          },
+          "invitedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "invitedBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "invitationExpiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "activatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "deactivatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "lastSeenAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer"
+          }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "required": [
+          "notificationId",
+          "kind",
+          "title",
+          "createdAt"
+        ],
+        "properties": {
+          "notificationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "upload_completed",
+              "upload_failed",
+              "export_ready",
+              "export_failed",
+              "role_changed",
+              "account_reactivated"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "description": "No PII, e.g. \"UPL-000231 processed: 19,870 accepted, 130 rejected\""
+          },
+          "subjectType": {
+            "type": "string",
+            "enum": [
+              "upload",
+              "export",
+              "user"
+            ]
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subjectCode": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string",
+            "description": "UI route, e.g. /uploads/UPL-000231 or /exports/EXP-000045"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "AuditEntry": {
+        "type": "object",
+        "required": [
+          "auditId",
+          "occurredAt",
+          "producer",
+          "action",
+          "actorUserId",
+          "subjectType",
+          "subjectId",
+          "via"
+        ],
+        "properties": {
+          "auditId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Source event (null for web's own entries)"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "producer": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "description": "e.g. contact.viewed, export.created, merge.done, merge.undone, publication.set, demand.exited, deal.closed, settings.changed, user.invited"
+          },
+          "actorUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actorDisplayName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Resolved from web.users at read time"
+          },
+          "subjectType": {
+            "type": "string"
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "ui",
+              "chat",
+              "system"
+            ]
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Producer-supplied, PII-free (codes, counts, from/to values)"
+          },
+          "correlationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entryHash": {
+            "type": "string",
+            "description": "SHA-256 over the previous hash + this entry (tamper evidence)"
+          }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "description": "RFC 7807 problem details.",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "correlationId"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://errors.11estates.in/validation-failed"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable kebab-case error code"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "field",
+                "code"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "down"
+            ]
+          },
+          "checks": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "CorrelationId": {
+        "name": "X-Correlation-Id",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 25
+        }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "description": "UUID; 24 h replay window per user+route. Same key with a different body → 409 idempotency-key-reused.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": false,
+        "description": "Row version for optimistic concurrency; mismatch → 412 version-mismatch.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "Unauthenticated": {
+        "description": "Missing or invalid credentials",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "TooMany": {
+        "description": "rate-limited",
+        "headers": {
+          "Retry-After": {
+            "$ref": "#/components/headers/RetryAfter"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "internal or dependency-unavailable",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Validation failed",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Conflict (state or idempotency-key-reused)",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Role or tenant not allowed",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Not found",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "PreconditionFailed": {
+        "description": "version-mismatch",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      }
+    },
+    "headers": {
+      "RetryAfter": {
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Seconds to wait before retrying."
+      }
+    }
+  },
+  "x-routes": {
+    "description": "Routing table (evaluated top-down, first match wins; `*` = one path segment, `**` = the rest). web adds auth headers\nand forwards the request unchanged to `<service base URL><path>`. For proxied routes web checks only authentication,\nactive status and tenant; role rules live in the owning service (single source of truth, no drift). web applies\nroles itself only to its own endpoints. Anything not listed → 404 route-not-found.\n",
+    "table": [
+      {
+        "prefix": "/v1/me",
+        "service": "web",
+        "note": "own endpoints"
+      },
+      {
+        "prefix": "/v1/users",
+        "service": "web"
+      },
+      {
+        "prefix": "/v1/roles",
+        "service": "web"
+      },
+      {
+        "prefix": "/v1/audit-log",
+        "service": "web"
+      },
+      {
+        "prefix": "/v1/offers/*/publication",
+        "service": "listings"
+      },
+      {
+        "prefix": "/v1/offers/*/privacy-scan",
+        "service": "listings"
+      },
+      {
+        "prefix": "/v1/projects/*/publication",
+        "service": "listings"
+      },
+      {
+        "prefix": "/v1/demands/*/demand-post",
+        "service": "listings"
+      },
+      {
+        "prefix": "/v1/publications",
+        "service": "listings"
+      },
+      {
+        "prefix": "/v1/publication-settings",
+        "service": "listings"
+      },
+      {
+        "prefix": "/v1/api-keys",
+        "service": "listings"
+      },
+      {
+        "prefix": "/v1/offers/*/matches",
+        "service": "crm-engine"
+      },
+      {
+        "prefix": "/v1/demands/*/matches",
+        "service": "crm-engine"
+      },
+      {
+        "prefix": "/v1/demands/*/exclusions",
+        "service": "crm-engine"
+      },
+      {
+        "prefix": "/v1/demands/*/matching-runs",
+        "service": "crm-engine"
+      },
+      {
+        "prefix": "/v1/matches",
+        "service": "crm-engine"
+      },
+      {
+        "prefix": "/v1/bundles",
+        "service": "crm-engine"
+      },
+      {
+        "prefix": "/v1/matching-runs",
+        "service": "crm-engine"
+      },
+      {
+        "prefix": "/v1/weights",
+        "service": "crm-engine"
+      },
+      {
+        "prefix": "/v1/offers/*/journey",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/offers/*/retire",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/demands/*/journey",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/demands/*/qualify",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/demands/*/exit",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/demands/*/reactivate",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/queues",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/queue-items",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/capacities",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/calls",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/life-curves",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/sourcing-requests",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/proposals",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/site-visits",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/deals",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/lease-renewals",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/watchlist-tasks",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/settings/life-curve-thresholds",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/settings/queue-weights",
+        "service": "journeys"
+      },
+      {
+        "prefix": "/v1/notifications",
+        "service": "journeys",
+        "note": "work notifications (R-6); web's upload/export/user notifications are /v1/me/notifications"
+      },
+      {
+        "prefix": "/p/*",
+        "service": "journeys",
+        "auth": "none",
+        "note": "proposal share page (token in path); rate limit public_page per IP"
+      },
+      {
+        "prefix": "/v1/uploads",
+        "service": "intake",
+        "note": "POST /v1/uploads also takes an upload bucket token (5/h)"
+      },
+      {
+        "prefix": "/v1/templates",
+        "service": "intake"
+      },
+      {
+        "prefix": "/v1/review-items",
+        "service": "intake"
+      },
+      {
+        "prefix": "/v1/parse",
+        "service": "intake",
+        "note": "x-timeout 4,000 ms (R-5)"
+      },
+      {
+        "prefix": "/v1/offers",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/properties",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/second-sources",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/projects",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/demands",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/people",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/quick-add",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/reveals",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/enquiries",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/source-ads",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/merge-candidates",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/merges",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/desks",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/desk-items",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/vocabulary",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/micromarkets",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/launch-area",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/photos",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/market-data",
+        "service": "records"
+      },
+      {
+        "prefix": "/v1/chat",
+        "service": "insight",
+        "note": "SSE passthrough, no buffering; chat_msg + chat_stream buckets"
+      },
+      {
+        "prefix": "/v1/queries",
+        "service": "insight"
+      },
+      {
+        "prefix": "/v1/dashboards",
+        "service": "insight"
+      },
+      {
+        "prefix": "/v1/exports",
+        "service": "insight"
+      },
+      {
+        "prefix": "/internal/**",
+        "service": "none",
+        "note": "never routed; services expose /internal only to pg_cron/pg_net (X-Cron-Secret) or to service tokens"
+      }
+    ]
+  }
+}

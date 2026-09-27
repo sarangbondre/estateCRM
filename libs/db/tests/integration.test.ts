@@ -142,6 +142,18 @@ describe('idempotency keys', () => {
     ).toBeGreaterThanOrEqual(2);
   });
 
+  it('an abandoned in-progress claim can be taken over after the stale window, once', async () => {
+    const r = { ...ref, key: randomUUID() };
+    const t0 = new Date();
+    expect(await beginIdempotent(db, r, h, t0)).toEqual({ outcome: 'new' });
+    expect(await beginIdempotent(db, r, h, new Date(t0.getTime() + 60_000))).toEqual({
+      outcome: 'in-progress',
+    });
+    const later = new Date(t0.getTime() + 180_000);
+    const [a, b] = await Promise.all([beginIdempotent(db, r, h, later), beginIdempotent(db, r, h, later)]);
+    expect([a.outcome, b.outcome].sort()).toEqual(['in-progress', 'new']);
+  });
+
   it('only one of many concurrent claims wins', async () => {
     const r = { ...ref, key: randomUUID() };
     const outcomes = await Promise.all(Array.from({ length: 4 }, () => beginIdempotent(db, r, h)));

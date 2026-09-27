@@ -36,7 +36,7 @@ lockfile (`pnpm-lock.yaml`) pins exact versions, and upgrades go through normal 
 | HTTP layer | **Hono**, deployed as Vercel Node functions | 4.13.x | One Hono app per service, built by the `libs/http` factory (task F-10) |
 | Database access | **Kysely** (typed SQL query builder) + **node-postgres** (`pg`) | 0.29.x / 8.23.x | No ORM: queries stay explicit so every one maps to an index in the LLD. Connects through the Supavisor pooler with prepared statements off. |
 | Migrations | Plain **SQL files** in `services/<svc>/migrations`, run by the `libs/db` runner | — | Forward-only, expand → migrate → contract (CLAUDE.md §3.2) |
-| Validation | **Zod** | 4.6.x | Request and event validation at the edge |
+| Validation | **Ajv** against the contract JSON Schemas (CR-007; was Zod 4.6.x) | 8.x | Request and event validation at the edge, generated from `contracts/` so it can't drift |
 | Contract types | **openapi-typescript** (types generated from `contracts/openapi`) | 7.13.x | Drift check in CI (F-04) |
 | JWT / JWKS | **jose** | 6.2.x | Service tokens (R-2) |
 | IDs | **uuidv7** | 1.2.x | Conventions §2 |

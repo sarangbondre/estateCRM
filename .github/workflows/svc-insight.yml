@@ -1,7 +1,15 @@
 name: insight
 on:
   pull_request:
-    paths: ['services/insight/**', 'libs/**', 'contracts/**', 'pnpm-lock.yaml', '.github/workflows/_service-ci.yml', '.github/workflows/svc-insight.yml']
+    paths:
+      [
+        'services/insight/**',
+        'libs/**',
+        'contracts/**',
+        'pnpm-lock.yaml',
+        '.github/workflows/_service-ci.yml',
+        '.github/workflows/svc-insight.yml',
+      ]
   push:
     branches: [main]
     paths: ['services/insight/**', 'libs/**', 'contracts/**', 'pnpm-lock.yaml']
