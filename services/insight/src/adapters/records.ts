@@ -51,8 +51,8 @@ export function createContactsReader(http: HttpClient | null, tokens: ServiceTok
   };
 }
 
-export function recordsHttpClient(baseUrl: string): HttpClient {
-  return createHttpClient({ name: 'records', baseUrl });
+export function recordsHttpClient(baseUrl: string, onCall?: Parameters<typeof createHttpClient>[0]['onCall']): HttpClient {
+  return createHttpClient({ name: 'records', baseUrl, ...(onCall ? { onCall } : {}) });
 }
 
 export function createRecordsReference(http: HttpClient | null, tokens: ServiceTokenClient | null): RecordsReference {

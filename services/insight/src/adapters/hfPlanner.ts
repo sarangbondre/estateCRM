@@ -30,6 +30,8 @@ export interface HfPlannerOptions {
   attemptTimeoutMs?: number;
   budgetMs?: number;
   concurrency?: number;
+  /** RED metrics per downstream (libs/observability `obs.onCall`, name "huggingface"). */
+  onCall?: (info: { name: string; method: string; path: string; status: number | 'error'; durationMs: number; attempt: number }) => void;
 }
 
 export function createHfClient(token: string | undefined, baseUrl: string | undefined): ChatCompletionClient | null {
@@ -49,7 +51,10 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
   const cap = o.concurrency ?? 5;
   let inFlight = 0;
 
-  async function attempt(req: PlannerRequest, timeoutMs: number): Promise<PlannerResult & { fast?: boolean }> {
+  const record = (status: number | 'error', started: number, n: number) =>
+    o.onCall?.({ name: 'huggingface', method: 'POST', path: '/v1/chat/completions', status, durationMs: Date.now() - started, attempt: n });
+
+  async function attempt(req: PlannerRequest, timeoutMs: number, n = 1): Promise<PlannerResult & { fast?: boolean }> {
     const client = o.client as ChatCompletionClient;
     const started = Date.now();
     try {
@@ -70,6 +75,7 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
         { signal: AbortSignal.timeout(timeoutMs), retry_on_error: false },
       );
       breaker.after(true);
+      record(200, started, n);
       return {
         ok: true,
         text: out.choices[0]?.message.content ?? '',
@@ -80,6 +86,7 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
     } catch (err) {
       const status = statusOf(err);
       const elapsed = Date.now() - started;
+      record(status ?? 'error', started, n);
       if (status === 402 || /quota|credit|exceeded your monthly/i.test(String((err as Error)?.message ?? ''))) {
         breaker.after(true); // not an availability failure
         return { ok: false, reason: 'credits' };
@@ -106,7 +113,7 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
         if (first.ok || !first.fast) return strip(first);
         const left = budgetMs - (Date.now() - started);
         if (left < 300) return strip(first);
-        return strip(await attempt(req, Math.min(attemptMs, left)));
+        return strip(await attempt(req, Math.min(attemptMs, left), 2));
       } finally {
         inFlight--;
       }

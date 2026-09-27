@@ -10,7 +10,7 @@
     "dev": "tsx watch --env-file-if-exists=../../.env.local src/server.ts",
     "start": "node --env-file-if-exists=../../.env.local dist/src/server.js",
     "build": "tsc -p tsconfig.build.json",
-    "test": "vitest run",
+    "test": "INSIGHT_CONTRACT_COVERAGE=1 vitest run",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint . --no-error-on-unmatched-pattern",
     "migrate": "node --env-file-if-exists=../../.env.local ../../libs/db/dist/cli/migrate.js --schema insight --dir migrations",

@@ -23,7 +23,7 @@ export function compose(env: NodeJS.ProcessEnv = process.env) {
   const tokens = config.serviceCredential
     ? createServiceTokenClient({ webUrl: config.webUrl, credential: config.serviceCredential })
     : null;
-  const recordsHttp = tokens ? recordsHttpClient(config.recordsUrl) : null;
+  const recordsHttp = tokens ? recordsHttpClient(config.recordsUrl, obs.onCall) : null;
   const records = createRecordsReference(recordsHttp, tokens);
   const contacts = createContactsReader(recordsHttp, tokens);
   const planner = createHfPlanner({
@@ -31,6 +31,7 @@ export function compose(env: NodeJS.ProcessEnv = process.env) {
     client: createHfClient(config.hfToken, config.hfBaseUrl),
     endpointUrl: config.hfBaseUrl,
     concurrency: config.hfConcurrency,
+    onCall: obs.onCall,
   });
   const svc = buildApp({ config, db: handle.db, obs, auth, clock: { now: () => new Date() }, records, planner, contacts });
   return {
