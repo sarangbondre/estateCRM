@@ -89,11 +89,17 @@ describe('test set', () => {
     expect(uncertain.filter((u) => !u.includes('@'))).toEqual([]);
   });
 
-  it('redacts 10,000 ads in well under 2 seconds', () => {
+  it('redacts 10,000 ads in under 2 seconds of CPU time', () => {
     const texts = Array.from({ length: 10_000 }, (_, i) => PII_ADS[i % PII_ADS.length]?.text ?? '');
+    // CPU time, not wall time: CI runs every lib's build/typecheck/test in parallel on a shared runner.
+    const c0 = process.cpuUsage();
     const t0 = performance.now();
     for (const t of texts) redact(t);
-    expect(performance.now() - t0).toBeLessThan(2000);
+    const cpu = process.cpuUsage(c0);
+    const cpuMs = (cpu.user + cpu.system) / 1000;
+    expect(cpuMs, `cpu ${cpuMs.toFixed(0)} ms, wall ${(performance.now() - t0).toFixed(0)} ms`).toBeLessThan(
+      2000,
+    );
   });
 });
 
