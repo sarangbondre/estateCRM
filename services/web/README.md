@@ -104,6 +104,50 @@ pnpm --filter @11e/web test
 Google OAuth is not configured on the local stack; with `ENVIRONMENT_NAME=local` the sign-in page also offers an
 e-mail link (existing users only), delivered to the local mail catcher at http://127.0.0.1:54324.
 
+## Cards and panels (PRD §5.4)
+
+Each area registers its cards and panels in `src/ui/cards/<area>/index.ts` (`all.ts` loads them): intake (C-04
+upload, C-05 review), records (C-06 quick add, C-07 add supply, P-02…P-05 record panels + contact reveal, P-08 desks,
+C-21 desk item), journeys (P-01 My queue, C-08 call outcome, C-09 qualify, C-11 sourcing, C-13 proposal, C-14 site
+visit, C-15 deal, C-16 exit, C-17 retire/close), engine (C-10 matches and bundles), listings (C-12 publication),
+insight (C-02/C-03 streamed answers with How I got this and proposed action cards, P-07 table, C-20/P-06
+dashboards, exports), and the Settings page (`src/ui/settings`). Rules every card follows: data only through `/v1`
+on web; nothing changes until a click (R-CHAT-1), one Idempotency-Key per action, merge patch + If-Match where the
+contract has versions; controlled dropdowns from the vocabulary; buttons disabled for roles outside the contract's
+`x-roles` (services re-check); pure logic in `<area>/logic.ts` with unit tests in `tests/ui/`.
+
+## End-to-end tests and accessibility (WEB-09)
+
+Playwright + axe-core against the local stack (`e2e/`, `playwright.config.ts`):
+
+```sh
+pnpm db:start && pnpm --filter @11e/web migrate && pnpm --filter @11e/web env:local   # once
+pnpm --filter @11e/web build
+pnpm --filter @11e/web e2e          # starts the Prism mocks (4011–4016) and `next start` on :3000 unless running
+```
+
+- `e2e/global-setup.ts` seeds one synthetic user per role (Supabase Auth + `web.users`) and signs each in through
+  `/auth/confirm` with an admin-generated magic link; storage states land in `e2e/.auth/` (git-ignored).
+- `shell.spec.ts`: sign-in redirect, 401 problems, home, "/" menu by keyboard, side panel, theme, sign-out.
+- `cards.spec.ts`: every card and panel renders against the contract mocks without errors, panel tabs work by
+  keyboard, every Settings tab — each with an axe WCAG 2.1 A/AA check (light and dark on home).
+- `flows.spec.ts`: quick add lookup (nothing sent before the click), match confirm (Idempotency-Key), streamed chat
+  answer (SSE stubbed), upload to the signed URL, publication choices, gateway headers.
+- Locally it uses the installed Google Chrome (`PW_CHANNEL=chrome`); CI would need `playwright install chromium`, a
+  database and the mocks (the web CI job runs without a database, so E2E is not part of it yet).
+
+Latest local run: 38 passed, 1 skipped (match confirm is skipped when the random mock data has no confirmable match).
+
+## Metrics and performance
+
+- Logs, traces and RED metrics come from `@11e/observability`: per route for web's own endpoints (`onRequestEnd`),
+  per downstream for the gateway (`onCall`: status, duration, attempt), relay and drain results, plus the log events
+  `ratelimit_fallback`, `audit_details_scrubbed`, `audit_chain_broken`. `/health/ready` reports DB/migration, the
+  signing key and each downstream circuit.
+- Gateway overhead (LLD §8 target p95 ≤ 30 ms): `node scripts/gateway-overhead.mjs` sends the same GET straight to the
+  records mock and through web. Local run (300 samples, `next start`, M-series Mac): direct p95 11.6 ms, through the
+  gateway p95 18.2 ms, **overhead p50 1.5 ms / p95 10.0 ms**; own `GET /v1/me` p95 7.0 ms.
+
 ## Environment variables
 
 | Name                                | Purpose                                                                        |

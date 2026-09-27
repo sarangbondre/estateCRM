@@ -11,6 +11,7 @@
     "build": "next build",
     "start": "next start --port 3000",
     "test": "vitest run",
+    "e2e": "playwright test",
     "lint": "eslint . --no-error-on-unmatched-pattern",
     "typecheck": "next typegen && tsc -p tsconfig.json --noEmit",
     "migrate": "node --env-file-if-exists=../../.env.local ../../libs/db/dist/cli/migrate.js --schema web --dir migrations",
@@ -40,6 +41,8 @@
     "server-only": "0.0.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "^24.19.0",
     "@types/pg": "^8.23.1",
