@@ -16,6 +16,7 @@
     "paths": { "@/*": ["./src/*"] }
   },
   "include": [
+    "scripts",
     "next-env.d.ts",
     "src",
     "tests",

@@ -2,7 +2,15 @@
 // Sign-in (prototype loginView): Google only, invited users only (D-7, questionnaire A6).
 import { Wordmark } from '../shell/Wordmark';
 
-export function SignInBox({ message, next }: { message?: string | undefined; next: string }) {
+export function SignInBox({
+  message,
+  next,
+  localEmail = false,
+}: {
+  message?: string | undefined;
+  next: string;
+  localEmail?: boolean;
+}) {
   return (
     <div className="box">
       <Wordmark href={null} />
@@ -24,6 +32,25 @@ export function SignInBox({ message, next }: { message?: string | undefined; nex
           Sign in with Google
         </button>
       </form>
+      {localEmail && (
+        <form action="/auth/email" method="post" className="field" aria-label="Local e-mail sign-in">
+          <input type="hidden" name="next" value={next} />
+          <label htmlFor="local-email">Local development: e-mail link (invited users only)</label>
+          <div className="row">
+            <input
+              id="local-email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              className="grow"
+            />
+            <button type="submit" className="btn sm">
+              Send link
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
