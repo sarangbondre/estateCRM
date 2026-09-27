@@ -185,6 +185,9 @@ export interface Queries {
   saveJobCursor(job: string, runDate: IsoDate, cursor: string | null, processed: number, done: boolean, now: Date): Promise<void>;
   purgeBefore(kind: 'notifications' | 'link_opens' | 'pii_notes' | 'snapshots', before: Date, limit: number): Promise<{ count: number; paths: string[] }>;
 
+  /** Sets next_change_on = today for live curves of the given categories (keyset by id); returns the last id seen. */
+  rearmCurves(categoryKeys: readonly string[], afterId: string | null, today: IsoDate, limit: number): Promise<string | null>;
+
   // merges
   repoint(mergeId: string, target: RepointTarget, from: string, to: string, limit: number): Promise<number>;
   logBefore(mergeId: string, table: string, rowId: string, before: Record<string, unknown>): Promise<void>;

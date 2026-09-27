@@ -51,6 +51,7 @@ export async function notify(tx: Tx, userId: string | null | undefined, spec: No
     subject_id: spec.subject?.id ?? null,
     subject_code: spec.subject?.code ?? null,
     dedupe_key: spec.dedupeKey ?? null,
+    created_at: tx.now,
   });
 }
 

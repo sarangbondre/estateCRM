@@ -6,6 +6,7 @@ import { createHttp } from './http.js';
 import { registerDealRoutes } from './routes-deals.js';
 import { registerProposalRoutes } from './routes-proposals.js';
 import { registerQueueRoutes } from './routes-queues.js';
+import { registerSettingsRoutes } from './routes-settings.js';
 import { registerSubjectRoutes } from './routes-subjects.js';
 
 export function registerRoutes(svc: Service<operations>, deps: AppDeps): void {
@@ -14,4 +15,5 @@ export function registerRoutes(svc: Service<operations>, deps: AppDeps): void {
   registerSubjectRoutes(svc, http);
   registerProposalRoutes(svc, http);
   registerDealRoutes(svc, http);
+  registerSettingsRoutes(svc, http);
 }

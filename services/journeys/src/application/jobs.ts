@@ -8,6 +8,7 @@ import { notify } from './notify.js';
 import type { Clock, FileStoragePort, Tx, TxRunner } from './ports.js';
 import type { Position } from './queries.js';
 import { openItem, rankOffer, resolveAssignee } from './queue-ops.js';
+import { REARM_DATE, REARM_JOB } from './settings.js';
 
 export interface JobOutcome {
   processed: number;
@@ -51,6 +52,14 @@ async function perTenant(
 export function lifeCurveNightly(deps: JobDeps) {
   const size = deps.batchSize ?? 1000;
   return perTenant(deps, 'life-curve-nightly', async (tx) => {
+    // New thresholds first re-arm the curves of the changed categories (bounded batches), then they are evaluated below.
+    const rearm = await tx.q.jobCursor(REARM_JOB, REARM_DATE);
+    if (rearm && !rearm.done && rearm.cursor) {
+      const c = JSON.parse(rearm.cursor) as { keys: string[]; after: string | null };
+      const last = await tx.q.rearmCurves(c.keys, c.after, tx.today, 10_000);
+      await tx.q.saveJobCursor(REARM_JOB, REARM_DATE, last ? JSON.stringify({ keys: c.keys, after: last }) : null, 0, !last, tx.now);
+      return { processed: 0, more: true };
+    }
     const rows = await tx.q.dueCurves(tx.today, size);
     for (const row of rows) {
       const { row: after } = await refreshCurve(tx, row, {});

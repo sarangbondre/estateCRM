@@ -888,6 +888,18 @@ function makeQueries(db: Db, t: string): Queries {
       }
     },
 
+    async rearmCurves(categoryKeys, afterId, today, limit) {
+      const rows = await rowsOf(
+        sql<{ id: string }>`select id from life_curve where tenant_id = ${t} and category_key = any(${textArray(categoryKeys)})
+          and frozen = false ${afterId ? sql`and id > ${afterId}` : sql``} order by id limit ${limit}`,
+        db,
+      );
+      if (!rows.length) return null;
+      await sql`update life_curve set next_change_on = ${today} where tenant_id = ${t} and id = any(${uuidArray(rows.map((r) => r.id))})
+        and stage <> 'Paused' and (next_change_on is null or next_change_on > ${today})`.execute(db);
+      return rows.length < limit ? null : (rows.at(-1)?.id ?? null);
+    },
+
     // ------------------------------------------------------------------------------------------------ merges
     async repoint(mergeId, target: RepointTarget, from, to, limit) {
       const table = ident(target.table);
