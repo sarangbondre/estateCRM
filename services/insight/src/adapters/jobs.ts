@@ -7,6 +7,7 @@ import type { JobResult } from '@11e/http';
 import { purgeProcessedEvents, purgePublishedOutbox } from '@11e/outbox';
 import { SCHEMA } from '../config.js';
 import type { AppDeps } from '../deps.js';
+import { expireExports } from '../application/exports.js';
 import { refreshReferenceData } from '../application/reference.js';
 import { reconcileRollups } from './reconcile.js';
 import type { Wired } from './wiring.js';
@@ -67,6 +68,8 @@ export function jobs(
     },
     // Monthly: clear the "credits exhausted" flag once its time has come (the model is tried again).
     'hf-credit-reset': async () => ({ processed: await wired.usage.resetCredits(deps.clock.now()), remaining: 0 }),
+    // Export files older than 24 h: deleted, job marked expired (later GETs → 410).
+    'export-expire': () => expireExports(wired.exports),
     ...extra,
   } as Record<string, () => Promise<JobResult>>;
 }

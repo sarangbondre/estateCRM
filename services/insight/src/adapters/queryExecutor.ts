@@ -214,7 +214,7 @@ export function createQueryExecutor(db: Kysely<InsightDb>): QueryExecutor {
           return { rows, total: rows.length, capped: false, nextCursor: null };
         }
         // list
-        const limit = Math.min(opts.limit ?? 25, v.template.maxRows);
+        const limit = opts.pageSize ?? Math.min(opts.limit ?? 25, v.template.maxRows);
         const sort = v.sort[0];
         const sortCol = sort ? col(sort.column) : sql`b.id`;
         const dir = sort?.dir ?? 'desc';
@@ -233,6 +233,7 @@ export function createQueryExecutor(db: Kysely<InsightDb>): QueryExecutor {
         const cols = v.template.columns.filter((c) => c.column).map((c) => sql`${col(c.column ?? '')} as ${sql.ref(c.key)}`);
         if (labels)
           cols.push(sql`${col(labels.dealType)} as "_deal_type"`, sql`${col(labels.market)} as "_market"`, sql`${col(labels.segment)} as "_segment"`);
+        if (opts.withContactIds && labels) cols.push(sql`b.contact_person_ids as "_contact_ids"`);
         cols.push(sql`b.id as "_id"`, sql`${sortCol} as "_sort"`);
         const dirSql = sql.raw(dir);
         const r = await sql<Record<string, unknown>>`select ${sql.join(cols)} from ${fromClause(v, tenantId)}${and(parts)}

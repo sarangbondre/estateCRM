@@ -27,6 +27,7 @@
     "@11e/vocabulary": "workspace:*",
     "@hono/node-server": "^2.1.1",
     "@huggingface/inference": "^4.13.30",
+    "exceljs": "~4.4.0",
     "hono": "~4.13.9",
     "kysely": "~0.29.6",
     "pg": "~8.23.0"

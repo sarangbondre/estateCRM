@@ -3,6 +3,7 @@ import type { DemandDims, FactDims, OfferDims } from '../domain/readmodel/rollup
 import type { ResolvedSubject } from '../domain/cards/cardBuilder.js';
 import type { ChatMessage } from '../domain/chat/prompt.js';
 import type { DayRange } from '../domain/dates.js';
+import type { QueryPlan } from '../domain/plans/types.js';
 import type { LocationIndex, ValidatedPlan, VocabularyView } from '../domain/plans/validator.js';
 import type { RmTable, RmTables } from '../domain/readmodel/rows.js';
 
@@ -41,6 +42,10 @@ export interface ExecOptions {
   cursor?: string | null;
   /** Lists: also run the capped count ("Here are 25 of 132"). */
   withTotal?: boolean;
+  /** Exports: page size beyond the template's maxRows (5,000). */
+  pageSize?: number;
+  /** Exports with contacts: also return `_contact_ids` (pseudonymous person ids) for offers and demands. */
+  withContactIds?: boolean;
 }
 
 export interface ExecResult {
@@ -204,6 +209,75 @@ export interface CodeLookup {
 
 export interface Ids {
   uuid(): string;
+}
+
+// ------------------------------------------------------------------------------------------ exports (INS-05)
+
+export type ExportStatus = 'queued' | 'running' | 'completed' | 'failed' | 'expired';
+
+export interface ExportJob {
+  id: string;
+  code: string;
+  requestedBy: string;
+  requesterRole: string;
+  plan: QueryPlan;
+  includeContacts: boolean;
+  fileName: string;
+  status: ExportStatus;
+  estimatedRows: number | null;
+  rowCount: number | null;
+  filePath: string | null;
+  fileBytes: number | null;
+  sourceMessageId: string | null;
+  attempts: number;
+  errorCode: string | null;
+  completedAt: Date | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+}
+
+export interface ExportRepo {
+  countSince(tenantId: string, userId: string, since: Date): Promise<number>;
+  /** Inserts the job (queued) and enqueues it on q_insight_exports in one transaction. */
+  create(tenantId: string, job: Omit<ExportJob, 'code' | 'createdAt' | 'fileName'>, fileNameOf: (code: string) => string, now: Date): Promise<ExportJob>;
+  get(tenantId: string, idOrCode: string): Promise<ExportJob | null>;
+  list(tenantId: string, userId: string | null, status: ExportStatus | undefined, limit: number, after: { k: string; id: string } | undefined): Promise<ExportJob[]>;
+  /** queued/running → running, attempts + 1; null when already finished (duplicate delivery). */
+  claim(tenantId: string, id: string, now: Date): Promise<ExportJob | null>;
+  /** completed + export.completed.v1 + audit.recorded.v1 (outbox), one transaction. */
+  complete(tenantId: string, job: ExportJob, r: { rowCount: number; filePath: string; fileBytes: number; now: Date; expiresAt: Date; via: 'ui' | 'chat'; correlationId: string }): Promise<void>;
+  /** failed + export.failed.v1 (outbox), one transaction. */
+  fail(tenantId: string, job: ExportJob, errorCode: string, now: Date, correlationId: string): Promise<void>;
+  expiring(now: Date, limit: number): Promise<{ tenantId: string; id: string; filePath: string | null }[]>;
+  markExpired(tenantId: string, id: string, now: Date): Promise<void>;
+}
+
+export interface FileStore {
+  put(path: string, body: Uint8Array, contentType: string): Promise<void>;
+  signedUrl(path: string, expiresInSec: number): Promise<string>;
+  remove(paths: readonly string[]): Promise<void>;
+}
+
+export interface Contact {
+  name: string | null;
+  phones: string[];
+  emails: string[];
+}
+
+/** records POST /internal/v1/contacts:batch (service token, ≤ 1,000 ids, audited by records, R-21). */
+export interface ContactsReader {
+  batch(tenantId: string, personIds: readonly string[], exportId: string, requestedBy: string): Promise<Map<string, Contact>>;
+}
+
+export interface SheetColumn {
+  key: string;
+  label: string;
+  type: string;
+}
+
+/** Streaming .xlsx writer: consumes pages of rows, returns the file. */
+export interface SpreadsheetWriter {
+  write(sheetName: string, columns: readonly SheetColumn[], pages: AsyncIterable<Record<string, unknown>[]>): Promise<Uint8Array>;
 }
 
 export interface VocabularyReleaseDoc {

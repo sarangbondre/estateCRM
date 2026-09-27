@@ -43,7 +43,7 @@ export function buildApp(deps: AppDeps): Service<operations> {
 
   const queue = { db, schema: SCHEMA };
   const handlers = eventHandlers(deps);
-  const work = workHandlers(deps);
+  const work = workHandlers(deps, wired);
   const drains: Record<string, () => Promise<DrainResult>> = {
     [EVENT_QUEUE]: () =>
       drainEvents(queue, {

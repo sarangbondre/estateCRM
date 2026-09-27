@@ -1,9 +1,11 @@
 // HTTP adapters: one svc.op(...) per contract operation, calling application use cases (CLAUDE.md §3.1).
 import { requireStaff } from '@11e/auth';
 import type { operations } from '@11e/contracts/insight';
-import { HttpError, badRequest, forbidden } from '@11e/http';
+import { HttpError, badRequest, decodeCursor, forbidden, idempotent, notFound, pageLimit, toPage } from '@11e/http';
 import type { Service } from '@11e/http';
 import { getDashboard } from '../application/dashboards.js';
+import { createExport, exportView } from '../application/exports.js';
+import type { ExportStatus } from '../application/ports.js';
 import type { DashboardQuery } from '../application/dashboards.js';
 import type { Caller, RunQueryOutcome } from '../application/queries.js';
 import type { DashboardName } from '../domain/dashboards/definitions.js';
@@ -59,4 +61,47 @@ export function registerRoutes(svc: Service<operations>, deps: AppDeps, wired: W
   svc.op('getSupplyDashboard', (c, { query }) => dashboard('supply')(c, query as DashboardQuery));
   svc.op('getScopesDashboard', (c, { query }) => dashboard('scopes')(c, query as DashboardQuery));
   svc.op('getQualityDashboard', (c, { query }) => dashboard('quality')(c, query as DashboardQuery));
+
+  // ------------------------------------------------------------------ exports (US-32, R-16, R-21)
+  svc.op('createExport', async (c, { body }) => {
+    const caller = callerOf(c);
+    return idempotent(c, deps.db, caller, body, async () => {
+      const r = await createExport(wired.exports, caller, {
+        plan: body.plan as QueryPlan,
+        ...(body.includeContacts !== undefined ? { includeContacts: body.includeContacts } : {}),
+        ...(body.fileName !== undefined ? { fileName: body.fileName } : {}),
+        sourceMessageId: body.sourceMessageId ?? null,
+      });
+      if (!r.ok) throw new HttpError(r.status, r.code, { ...(r.detail ? { detail: r.detail } : {}), ...(r.errors ? { errors: r.errors } : {}) });
+      c.header('location', `/v1/exports/${r.job.id}`);
+      return { status: 202, body: await exportView(wired.exports, r.job, deps.clock.now()) };
+    });
+  });
+
+  svc.op('listExports', async (c, { query }) => {
+    const caller = callerOf(c);
+    const limit = pageLimit(query.limit);
+    const after = decodeCursor<{ k: string; id: string }>(query.cursor);
+    const rows = await wired.exports.exports.list(
+      caller.tenantId,
+      caller.role === 'Admin' ? null : caller.userId,
+      query.status as ExportStatus | undefined,
+      limit,
+      after,
+    );
+    const page = toPage(rows, limit, (r) => ({ k: r.createdAt.toISOString(), id: r.id }));
+    const now = deps.clock.now();
+    return c.json({ items: await Promise.all(page.items.map((j) => exportView(wired.exports, j, now))), nextCursor: page.nextCursor }, 200);
+  });
+
+  svc.op('getExport', async (c, { params }) => {
+    const caller = callerOf(c);
+    const job = await wired.exports.exports.get(caller.tenantId, params.idOrCode);
+    if (!job) throw notFound();
+    if (job.requestedBy !== caller.userId && caller.role !== 'Admin') throw forbidden('only the requester or an Admin');
+    const now = deps.clock.now();
+    if (job.status === 'expired' || (job.status === 'completed' && job.expiresAt && job.expiresAt <= now))
+      throw new HttpError(410, 'export-expired', { detail: 'export links last 24 hours; run the export again' });
+    return c.json(await exportView(wired.exports, job, now), 200);
+  });
 }
