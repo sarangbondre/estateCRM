@@ -46,16 +46,14 @@ equivalent: `docs/01-brd.md` (BRD v0.6.1). Requirements: `docs/02-prd.md` (PRD v
 
 | Phase | Branch | Status | Progress |
 |-------|--------|--------|----------|
-| Stage 7 — Execution: Foundation track (F-01…F-17) | `task/<ID>-<slug>` per task, PRs to `main` | starting | 0 / 87 tasks |
+| Stage 7 — Execution: Foundation track (F-01…F-17) | `task/<ID>-<slug>` per task, PRs #2–#19 | done except F-07 (deferred provisioning) | 16 / 17 foundation tasks |
+| Stage 7 — Execution: records, journeys, crm-engine tracks | `task/<ID>-<slug>` | in progress (parallel) | 0 / 30 |
 
 ## Upcoming Phases
 
 | Phase | Name | Status | Key Deliverables |
 |-------|------|--------|-----------------|
-| Stage 7 | records track (REC-01…12) | planned | System of record, ingest, dedup, merges |
 | Stage 7 | intake track (INT-01…11) | planned | Uploads, strict/mapping modes, AI for leftovers, anonymiser |
-| Stage 7 | crm-engine track (ENG-01…07) | planned | Matching, bundles, triggers |
-| Stage 7 | journeys track (JOU-01…11) | planned | Life curve, queues, calls, proposals, deals |
 | Stage 7 | listings track (LIS-01…07) | planned | Publication ceiling, privacy scan, public API |
 | Stage 7 | insight track (INS-01…07) | planned | Dashboards, chat, exports |
 | Stage 7 | web track (WEB-01…09) | planned | Chat-first UI, sign-in, gateway |
@@ -75,7 +73,7 @@ equivalent: `docs/01-brd.md` (BRD v0.6.1). Requirements: `docs/02-prd.md` (PRD v
 
 ## Next Actions
 
-1. Stage 7 Foundation track: F-01 monorepo scaffold → F-02 quality baseline → F-03 CI → F-04 contract tooling → F-06 local DB stack.
+1. Service tracks running in parallel: records, journeys (critical path), crm-engine. Next: intake, listings, insight; then web.
 2. Then the service tracks in parallel (≤ 3 at a time): records first, then intake and crm-engine, and so on.
 3. The provisioning session with the product owner, then QA-02 pilot deploy and QA-03 benchmarks.
 
