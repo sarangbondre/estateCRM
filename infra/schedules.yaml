@@ -1,0 +1,73 @@
+# Scheduled calls made by Supabase pg_cron + pg_net (ADR-0003, HLD §9 "Schedules", F-15).
+# Source of truth for every /internal/v1/jobs/{name} schedule. Times are UTC (pg_cron runs in UTC); IST = UTC+05:30.
+# `on-demand` jobs are not scheduled: they are poked by the owning service (after deploy or after an event).
+# tools/gen-schedules.mjs checks this file against the contracts (every job in each service's jobs enum must be listed)
+# and generates infra/supabase/migrations/*_platform_schedules.sql. Relay and drain calls are generated from
+# contracts/generated/event-topology.json (every minute).
+
+# Local dev ports (pnpm dev); base URLs are http://host.docker.internal:<port> so pg_net inside Docker reaches them.
+localPorts:
+  web: 3000
+  intake: 3001
+  records: 3002
+  journeys: 3003
+  crm-engine: 3004
+  listings: 3005
+  insight: 3006
+
+jobs:
+  web:
+    invitation-expire: '5 * * * *' # hourly
+    idle-session-sweep: '*/15 * * * *' # every 15 min (NFR-16)
+    notification-prune: '0 21 * * *' # daily 02:30 IST
+    rate-limit-prune: '10 * * * *' # hourly
+    idempotency-prune: '15 * * * *' # hourly
+    audit-chain-verify: '30 21 * * *' # daily 03:00 IST
+    signing-key-rotate: '0 22 * * *' # daily check; web rotates when the active key is 90 days old
+    keep-alive: '0 */12 * * *' # pilot only: every 12 h so the free project isn't paused
+  intake:
+    retention-purge: '45 21 * * *' # daily 03:15 IST
+    expire-idempotency-keys: '20 * * * *' # hourly
+    reap-chunk-leases: '*/5 * * * *' # every 5 min
+    delete-processed-files: '25 * * * *' # hourly
+  records:
+    activate-vocabulary: on-demand # after each deploy that ships a release
+    recompute-launch-area: on-demand # queued when the launch area / hierarchy changes
+    resolve-pending-repeats: '30 19 * * *' # nightly 01:00 IST
+    retention-purge: '30 22 * * 6' # Sunday 04:00 IST
+    expire-idempotency-keys: '20 * * * *' # hourly
+    reconcile-counters: '0 22 * * *' # nightly 03:30 IST
+  journeys:
+    life-curve-nightly: '30 20 * * *' # 02:00 IST, must finish by 04:00 IST (NFR-9)
+    demand-gap-refresh: '15 21 * * *' # 02:45 IST
+    rank-refresh: '*/5 * * * *' # every 5 min
+    lease-renewal-scan: '30 23 * * *' # 05:00 IST
+    dormant-revisit: '30 0 * * *' # 06:00 IST
+    follow-up-reminders: '30 2 * * *' # 08:00 IST
+    queue-counts-flush: '* * * * *' # every minute
+    retention-purge: '0 22 * * 6' # Sunday 03:30 IST
+  crm-engine:
+    full-rescore: '30 21 * * *' # 03:00 IST, after the 02:00 life curve
+    micromarket-refresh: '0 20 * * *' # 01:30 IST (+ on events)
+    projection-reconcile: '30 22 * * 6' # Sunday 04:00 IST
+  listings:
+    ceiling-sweep: '0 23 * * *' # 04:30 IST, after the life curve
+    projection-refresh: on-demand # after a settings or vocabulary change
+    change-feed-prune: '15 22 * * *' # daily 03:45 IST
+    idempotency-prune: '15 * * * *' # hourly
+    rate-limit-prune: '10 * * * *' # hourly
+    api-key-expire: '*/5 * * * *' # every 5 min
+  insight:
+    export-expire: '*/15 * * * *' # every 15 min
+    conversation-purge: '45 22 * * *' # daily 04:15 IST
+    rollup-reconcile: '0 23 * * *' # 04:30 IST
+    vocabulary-refresh: on-demand # after vocabulary.released.v1 / micromarkets.updated.v1
+    idempotency-prune: '15 * * * *' # hourly
+    hf-credit-reset: '30 18 1 * *' # monthly, 1st 00:00 IST
+
+# In-database alarms (CR-008), evaluated every minute by platform.check_alarms().
+alarms:
+  dlq-depth: 0 # any message in a *_dlq queue (conventions §5)
+  relay-lag-sec: 300 # oldest unpublished outbox row (conventions §7)
+  queue-lag-sec: 300 # oldest message in an event/work queue (insight LLD: lag > 5 min)
+  job-failure-window-min: 10 # a pg_cron job or a scheduler call (pg_net) failed or got 5xx in this window
