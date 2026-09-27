@@ -1,0 +1,19 @@
+{
+  "eventId": "bfe0e6fc-db8d-4a5d-8c54-6657bd002c2c",
+  "eventType": "demand.touch_added.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-demand.touch_added.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "demand",
+  "aggregateId": "4b078dbd-90d1-4406-8d7e-153a93471bef",
+  "aggregateVersion": 1,
+  "data": {
+    "demandId": "412dea89-2b2a-49d5-96b0-14afa90f5ba9",
+    "touchId": "e3c38668-dad6-43da-b5a9-9ab44d18e6ca",
+    "sourceType": "7uEAMlKc7",
+    "captureMode": "kkTHZJui",
+    "isFirstTouch": true
+  }
+}

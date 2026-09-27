@@ -1,0 +1,17 @@
+{
+  "eventId": "94f50d63-c20b-41c7-8121-e07b4bfe9541",
+  "eventType": "offer.confirmed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-offer.confirmed.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "offer",
+  "aggregateId": "78c265f7-de45-48ac-8956-7b7cd0dcdfb4",
+  "aggregateVersion": 1,
+  "data": {
+    "offerId": "817ed2fd-ce35-4123-9f77-b41a9a53a2ee",
+    "confirmedAt": "2022-11-04T22:55:08Z",
+    "how": "price_sheet"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "eventId": "c6bdaedf-5613-41f2-82a0-9a1531ebe009",
+  "eventType": "project.created.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-project.created.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "project",
+  "aggregateId": "1bc493d8-4002-4067-8fee-1e7dd299c9b1",
+  "aggregateVersion": 1,
+  "data": {
+    "projectId": "bc116ded-723b-4f57-948a-9618ff580a0b",
+    "code": "dRuTLuoLIi",
+    "name": "rRtrucar",
+    "developerPersonId": "ebe27948-fa92-4619-917e-00e155b30a15",
+    "developerName": "4TNGZKe",
+    "reraNumber": "o5EiTqhO5",
+    "locality": "PgjL",
+    "micromarket": "6t",
+    "city": "vCWDD4",
+    "possessionDate": "pmCoO",
+    "amenities": [
+      "pyqes",
+      "f"
+    ],
+    "offerIds": [
+      "ed3a7da0-58c7-4e12-8825-11bea50fbb1f",
+      "5eb08e48-ce72-4c1d-b0f0-3724adbca5dd"
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "eventId": "2b1645c8-df0f-4a9b-8181-028ee6146101",
+  "eventType": "person.flagged.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-person.flagged.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "person",
+  "aggregateId": "ff2a1b23-bd4a-4ee8-8f3a-10f26e653a8d",
+  "aggregateVersion": 1,
+  "data": {
+    "personId": "02ad35d1-1a6c-4bbc-a54b-bb1180238f3c",
+    "flag": "lHH",
+    "reason": "bwjjXmrvn"
+  }
+}

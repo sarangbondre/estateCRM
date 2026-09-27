@@ -1,0 +1,16 @@
+{
+  "eventId": "83c3ca87-64b9-4558-8eb6-288807bd98b3",
+  "eventType": "offer.voided.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-offer.voided.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "offer",
+  "aggregateId": "ee3d794f-3954-40c1-839d-293d7a704326",
+  "aggregateVersion": 1,
+  "data": {
+    "offerId": "85d88533-543c-4dcf-b274-557ecd4a7a41",
+    "reason": "duplicate_discarded"
+  }
+}

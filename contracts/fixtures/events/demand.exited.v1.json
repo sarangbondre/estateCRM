@@ -1,0 +1,22 @@
+{
+  "eventId": "dabcf14b-186d-49b7-8eef-6b6568897f41",
+  "eventType": "demand.exited.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-demand.exited.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "demand",
+  "aggregateId": "435c2cd5-6a3c-4b2e-8b48-fb35666d32d9",
+  "aggregateVersion": 1,
+  "data": {
+    "demandId": "9b14757f-c2be-467e-81fc-ae0dd9d9d860",
+    "exit": "Dormant",
+    "revisitDate": "2009-08-03",
+    "reason": "A",
+    "competingTerms": "0mvq",
+    "competingPriceInr": 41,
+    "flagPerson": false,
+    "personId": "d906f476-9e91-4acf-b2a7-e0daf2d880da"
+  }
+}

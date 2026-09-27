@@ -1,0 +1,19 @@
+{
+  "eventId": "10312e6d-f52c-479e-80f8-6ee49d7e3f5e",
+  "eventType": "lifecycle.stage_changed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-lifecycle.stage_changed.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "lifecycle",
+  "aggregateId": "3bd19c61-dab0-4413-86cc-d251a1c9f940",
+  "aggregateVersion": 1,
+  "data": {
+    "subjectType": "offer",
+    "subjectId": "83ee42f5-d33d-45b0-ae6e-66992d9bbe14",
+    "from": "B0n",
+    "to": "Stale",
+    "day": 281
+  }
+}

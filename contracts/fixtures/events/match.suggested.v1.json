@@ -1,0 +1,27 @@
+{
+  "eventId": "cf53da35-57a8-4cd1-8a81-19656f031d33",
+  "eventType": "match.suggested.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-match.suggested.v1",
+  "producer": "crm-engine",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "match",
+  "aggregateId": "076b8cae-d4ff-40f5-8dcc-467e8d5f67a2",
+  "aggregateVersion": 1,
+  "data": {
+    "matchId": "756693a0-e646-4a4c-b219-0a69d09f4eb6",
+    "code": "fBqMUOe",
+    "demandId": "a5e6e4ec-0684-4e38-87aa-3091de0a04ad",
+    "offerIds": [
+      "f23031a6-979d-4bcb-8580-fa390e9601ab",
+      "8534c2d5-e267-491c-97af-cbb97dcfb2f8"
+    ],
+    "isBundle": false,
+    "score": 3,
+    "flags": [
+      "KzAqq16eA",
+      "5mXbD3aaT"
+    ]
+  }
+}

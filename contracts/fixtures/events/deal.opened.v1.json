@@ -1,0 +1,18 @@
+{
+  "eventId": "a4ff251c-76b8-4d9d-8f1e-223b794f9857",
+  "eventType": "deal.opened.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-deal.opened.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "deal",
+  "aggregateId": "79f7603c-2d08-445e-835a-69cc2e0cbb55",
+  "aggregateVersion": 1,
+  "data": {
+    "dealId": "95015497-6512-455f-917b-f79d5ace4347",
+    "code": "HgtOaeSW",
+    "demandId": "769464e1-0812-4d39-9b75-3a0c08654eb1",
+    "offerId": "7b9843cc-194a-4456-8a63-c91d4e34ef4b"
+  }
+}

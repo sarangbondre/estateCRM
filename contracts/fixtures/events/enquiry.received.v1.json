@@ -1,0 +1,21 @@
+{
+  "eventId": "e5ed6d31-30ff-406e-8ec7-4ea1c300b63c",
+  "eventType": "enquiry.received.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-enquiry.received.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "enquiry",
+  "aggregateId": "30f34cdc-1238-4101-8f64-96fdf3713e66",
+  "aggregateVersion": 1,
+  "data": {
+    "enquiryId": "fde1b461-9969-4bb6-ab54-2f133aa7a980",
+    "code": "zX5",
+    "offerId": "21b3c272-d8e3-448f-8037-97ec794b1328",
+    "projectId": "22a99213-838c-4e51-9563-1094f52f5c85",
+    "campaignRef": "jB4o",
+    "demandId": "fc822f4f-4cbf-43fe-ae97-3035f8b0c7c5",
+    "receivedAt": "2001-05-13T14:42:21Z"
+  }
+}

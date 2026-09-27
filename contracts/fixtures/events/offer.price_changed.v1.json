@@ -1,0 +1,34 @@
+{
+  "eventId": "a8bc5fc9-259e-4cb0-83c1-b6f152dfaffd",
+  "eventType": "offer.price_changed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-offer.price_changed.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "offer",
+  "aggregateId": "668bc1b2-d438-48f8-89e6-552ec162d658",
+  "aggregateVersion": 1,
+  "data": {
+    "offerId": "d89dbfcc-4e32-4cbb-8db4-720464a8b52b",
+    "previous": {
+      "salePriceInrMin": 883,
+      "salePriceInrMax": 69,
+      "rentMonthlyInrMin": 224,
+      "rentMonthlyInrMax": 472,
+      "depositInr": 686,
+      "currentRentInr": 73,
+      "unitCount": -627
+    },
+    "current": {
+      "salePriceInrMin": 254,
+      "salePriceInrMax": 104,
+      "rentMonthlyInrMin": 43,
+      "rentMonthlyInrMax": 705,
+      "depositInr": 25,
+      "currentRentInr": 317,
+      "unitCount": 399
+    },
+    "cause": "edit"
+  }
+}

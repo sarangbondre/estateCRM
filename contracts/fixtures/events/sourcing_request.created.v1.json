@@ -1,0 +1,20 @@
+{
+  "eventId": "e0b21c9c-fe39-46f7-8784-f5ee9ec5c1f9",
+  "eventType": "sourcing_request.created.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-sourcing_request.created.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "sourcing_request",
+  "aggregateId": "932c2225-7ede-4b5d-871f-56236366de75",
+  "aggregateVersion": 1,
+  "data": {
+    "sourcingRequestId": "6fc67fc3-6d0a-4bb5-9ffa-2efbfe094897",
+    "code": "BhIxR7",
+    "demandId": "e7d9c96e-af5d-47aa-8b6b-8b32a1afd4ad",
+    "assigneeUserId": "851421c3-7490-4588-9649-02fbf28a56e4",
+    "dueDate": "2004-02-16",
+    "priority": "6WK"
+  }
+}

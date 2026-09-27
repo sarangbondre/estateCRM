@@ -1,0 +1,19 @@
+{
+  "eventId": "a7720f21-d321-4cc1-8929-03a7c07afd08",
+  "eventType": "export.completed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-export.completed.v1",
+  "producer": "insight",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "export",
+  "aggregateId": "368211d5-b359-4ed8-8ab0-4b34a1f8de3f",
+  "aggregateVersion": 1,
+  "data": {
+    "exportId": "a5515a14-08c0-4ad3-aa24-a172eedc6388",
+    "code": "Ar0L",
+    "rowCount": -385,
+    "requestedBy": "88ef80bb-2f84-4404-b681-3cab18cfca81",
+    "includesPii": true
+  }
+}

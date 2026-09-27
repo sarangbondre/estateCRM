@@ -1,0 +1,17 @@
+{
+  "eventId": "3ceb65e5-1f72-4d74-85a0-dab082e39812",
+  "eventType": "merge_candidate.raised.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-merge_candidate.raised.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "merge_candidate",
+  "aggregateId": "42e5d91d-8f89-4697-83f2-62dfbcfc3849",
+  "aggregateVersion": 1,
+  "data": {
+    "candidateId": "b17c95c0-5c62-40db-a751-baeba853fe6c",
+    "kind": "uncertain_merge",
+    "aggregateType": ""
+  }
+}

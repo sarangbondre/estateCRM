@@ -1,0 +1,17 @@
+{
+  "eventId": "2cb4baf7-dfba-458c-8b35-306667041f4f",
+  "eventType": "watchlist_task.completed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-watchlist_task.completed.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "watchlist_task",
+  "aggregateId": "44fe28c3-1a81-4489-8107-a8c6bce5158d",
+  "aggregateVersion": 1,
+  "data": {
+    "taskId": "230a22e3-42dc-411c-bec4-1ea78006abc1",
+    "watchlistItemId": "1c05ec26-94bc-4300-bef3-239ae5e02305",
+    "outcome": "tGt4cc7"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "eventId": "a55f4466-7dcb-4a8a-8dde-f3741295e102",
+  "eventType": "demand.confirmed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-demand.confirmed.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "demand",
+  "aggregateId": "69307dc8-a054-4d7a-897c-419c606e0733",
+  "aggregateVersion": 1,
+  "data": {
+    "demandId": "74a5cc00-fb8b-4714-80de-46ad9bcfb6e9",
+    "confirmedAt": "2020-11-24T09:39:53Z",
+    "how": "WbzzanK47z"
+  }
+}

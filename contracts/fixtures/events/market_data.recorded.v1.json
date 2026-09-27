@@ -1,0 +1,22 @@
+{
+  "eventId": "ff001051-3a44-4f62-8a9d-52c3f43b8093",
+  "eventType": "market_data.recorded.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-market_data.recorded.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "market_data",
+  "aggregateId": "3335b573-66fe-4014-8db0-1ff802fa6875",
+  "aggregateVersion": 1,
+  "data": {
+    "marketDataId": "c36df40c-3c3e-4b17-9889-e43d55a1556b",
+    "kind": "closed_elsewhere",
+    "segment": "",
+    "dealType": "0027jN2Q",
+    "micromarket": "LsgFyFpPel",
+    "priceInr": 58,
+    "areaSqft": 283.96216593682766,
+    "recordedOn": "2007-05-30"
+  }
+}

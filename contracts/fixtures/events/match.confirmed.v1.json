@@ -1,0 +1,21 @@
+{
+  "eventId": "f2a708ed-7af1-4485-83cb-53aa78886bc8",
+  "eventType": "match.confirmed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-match.confirmed.v1",
+  "producer": "crm-engine",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "match",
+  "aggregateId": "83493c6e-d010-49b3-8264-d26bb8249d7d",
+  "aggregateVersion": 1,
+  "data": {
+    "matchId": "ab9995a7-1901-4bbe-b09e-33459eb18914",
+    "demandId": "973ca0ba-0793-4d05-b18b-5d8cceeb310d",
+    "offerIds": [
+      "24ff2024-53ec-4c5f-b7f0-4777991de364",
+      "032a6c3a-16ac-41c5-8eb0-a2da2b004135"
+    ],
+    "confirmedBy": "4fb6cd0d-8b0d-44c1-810d-9ac3adedc4e0"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "eventId": "ea3fd3a0-09b7-4747-8657-5e4750a2966d",
+  "eventType": "proposal.sent.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-proposal.sent.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "proposal",
+  "aggregateId": "371ab805-f947-4977-833b-d9878f944ea1",
+  "aggregateVersion": 1,
+  "data": {
+    "proposalId": "52f244a1-80c7-4579-acb2-8841acb533ef",
+    "demandId": "0a47218c-7f4e-48bc-a068-acb7d5e39b8f",
+    "matchIds": [
+      "90ce57c4-a73e-456e-a1dc-0908e74120c0",
+      "0828a0c8-cc54-4bc0-9b7a-8192ce61f9b0"
+    ]
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "eventId": "b386d501-6fa9-4bbf-8dde-116474e03c19",
+  "eventType": "demand.created.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-demand.created.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "demand",
+  "aggregateId": "53d50e17-edcb-4125-8a06-29fa60e10479",
+  "aggregateVersion": 1,
+  "data": {
+    "demandId": "a5b4e4f2-c21b-4d0c-a90f-4c3ba1f5c35f",
+    "code": "k18Vuk",
+    "dealTypes": [
+      "ERUMpmpC0",
+      "BWgJ"
+    ],
+    "market": "D51Lc42",
+    "segment": "",
+    "propertyTypes": [
+      "",
+      "wAbT4c"
+    ],
+    "bhkMin": -580.3993958979845,
+    "bhkMax": -522.1766489557922,
+    "areaSqftMin": -949.2734549567103,
+    "areaSqftMax": 953.5054974257946,
+    "areaBasis": "Saleable",
+    "budgetInrMin": 710,
+    "budgetInrMax": 808,
+    "rentMonthlyInrMin": 396,
+    "rentMonthlyInrMax": 385,
+    "micromarkets": [
+      "iKZttWX",
+      "LJ"
+    ],
+    "localities": [
+      "q01FE",
+      "Y"
+    ],
+    "moveInBy": "2005-02-02",
+    "statedTags": {},
+    "outsideLaunchArea": false,
+    "recordStage": "Captured",
+    "sourceType": "Digi",
+    "ownerUserId": "60ca1440-98a2-4a93-9a72-163a870065ba",
+    "contactPersonIds": [
+      "174dad34-c6f5-4360-8a33-f0cf7cc511e3",
+      "81a7c691-a0b8-4d7a-9bba-0fb2e0355157"
+    ],
+    "moveInFrom": "2011-10-30",
+    "lastSeenDate": "2000-05-11"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "eventId": "be418e7c-9616-4bd7-8e21-a2f6f1a3208c",
+  "eventType": "micromarkets.updated.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-micromarkets.updated.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "micromarkets",
+  "aggregateId": "e641522a-3bfe-44b8-87ae-466fc1a85094",
+  "aggregateVersion": 1,
+  "data": {
+    "version": 85
+  }
+}

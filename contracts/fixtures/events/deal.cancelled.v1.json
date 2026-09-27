@@ -1,0 +1,18 @@
+{
+  "eventId": "d4931b8d-eaac-4bc4-8786-928e6fb22314",
+  "eventType": "deal.cancelled.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-deal.cancelled.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "deal",
+  "aggregateId": "a4b94ba9-adcf-4143-8ac2-716628f61e59",
+  "aggregateVersion": 1,
+  "data": {
+    "dealId": "6b3b5478-87f5-45a1-87fc-74e73185a7ce",
+    "demandId": "cba2cb9b-ea5b-4e3d-a201-9a8bce736ce5",
+    "offerId": "46b6f7c5-f449-4a51-935f-1e310054673a",
+    "reason": "PGqtPqg"
+  }
+}

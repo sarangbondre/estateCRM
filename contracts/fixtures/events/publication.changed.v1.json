@@ -1,0 +1,20 @@
+{
+  "eventId": "1e0ddd6c-8198-4c92-8248-56f9167e5bc9",
+  "eventType": "publication.changed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-publication.changed.v1",
+  "producer": "listings",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "publication",
+  "aggregateId": "0fbe6fd8-2281-40e3-8fc5-7e71009440aa",
+  "aggregateVersion": 1,
+  "data": {
+    "subjectType": "offer",
+    "subjectId": "a7394887-96ad-47c0-bb5f-9b916fafe3d6",
+    "from": "XyB6L6E",
+    "to": "Anonymous",
+    "reason": "user",
+    "publicId": "dcvT"
+  }
+}

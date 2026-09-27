@@ -1,0 +1,22 @@
+{
+  "eventId": "cc93bc7a-20fa-4ca0-8924-bdbb21cb4348",
+  "eventType": "upload.started.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-upload.started.v1",
+  "producer": "intake",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "upload",
+  "aggregateId": "dd9f8b1f-e785-4226-8808-76a40f0b8ea1",
+  "aggregateVersion": 1,
+  "data": {
+    "uploadId": "76db6985-3c8d-4b2b-9bd6-aa2abb85651e",
+    "code": "UA1uW1n",
+    "mode": "mapping",
+    "sourceType": "zj3AVN4AuK",
+    "sourceDetail": "lcNW89",
+    "rowCount": -720,
+    "anonymised": false,
+    "uploadedBy": "8c356260-d53d-46b7-b1ca-1b0722bea11e"
+  }
+}

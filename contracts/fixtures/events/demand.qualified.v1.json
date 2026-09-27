@@ -1,0 +1,15 @@
+{
+  "eventId": "c2d4906a-10a7-42b1-850f-50b8a4bf95db",
+  "eventType": "demand.qualified.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-demand.qualified.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "demand",
+  "aggregateId": "21910c73-000e-4143-8249-c5ab0b802bab",
+  "aggregateVersion": 1,
+  "data": {
+    "demandId": "15f17b4e-1886-4018-800f-514f3b7b2f86"
+  }
+}

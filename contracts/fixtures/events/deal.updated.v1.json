@@ -1,0 +1,18 @@
+{
+  "eventId": "245939a0-3776-4d66-8ca1-5329e327dc98",
+  "eventType": "deal.updated.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-deal.updated.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "deal",
+  "aggregateId": "b6369692-e9d1-450a-80ad-d9702694f7a2",
+  "aggregateVersion": 1,
+  "data": {
+    "dealId": "70fe3414-8c52-4bb3-9208-cf65fd26df51",
+    "stage": "tPPWzRzt",
+    "followUpDate": "2028-10-04",
+    "overdue": true
+  }
+}

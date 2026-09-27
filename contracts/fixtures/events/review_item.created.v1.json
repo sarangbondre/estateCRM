@@ -1,0 +1,19 @@
+{
+  "eventId": "63c140bf-6b73-4d64-8473-12c57a50a1e3",
+  "eventType": "review_item.created.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-review_item.created.v1",
+  "producer": "intake",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "review_item",
+  "aggregateId": "a253cb4d-b622-452b-84be-d78c07374a2a",
+  "aggregateVersion": 1,
+  "data": {
+    "reviewItemId": "4d4b0437-704e-47a4-8a72-4cd39f771198",
+    "uploadId": "cbe21715-11c3-4cd0-82b3-9e9af5711706",
+    "rowId": "2520fc3e-e276-48cd-953d-0c8e0cf33b39",
+    "reasonCode": "",
+    "detailCode": ""
+  }
+}

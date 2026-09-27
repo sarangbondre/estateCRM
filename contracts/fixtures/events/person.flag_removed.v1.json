@@ -1,0 +1,16 @@
+{
+  "eventId": "6244a951-a160-41c6-8e46-2eec6bc6acb9",
+  "eventType": "person.flag_removed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-person.flag_removed.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "person",
+  "aggregateId": "cd71831e-8659-4737-8c41-36d0fe8a785f",
+  "aggregateVersion": 1,
+  "data": {
+    "personId": "23800638-43cc-4069-ac43-31ce044469b4",
+    "flag": "FoT"
+  }
+}

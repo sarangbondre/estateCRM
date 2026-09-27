@@ -1,0 +1,26 @@
+{
+  "eventId": "a7dbe505-c9b8-4432-842d-4a40e765d9a1",
+  "eventType": "proposal.feedback_recorded.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-proposal.feedback_recorded.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "proposal",
+  "aggregateId": "be173ecd-0dc2-4d1a-8c7f-8c4ac1c7a35c",
+  "aggregateVersion": 1,
+  "data": {
+    "proposalId": "8fe97ba6-6391-46ef-826a-79d6b36c8a05",
+    "demandId": "90f82d6f-4f4b-406e-b8dc-a72b97bc6cbe",
+    "feedback": [
+      {
+        "matchId": "a132e697-28d1-4b99-9cab-38bef9aec658",
+        "verdict": "liked"
+      },
+      {
+        "matchId": "34de39ee-949e-4f3e-90f9-1cd9a98c34f1",
+        "verdict": "rejected"
+      }
+    ]
+  }
+}

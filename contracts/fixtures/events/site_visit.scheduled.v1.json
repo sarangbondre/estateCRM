@@ -1,0 +1,21 @@
+{
+  "eventId": "40fecdef-ef3d-4a55-8d0b-34225e86304c",
+  "eventType": "site_visit.scheduled.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-site_visit.scheduled.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "site_visit",
+  "aggregateId": "5f98ac68-b50f-4285-80aa-c088795d6f9f",
+  "aggregateVersion": 1,
+  "data": {
+    "visitId": "fcb5067d-de31-4f80-97c0-56db69b374fb",
+    "demandId": "d4cdd6ac-ff15-4e46-846c-5026878bc46c",
+    "offerIds": [
+      "264c869e-c4d0-4d77-998b-4859a29bf2b1",
+      "3e06b382-d388-4252-afe7-bfc75bfb2937"
+    ],
+    "scheduledFor": "2019-03-22T13:09:50Z"
+  }
+}

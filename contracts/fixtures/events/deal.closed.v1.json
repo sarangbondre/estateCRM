@@ -1,0 +1,22 @@
+{
+  "eventId": "fb9493de-84e6-4780-8f46-839a248432b3",
+  "eventType": "deal.closed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-deal.closed.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "deal",
+  "aggregateId": "8957394d-1cfd-4f44-82e6-250b349d3085",
+  "aggregateVersion": 1,
+  "data": {
+    "dealId": "179f15d4-ae2f-4636-8dc4-183cd467acd1",
+    "demandId": "85a88452-6b03-4b66-8ba0-c2ad2947c95b",
+    "offerId": "19fd63d9-6330-4364-b7b5-b5a4797d7e00",
+    "closedAt": "2022-09-25T16:12:02Z",
+    "closingPriceInr": 928,
+    "dealType": "ybi0KWE8a",
+    "leaseMonths": -686,
+    "unitsBooked": 52
+  }
+}

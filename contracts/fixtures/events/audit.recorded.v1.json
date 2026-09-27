@@ -1,0 +1,20 @@
+{
+  "eventId": "d43d8808-f0fa-47fd-8053-59b9c2fc79ce",
+  "eventType": "audit.recorded.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-audit.recorded.v1",
+  "producer": "*",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "audit",
+  "aggregateId": "832aff1e-8de1-44b3-8cfa-5d887334fb98",
+  "aggregateVersion": 1,
+  "data": {
+    "action": "4",
+    "actorUserId": "6d00a0d8-0016-4bd0-a530-307b105cacd5",
+    "subjectType": "EYgRY86zN",
+    "subjectId": "e8182977-2329-42cc-93cc-4e12d2ca95f1",
+    "via": "ui",
+    "details": {}
+  }
+}

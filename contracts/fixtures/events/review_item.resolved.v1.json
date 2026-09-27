@@ -1,0 +1,32 @@
+{
+  "eventId": "9262f764-a47a-4ccc-8d2d-bf3e560dfeb9",
+  "eventType": "review_item.resolved.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-review_item.resolved.v1",
+  "producer": "intake",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "review_item",
+  "aggregateId": "fd573f0b-44f9-4620-8683-aee456d059e7",
+  "aggregateVersion": 1,
+  "data": {
+    "reviewItemId": "c6737fa6-9334-4917-a9f6-14e994983782",
+    "uploadId": "3182c817-0110-443e-98c1-6d73ee31da47",
+    "rowId": "a1e626d7-08e7-49c2-a2b8-85b7cb427395",
+    "externalRef": "doHTV",
+    "action": "discard",
+    "recordScope": "Capital",
+    "side": "None",
+    "dealTypes": [
+      "",
+      "Q"
+    ],
+    "market": "332GoUy9w",
+    "segment": "O",
+    "propertyTypes": [
+      "z3PX8gTU",
+      "6"
+    ],
+    "resolvedBy": "f9df1400-6c4a-4423-9ff9-d7ee432c9035"
+  }
+}

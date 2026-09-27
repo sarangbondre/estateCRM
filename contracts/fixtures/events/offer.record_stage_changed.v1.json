@@ -1,0 +1,19 @@
+{
+  "eventId": "922c2064-6d2a-4111-8e8f-c106de909e4b",
+  "eventType": "offer.record_stage_changed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-offer.record_stage_changed.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "offer",
+  "aggregateId": "59b57390-424b-4129-8feb-3c8a6fb9d5dc",
+  "aggregateVersion": 1,
+  "data": {
+    "offerId": "b03918f4-8881-4fc3-a9a9-5868421e4fb5",
+    "from": "ZU",
+    "to": "SIHvMeP",
+    "hasRealPhotos": true,
+    "changedBy": "bd1841ec-34bf-4e82-afcb-4ca4725fa8be"
+  }
+}

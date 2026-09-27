@@ -1,0 +1,16 @@
+{
+  "eventId": "752878ad-e98e-4e91-86c3-df0a23f0a64c",
+  "eventType": "vocabulary.released.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-vocabulary.released.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "vocabulary",
+  "aggregateId": "37bbd1c5-164d-4dce-8179-c8168e1914d9",
+  "aggregateVersion": 1,
+  "data": {
+    "version": "ghO0me9",
+    "checksum": "jfSnj"
+  }
+}

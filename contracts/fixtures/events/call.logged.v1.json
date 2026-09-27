@@ -1,0 +1,22 @@
+{
+  "eventId": "c2a1a9de-ae21-47ef-8295-ff1ead94daac",
+  "eventType": "call.logged.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-call.logged.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "call",
+  "aggregateId": "51bf7b70-14fe-4e3e-86d7-ce75d21089b3",
+  "aggregateVersion": 1,
+  "data": {
+    "callId": "a9f6a60d-7a6f-4377-a5d2-38d6ec7483b8",
+    "subjectType": "offer",
+    "subjectId": "7f430c46-8734-4f8a-b99b-3862aed304db",
+    "personId": "3f23e632-370c-4ac2-bc30-6a2030d5c21c",
+    "outcome": "already_gone",
+    "attempt": -322,
+    "personUnreachable": false,
+    "calledBy": "5390289d-382a-41af-a727-544c0a49b845"
+  }
+}

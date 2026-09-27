@@ -1,0 +1,17 @@
+{
+  "eventId": "bad7fc1c-1fa4-44d1-8a5e-ccc9b06b4ae9",
+  "eventType": "lease_renewal.due.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-lease_renewal.due.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "lease_renewal",
+  "aggregateId": "37c4d0c0-2430-40e9-8e77-c79e22a141e1",
+  "aggregateVersion": 1,
+  "data": {
+    "propertyId": "1e290f1a-7394-4f5f-923a-b611129d4e61",
+    "previousOfferId": "efededff-79b1-43c7-90f8-d9634b9e5ac2",
+    "availableFrom": "2024-07-04"
+  }
+}

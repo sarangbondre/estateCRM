@@ -1,0 +1,17 @@
+{
+  "eventId": "36c6e778-20c6-4602-82a3-f6ba0115c35f",
+  "eventType": "match.reopened.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-match.reopened.v1",
+  "producer": "crm-engine",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "match",
+  "aggregateId": "10a6fe77-8bcd-4584-80e1-3ed7ca6e62cf",
+  "aggregateVersion": 1,
+  "data": {
+    "matchId": "aeba0fbe-d8a5-41ba-aa95-2373d0cf8b48",
+    "demandId": "c40adb42-98ff-49c6-b813-e9190b605133",
+    "reason": "deal_cancelled"
+  }
+}
