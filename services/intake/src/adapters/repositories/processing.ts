@@ -8,9 +8,10 @@ import type {
   FingerprintRepository,
   RawRowRecord,
   RawRowRepository,
+  ReviewItem,
   ReviewItemRepository,
 } from '../../application/ports.js';
-import type { IntakeDb, RawRowsTable, UploadChunksTable } from '../db.js';
+import type { IntakeDb, RawRowsTable, ReviewItemsTable, UploadChunksTable } from '../db.js';
 
 type Db = Kysely<IntakeDb> | Transaction<IntakeDb>;
 
@@ -367,10 +368,98 @@ export function rawRowRepository(db: Db): RawRowRepository {
   };
 }
 
+const toReview = (r: Selectable<ReviewItemsTable>): ReviewItem => ({
+  id: r.id,
+  tenantId: r.tenant_id,
+  uploadId: r.upload_id,
+  rowId: r.row_id,
+  rowNo: r.row_no,
+  externalRef: r.external_ref,
+  reasonCode: r.reason_code,
+  detailCode: r.detail_code,
+  reviewReasonText: r.review_reason_text,
+  current: r.current,
+  suggested: r.suggested,
+  context: r.context,
+  vocabularyVersion: r.vocabulary_version,
+  status: r.status as ReviewItem['status'],
+  resolution: r.resolution as ReviewItem['resolution'],
+  note: r.note,
+  resolvedBy: r.resolved_by,
+  resolvedAt: r.resolved_at,
+  version: r.version,
+  createdAt: r.created_at,
+});
+
 export function reviewItemRepository(db: Db): ReviewItemRepository {
   return {
+    async find(tenantId, id, options = {}) {
+      let q = tenantScope(db, tenantId).selectFrom('review_items').selectAll().where('id', '=', id);
+      if (options.forUpdate) q = q.forUpdate();
+      const r = await q.executeTakeFirst();
+      return r ? toReview(r as Selectable<ReviewItemsTable>) : undefined;
+    },
+
+    async list(tenantId, filter, after, limit) {
+      let q = tenantScope(db, tenantId)
+        .selectFrom('review_items')
+        .selectAll()
+        .where('status', '=', filter.status);
+      if (filter.reasonCode) q = q.where('reason_code', '=', filter.reasonCode);
+      if (filter.detailCode) q = q.where('detail_code', '=', filter.detailCode);
+      if (filter.uploadId) q = q.where('upload_id', '=', filter.uploadId);
+      if (after) q = q.where(sql<boolean>`(created_at, id) > (${after.k}::timestamptz, ${after.id}::uuid)`);
+      const rows = await q.orderBy('created_at').orderBy('id').limit(limit).execute();
+      return (rows as Selectable<ReviewItemsTable>[]).map(toReview);
+    },
+
+    async summary(tenantId, uploadId) {
+      let q = tenantScope(db, tenantId)
+        .selectFrom('review_items')
+        .select([
+          'reason_code',
+          sql<string>`count(*)`.as('n'),
+          sql<Date | null>`min(created_at)`.as('oldest'),
+        ])
+        .where('status', '=', 'open');
+      if (uploadId) q = q.where('upload_id', '=', uploadId);
+      const rows = await q.groupBy('reason_code').execute();
+      return rows.map((r) => ({
+        reasonCode: r.reason_code,
+        open: Number(r.n),
+        oldestAt: r.oldest ? new Date(r.oldest) : null,
+      }));
+    },
+
+    async close(tenantId, id, change) {
+      const r = await tenantScope(db, tenantId)
+        .updateTable('review_items')
+        .set({
+          status: change.status,
+          resolution: change.resolution ? JSON.stringify(change.resolution) : null,
+          note: change.note,
+          resolved_by: change.resolvedBy,
+          resolved_at: new Date(),
+          updated_at: new Date(),
+          version: sql<number>`version + 1`,
+        } as never)
+        .where('id', '=', id)
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      return toReview(r as Selectable<ReviewItemsTable>);
+    },
+
+    async purge(tenantId, uploadId, limit) {
+      const r = await sql<{ n: number }>`with doomed as (
+          select id from intake.review_items where tenant_id = ${tenantId} and upload_id = ${uploadId} limit ${limit})
+        delete from intake.review_items r using doomed d where r.id = d.id and r.tenant_id = ${tenantId}
+        returning 1 as n`.execute(db);
+      return r.rows.length;
+    },
+
     async insertMany(items) {
       const ids: string[] = [];
+      const now = new Date();
       for (let i = 0; i < items.length; i += 500) {
         const part = items.slice(i, i + 500);
         const tenantId = part[0]?.tenantId;
@@ -393,6 +482,9 @@ export function reviewItemRepository(db: Db): ReviewItemRepository {
               vocabulary_version: r.vocabularyVersion,
               note: null,
               resolved_by: null,
+              // millisecond precision, so the (created_at, id) cursor round-trips through ISO strings
+              created_at: now,
+              updated_at: now,
             })),
           )
           .onConflict((oc) => oc.columns(['tenant_id', 'row_id']).doNothing())

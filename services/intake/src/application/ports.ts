@@ -103,6 +103,8 @@ export interface UploadRepository {
     delta: Partial<UploadCounts & { chunksDone: number; chunksFailed: number; batchesEmitted: number }>,
   ): Promise<Upload>;
   countSince(tenantId: string, uploadedBy: string, since: Date): Promise<number>;
+  /** id → code for a page of review items (bounded by the page). */
+  codes(tenantId: string, ids: readonly string[]): Promise<Map<string, string>>;
   findCompletedBySha(tenantId: string, sha256: string, excludeId: string): Promise<Upload | undefined>;
   nextCode(tenantId: string): Promise<string>;
   purgeDue(now: Date, limit: number): Promise<Upload[]>;
@@ -333,9 +335,53 @@ export interface ReviewItemRecord {
   vocabularyVersion: string;
 }
 
+export type ReviewStatus = 'open' | 'resolved' | 'skipped';
+
+export interface ReviewItem extends ReviewItemRecord {
+  status: ReviewStatus;
+  resolution: { action: string; classification?: Record<string, unknown> } | null;
+  note: string | null;
+  resolvedBy: string | null;
+  resolvedAt: Date | null;
+  version: number;
+  createdAt: Date;
+}
+
+export interface ReviewListFilter {
+  status: ReviewStatus;
+  reasonCode?: string | undefined;
+  detailCode?: string | undefined;
+  uploadId?: string | undefined;
+}
+
 export interface ReviewItemRepository {
   /** ON CONFLICT (row_id) DO NOTHING; returns the ids actually inserted. */
   insertMany(items: readonly ReviewItemRecord[]): Promise<string[]>;
+  find(tenantId: string, id: string, options?: { forUpdate?: boolean }): Promise<ReviewItem | undefined>;
+  /** Oldest first within the filter, cursor (created_at, id). */
+  list(
+    tenantId: string,
+    filter: ReviewListFilter,
+    after: Position | undefined,
+    limit: number,
+  ): Promise<ReviewItem[]>;
+  /** Open items per reason code (bounded by the 8 codes). */
+  summary(
+    tenantId: string,
+    uploadId: string | undefined,
+  ): Promise<{ reasonCode: string; open: number; oldestAt: Date | null }[]>;
+  close(
+    tenantId: string,
+    id: string,
+    change: {
+      status: 'resolved' | 'skipped';
+      resolution: Record<string, unknown> | null;
+      note: string | null;
+      resolvedBy: string;
+    },
+  ): Promise<ReviewItem>;
+  /** Retention: deletes up to `limit` items of an upload. */
+  purge(tenantId: string, uploadId: string, limit: number): Promise<number>;
 }
 
 /** Records' micromarket hierarchy (reference data): locality alias → canonical name. */

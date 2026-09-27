@@ -244,6 +244,18 @@ export function uploadRepository(db: Db): UploadRepository {
       return Number((r as { n?: string } | undefined)?.n ?? 0);
     },
 
+    async codes(tenantId, ids) {
+      const out = new Map<string, string>();
+      if (!ids.length) return out;
+      const rows = await tenantScope(db, tenantId)
+        .selectFrom('uploads')
+        .select(['id', 'code'])
+        .where('id', 'in', [...new Set(ids)])
+        .execute();
+      for (const r of rows as { id: string; code: string }[]) out.set(r.id, r.code);
+      return out;
+    },
+
     async findCompletedBySha(tenantId, sha256, excludeId) {
       const row = await tenantScope(db, tenantId)
         .selectFrom('uploads')
