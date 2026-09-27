@@ -9,6 +9,7 @@
   "scripts": {
     "build": "echo \"build: not implemented yet\"",
     "test": "echo \"no tests yet\"",
-    "lint": "echo \"lint configured in F-02\""
+    "lint": "eslint . --no-error-on-unmatched-pattern",
+    "typecheck": "echo \"no sources yet\""
   }
 }
