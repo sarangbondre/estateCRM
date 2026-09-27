@@ -288,6 +288,18 @@ export interface Queries {
   /** The ids plus all their descendants (depth ≤ 4, capped at 200). */
   micromarketDescendants(ids: readonly string[]): Promise<string[]>;
   adjacentIds(ids: readonly string[]): Promise<Map<string, string[]>>;
+  // retention (NFR-18) and counters
+  /** Persons inactive since `cutoff` with no linked record changed since then. */
+  purgeablePersons(cutoff: Date, limit: number): Promise<string[]>;
+  /** Source ads older than `cutoff` whose records are all unchanged since then. */
+  purgeableSourceAds(cutoff: Date, limit: number): Promise<string[]>;
+  /** Properties holding unit details, unchanged (with their offers) since `cutoff`. */
+  purgeableUnitDetails(cutoff: Date, limit: number): Promise<string[]>;
+  /** Enquiries received before `cutoff` that still hold a message. */
+  oldEnquiryMessages(cutoff: Date, limit: number): Promise<string[]>;
+  /** Counters recomputed from their children for these offers. */
+  offerCounters(ids: readonly string[]): Promise<Map<string, { sightings: number; enquiries: number; secondSources: number; openGap: boolean }>>;
+  demandTouchCounts(ids: readonly string[]): Promise<Map<string, number>>;
   /** Active merges whose survivor or merged ids include any of `ids` (undo-blocked check). */
   activeMergesTouching(ids: readonly string[]): Promise<MergeRow[]>;
 }

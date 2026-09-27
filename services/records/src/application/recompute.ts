@@ -16,12 +16,12 @@ const BATCH = 1000;
 
 /** One bounded step for one tenant. Returns rows processed and whether more work remains. */
 export async function recomputeLaunchAreaStep(app: App, actor: Actor): Promise<{ processed: number; more: boolean }> {
-  app.cache.invalidate(actor.tenantId);
   return app.uow.run(
     actor,
     async (tx) => {
       const [ref] = await tx.store.find('reference_versions', { kind: 'launch_area' }, { limit: 1, lock: true });
       if (!ref || (ref.recompute_status !== 'queued' && ref.recompute_status !== 'running')) return { processed: 0, more: false };
+      app.cache.invalidate(actor.tenantId);
       const cursor = (ref.recompute_cursor as Cursor | null) ?? { phase: 'properties', after: null };
       const processed = await step(app, tx, cursor);
       let next: Cursor | null;

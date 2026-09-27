@@ -308,7 +308,6 @@ export class KyselyQueries implements Queries {
 
   async listOffers(f: OfferFilter, sort: SortKey, page: PageRequest): Promise<OfferRow[]> {
     const { col, dir } = sortOf(sort);
-    let q = this.#from('offers').selectAll('offers');
     const joinProperty =
       f.segment !== undefined ||
       f.propertyType !== undefined ||
@@ -320,20 +319,33 @@ export class KyselyQueries implements Queries {
       f.bhkMax !== undefined ||
       f.areaSqftMin !== undefined ||
       f.areaSqftMax !== undefined;
-    if (joinProperty) {
-      q = q
-        .innerJoin('properties', 'properties.id', 'offers.property_id')
-        .where('properties.tenant_id', '=', this.#t);
-      if (f.segment !== undefined) q = q.where('properties.segment', '=', f.segment);
-      if (f.propertyType !== undefined) q = q.where(sql<boolean>`properties.property_types @> array[${f.propertyType}]::text[]`);
-      if (f.micromarketIds !== undefined) q = q.where('properties.micromarket_id', 'in', f.micromarketIds.length ? f.micromarketIds : [null]);
-      if (f.locality !== undefined) q = q.where('properties.locality_norm', '=', norm(f.locality));
-      if (f.city !== undefined) q = q.where('properties.city_norm', '=', norm(f.city));
-      if (f.outsideLaunchArea !== undefined) q = q.where('properties.outside_launch_area', '=', f.outsideLaunchArea);
-      if (f.bhkMin !== undefined) q = q.where(sql<boolean>`coalesce(properties.bhk_max, properties.bhk_min) >= ${f.bhkMin}`);
-      if (f.bhkMax !== undefined) q = q.where(sql<boolean>`coalesce(properties.bhk_min, properties.bhk_max) <= ${f.bhkMax}`);
-      if (f.areaSqftMin !== undefined) q = q.where(sql<boolean>`coalesce(properties.area_sqft_max, properties.area_sqft_min) >= ${f.areaSqftMin}`);
-      if (f.areaSqftMax !== undefined) q = q.where(sql<boolean>`coalesce(properties.area_sqft_min, properties.area_sqft_max) <= ${f.areaSqftMax}`);
+    const propertyFilters = (pq: Q, p: string): Q => {
+      let x = pq.where(`${p}.tenant_id`, '=', this.#t);
+      if (f.segment !== undefined) x = x.where(`${p}.segment`, '=', f.segment);
+      if (f.propertyType !== undefined) x = x.where(sql<boolean>`${sql.ref(`${p}.property_types`)} @> array[${f.propertyType}]::text[]`);
+      if (f.micromarketIds !== undefined) x = x.where(`${p}.micromarket_id`, 'in', f.micromarketIds.length ? f.micromarketIds : [null]);
+      if (f.locality !== undefined) x = x.where(`${p}.locality_norm`, '=', norm(f.locality));
+      if (f.city !== undefined) x = x.where(`${p}.city_norm`, '=', norm(f.city));
+      if (f.outsideLaunchArea !== undefined) x = x.where(`${p}.outside_launch_area`, '=', f.outsideLaunchArea);
+      if (f.bhkMin !== undefined) x = x.where(sql<boolean>`coalesce(${sql.ref(`${p}.bhk_max`)}, ${sql.ref(`${p}.bhk_min`)}) >= ${f.bhkMin}`);
+      if (f.bhkMax !== undefined) x = x.where(sql<boolean>`coalesce(${sql.ref(`${p}.bhk_min`)}, ${sql.ref(`${p}.bhk_max`)}) <= ${f.bhkMax}`);
+      if (f.areaSqftMin !== undefined) x = x.where(sql<boolean>`coalesce(${sql.ref(`${p}.area_sqft_max`)}, ${sql.ref(`${p}.area_sqft_min`)}) >= ${f.areaSqftMin}`);
+      if (f.areaSqftMax !== undefined) x = x.where(sql<boolean>`coalesce(${sql.ref(`${p}.area_sqft_min`)}, ${sql.ref(`${p}.area_sqft_max`)}) <= ${f.areaSqftMax}`);
+      return x;
+    };
+    let q: Q;
+    if (f.micromarketIds !== undefined || f.locality !== undefined) {
+      // A location filter is selective: drive from the matching properties (LLD §3.5 "driving index"), materialised
+      // so the plan does not depend on per-tenant statistics.
+      q = (this.#db
+        .with((wb) => wb('p').materialized(), (db) => propertyFilters((db.selectFrom('properties' as never) as unknown as Q).select('properties.id'), 'properties'))
+        .selectFrom('offers' as never) as unknown as Q)
+        .innerJoin('p', 'p.id', 'offers.property_id')
+        .selectAll('offers')
+        .where('offers.tenant_id', '=', this.#t);
+    } else {
+      q = this.#from('offers').selectAll('offers');
+      if (joinProperty) q = propertyFilters(q.innerJoin('properties', 'properties.id', 'offers.property_id'), 'properties');
     }
     q = f.code !== undefined ? q.where('offers.code', '=', f.code).where('offers.status', '!=', 'voided') : q.where('offers.status', '=', 'active');
     const eq: [keyof OfferFilter, string][] = [
@@ -724,6 +736,83 @@ export class KyselyQueries implements Queries {
       )
       select distinct id from tree limit 200`.execute(this.#db);
     return r.rows.map((x) => x.id);
+  }
+
+  async purgeablePersons(cutoff: Date, limit: number): Promise<string[]> {
+    const t = this.#t;
+    const r = await sql<{ id: string }>`
+      select p.id from ${sql.table(`${SCHEMA}.persons`)} p
+      where p.tenant_id = ${t} and p.purged_at is null and p.last_activity_at < ${cutoff}
+        and not exists (select 1 from ${sql.table(`${SCHEMA}.demands`)} d
+                        where d.tenant_id = ${t} and d.person_id = p.id and d.updated_at >= ${cutoff})
+        and not exists (select 1 from ${sql.table(`${SCHEMA}.record_parties`)} rp
+                        join ${sql.table(`${SCHEMA}.offers`)} o on o.tenant_id = rp.tenant_id
+                          and (o.id = rp.subject_id or o.property_id = rp.subject_id)
+                        where rp.tenant_id = ${t} and rp.person_id = p.id and o.updated_at >= ${cutoff})
+      order by p.last_activity_at limit ${limit}`.execute(this.#db);
+    return r.rows.map((x) => x.id);
+  }
+
+  async purgeableSourceAds(cutoff: Date, limit: number): Promise<string[]> {
+    const t = this.#t;
+    const r = await sql<{ id: string }>`
+      select a.id from ${sql.table(`${SCHEMA}.source_ads`)} a
+      where a.tenant_id = ${t} and a.purged_at is null and a.created_at < ${cutoff}
+        and not exists (select 1 from ${sql.table(`${SCHEMA}.offers`)} o where o.tenant_id = ${t} and o.source_ad_id = a.id and o.updated_at >= ${cutoff})
+        and not exists (select 1 from ${sql.table(`${SCHEMA}.demands`)} d where d.tenant_id = ${t} and d.source_ad_id = a.id and d.updated_at >= ${cutoff})
+      order by a.created_at, a.id limit ${limit}`.execute(this.#db);
+    return r.rows.map((x) => x.id);
+  }
+
+  async purgeableUnitDetails(cutoff: Date, limit: number): Promise<string[]> {
+    const t = this.#t;
+    const r = await sql<{ id: string }>`
+      select p.id from ${sql.table(`${SCHEMA}.properties`)} p
+      where p.tenant_id = ${t} and p.updated_at < ${cutoff}
+        and (p.wing is not null or p.unit_no is not null or p.floor_no is not null)
+        and not exists (select 1 from ${sql.table(`${SCHEMA}.offers`)} o where o.tenant_id = ${t} and o.property_id = p.id and o.updated_at >= ${cutoff})
+      order by p.updated_at, p.id limit ${limit}`.execute(this.#db);
+    return r.rows.map((x) => x.id);
+  }
+
+  async oldEnquiryMessages(cutoff: Date, limit: number): Promise<string[]> {
+    const rows = (await this.#from('enquiries')
+      .select('id')
+      .where('message', 'is not', null)
+      .where('received_at', '<', cutoff)
+      .orderBy('received_at')
+      .limit(limit)
+      .execute()) as { id: string }[];
+    return rows.map((r) => r.id);
+  }
+
+  async offerCounters(ids: readonly string[]) {
+    const out = new Map<string, { sightings: number; enquiries: number; secondSources: number; openGap: boolean }>();
+    if (!ids.length) return out;
+    const t = this.#t;
+    const list = [...ids];
+    const [s, e, g] = await Promise.all([
+      sql<{ id: string; n: string }>`select subject_id as id, count(*)::text as n from ${sql.table(`${SCHEMA}.sightings`)}
+        where tenant_id = ${t} and subject_type = 'offer' and subject_id = any(${list}::uuid[]) group by subject_id`.execute(this.#db),
+      sql<{ id: string; n: string }>`select offer_id as id, count(*)::text as n from ${sql.table(`${SCHEMA}.enquiries`)}
+        where tenant_id = ${t} and offer_id = any(${list}::uuid[]) group by offer_id`.execute(this.#db),
+      sql<{ id: string; n: string; gap: boolean }>`select offer_id as id, count(*)::text as n, bool_or(price_gap and status = 'open') as gap
+        from ${sql.table(`${SCHEMA}.second_sources`)} where tenant_id = ${t} and offer_id = any(${list}::uuid[]) group by offer_id`.execute(this.#db),
+    ]);
+    for (const id of ids) out.set(id, { sightings: 0, enquiries: 0, secondSources: 0, openGap: false });
+    for (const r of s.rows) out.get(r.id)!.sightings = Number(r.n);
+    for (const r of e.rows) out.get(r.id)!.enquiries = Number(r.n);
+    for (const r of g.rows) Object.assign(out.get(r.id)!, { secondSources: Number(r.n), openGap: r.gap });
+    return out;
+  }
+
+  async demandTouchCounts(ids: readonly string[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>(ids.map((id) => [id, 0]));
+    if (!ids.length) return out;
+    const r = await sql<{ id: string; n: string }>`select demand_id as id, count(*)::text as n from ${sql.table(`${SCHEMA}.touches`)}
+      where tenant_id = ${this.#t} and demand_id = any(${[...ids]}::uuid[]) group by demand_id`.execute(this.#db);
+    for (const x of r.rows) out.set(x.id, Number(x.n));
+    return out;
   }
 
   async activeMergesTouching(ids: readonly string[]): Promise<MergeRow[]> {
