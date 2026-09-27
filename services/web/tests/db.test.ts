@@ -10,6 +10,10 @@ import { DbServiceClientRepo, DbSigningKeyStore } from '../src/adapters/db/keys'
 import { DbUnitOfWork, txRepos } from '../src/adapters/db/uow';
 import { DbUserRepo } from '../src/adapters/db/users';
 import { PgRateLimiter, PgStreamLeases } from '../src/adapters/db/limits';
+import { DbNotificationRepo } from '../src/adapters/db/notifications';
+import { webEventHandlers } from '../src/adapters/http/users-routes';
+import { observe } from '@11e/observability';
+import { CRON_SECRET, harness } from './harness';
 import { EXPECTED_MIGRATION } from '../src/config';
 import { verifyChain } from '../src/domain/audit';
 import { roleCatalogue } from '../src/domain/roles';
@@ -186,5 +190,41 @@ describe.skipIf(!hasDb)('web schema on Postgres', () => {
     expect(b).toBeTruthy();
     await new Promise((r) => setTimeout(r, 20));
     expect(await leases.acquire(tenant, u, 20_000)).toBeTruthy(); // the 1 ms lease expired
+  });
+
+  it('q_web handlers run inside the drain transaction: audit entry + notification, deduped by the stores', async () => {
+    const h = await harness();
+    const handlers = webEventHandlers(h.audit) as Record<string, (e: unknown, ctx: { trx: unknown; attempt: number }) => Promise<void>>;
+    const actor = randomUUID();
+    const audit = { eventId: randomUUID(), eventType: 'audit.recorded.v1', schemaVersion: 1, occurredAt: new Date().toISOString(), correlationId: 'corr-db-123456', producer: 'records', tenantId: tenant, aggregateType: 'person', aggregateId: randomUUID(), aggregateVersion: 1, data: { action: 'contact.viewed', actorUserId: actor, subjectType: 'person', subjectId: randomUUID(), via: 'ui', details: { field: 'phone' } } };
+    const upload = { ...audit, eventId: randomUUID(), eventType: 'upload.completed.v1', producer: 'intake', data: { uploadId: randomUUID(), code: 'UPL-900001', counts: { read: 3, accepted: 2, rejected: 1, needsReview: 0 }, uploadedBy: actor } };
+    await withTransaction(db, async (trx) => {
+      await handlers['audit.recorded.v1']!(audit, { trx, attempt: 1 });
+      await handlers['upload.completed.v1']!(upload, { trx, attempt: 1 });
+      await handlers['upload.completed.v1']!(upload, { trx, attempt: 1 }); // redelivery
+    });
+    const entries = await new DbAuditRepo(db).list(tenant, { limit: 10, actorUserId: actor });
+    expect(entries.map((e) => e.action)).toEqual(['contact.viewed']);
+    const repo = new DbNotificationRepo(db);
+    const mine = await repo.list(tenant, actor, { unreadOnly: true, limit: 10 });
+    expect(mine.map((n) => n.title)).toEqual(['UPL-900001 processed: 2 accepted, 1 rejected, 0 to review']);
+    expect(await repo.unreadCount(tenant, actor, 99)).toBe(1);
+    expect(await repo.markRead(tenant, actor, { ids: [mine[0]!.id] }, new Date())).toBe(1);
+    expect(await repo.unreadCount(tenant, actor, 99)).toBe(0);
+  });
+
+  it('relay, drain q_web and jobs run with the cron secret on the real schema', async () => {
+    const h = await harness((p) => ({
+      db,
+      platform: { db, obs: observe('web', { level: 'fatal' }), audit: p.audit, jobs: { 'keep-alive': async () => ({ processed: 1 }) } },
+    }));
+    const cron = { 'x-cron-secret': CRON_SECRET };
+    const relay = await h.app.request('/internal/v1/relay', { method: 'POST', headers: cron });
+    expect(relay.status).toBe(200);
+    expect(await relay.json()).toMatchObject({ processed: expect.any(Number), more: expect.any(Boolean) });
+    expect((await h.app.request('/internal/v1/drain/q_web', { method: 'POST', headers: cron })).status).toBe(200);
+    expect(await (await h.app.request('/internal/v1/jobs/keep-alive', { method: 'POST', headers: cron })).json()).toEqual({ processed: 1, more: false });
+    expect((await h.app.request('/internal/v1/jobs/idempotency-prune', { method: 'POST', headers: cron })).status).toBe(200);
+    expect((await h.app.request('/internal/v1/drain/q_other', { method: 'POST', headers: cron })).status).toBe(400);
   });
 });

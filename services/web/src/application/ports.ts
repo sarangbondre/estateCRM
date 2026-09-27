@@ -82,6 +82,13 @@ export interface UserRepo {
   touchLastSeen(tenantId: string, id: string, at: Date): Promise<void>;
   /** Active users idle longer than `before` (idle-session-sweep), bounded. */
   listIdle(before: Date, limit: number): Promise<User[]>;
+  /** Display names for the audit log (bounded by the page size). */
+  getMany(tenantId: string, ids: string[]): Promise<User[]>;
+}
+
+/** HMAC-SHA-256 of a lower-cased e-mail (hex): uniqueness and lookup without scanning plaintext. */
+export interface EmailHasher {
+  hash(normalizedEmail: string): string;
 }
 
 export interface Invitation {

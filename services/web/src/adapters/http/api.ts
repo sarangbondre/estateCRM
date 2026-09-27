@@ -15,7 +15,11 @@ import { EXPECTED_MIGRATION } from '../../config';
 import type { WebDb } from '../db/schema';
 import { cookieSession } from '../supabase';
 import type { SupabaseSettings } from '../supabase';
+import type { AuditAndNotifications } from '../../application/audit';
+import type { Users } from '../../application/users';
 import { registerGateway } from './proxy';
+import { registerPlatform, registerUserRoutes } from './users-routes';
+import type { PlatformDeps } from './users-routes';
 import type { GatewayRouteDeps } from './proxy';
 import { limit, mapped, securityMiddleware, staffOf } from './security';
 
@@ -35,6 +39,11 @@ export interface ApiDeps {
   limiter?: RateLimiter;
   /** The gateway for every other /v1 route and /p/{token} (WEB-03). */
   gateway?: GatewayRouteDeps;
+  /** Users, invitations, audit log and notifications (WEB-04). */
+  users: Users;
+  audit: AuditAndNotifications;
+  /** Relay, drain q_web and jobs (needs the database). */
+  platform?: PlatformDeps;
 }
 
 export type WebService = Service<operations>;
@@ -114,6 +123,14 @@ export function buildApi(deps: ApiDeps): WebService {
     }),
   );
 
+  registerUserRoutes(svc, {
+    users: deps.users,
+    audit: deps.audit,
+    db: deps.db,
+    limiter: deps.limiter,
+    appOrigin: deps.appOrigin,
+  });
+  if (deps.platform) registerPlatform(svc, deps.platform);
   if (deps.gateway) registerGateway(svc.app, deps.gateway);
   return svc;
 }

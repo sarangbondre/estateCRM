@@ -89,6 +89,16 @@ export class DbUserRepo implements UserRepo {
       .execute();
   }
 
+  async getMany(tenantId: string, ids: string[]): Promise<User[]> {
+    if (!ids.length) return [];
+    const rows = await tenantScope(this.db, tenantId)
+      .selectFrom('users')
+      .selectAll()
+      .where('id', 'in', ids.slice(0, 100))
+      .execute();
+    return (rows as Selectable<UsersTable>[]).map(toUser);
+  }
+
   async listIdle(before: Date, limit: number): Promise<User[]> {
     const rows = await this.db
       .selectFrom('users')

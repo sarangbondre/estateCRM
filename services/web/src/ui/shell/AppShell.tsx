@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import '../cards/all';
 import { Icon } from './Icon';
+import { NotificationBell } from './NotificationBell';
 import { ShellProvider, useShell } from './ShellProvider';
 import { SidePanel } from './SidePanel';
 import { Sidebar } from './Sidebar';
@@ -43,6 +44,9 @@ function Layout({ children }: { children: ReactNode }) {
               Pilot: sample / anonymised data only
             </span>
           )}
+          <span style={{ marginLeft: me.environment.pilot ? 0 : 'auto' }}>
+            <NotificationBell />
+          </span>
         </div>
         {children}
       </main>

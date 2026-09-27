@@ -71,6 +71,25 @@ tests/             Vitest: domain, use cases + HTTP contract on in-memory adapte
   trip over 50 ms falls back to an in-memory bucket at half the rates (fail-open) and logs `ratelimit_fallback`.
 - Correlation ids: `X-Correlation-Id` accepted if it matches `^[A-Za-z0-9-]{8,64}$`, else a UUIDv7.
 
+## Users, audit and notifications (web LLD §4.6–4.8)
+
+- `GET /v1/users` (directory for everyone; e-mail and audit fields for Admins), `POST /v1/users/invitations`
+  (Admin; Supabase invite e-mail, then users + invitation + audit + `user.changed.v1` in one transaction; the Supabase
+  user is deleted again if the transaction fails; 20 invitations/h per tenant; Idempotency-Key replay),
+  `DELETE /v1/users/invitations/{id}` (revoke), `PATCH /v1/users/{id}` (merge patch + If-Match: role, Data operator
+  flag, display name, deactivate/reactivate; own role and the last active Admin are protected; deactivation blocks the
+  Supabase user and evicts caches at once), `GET /v1/roles`.
+- Audit sink: `audit.recorded.v1` from every producer → `audit_log` (dedupe on eventId, `details` must be a flat string
+  map — non-strings go to the DLQ, contact-like values are removed and `scrubbed=true` is set), per-tenant hash chain;
+  web's own actions (invites, role changes, activation, sign-out) are written directly. `GET /v1/audit-log` (Admin).
+- Notifications: `upload.completed/failed.v1` → uploader, `export.completed/failed.v1` → requester, role change /
+  reactivation → the user. `GET /v1/me/notifications`, `POST /v1/me/notifications/read`. The bell in the top bar
+  merges them with journeys' `/v1/notifications` client-side and polls every 30 s and on focus.
+- Scheduler (`X-Cron-Secret`): `POST /internal/v1/relay`, `/internal/v1/drain/q_web`, `/internal/v1/jobs/{name}` for
+  `invitation-expire`, `idle-session-sweep`, `notification-prune`, `rate-limit-prune`, `idempotency-prune`,
+  `audit-chain-verify` (48 h window, logs `audit_chain_broken`; also keeps monthly partitions 3 months ahead),
+  `signing-key-rotate`, `keep-alive`.
+
 ## Run locally
 
 ```sh

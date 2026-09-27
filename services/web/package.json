@@ -26,6 +26,7 @@
     "@11e/http": "workspace:*",
     "@11e/observability": "workspace:*",
     "@11e/outbox": "workspace:*",
+    "@11e/redaction": "workspace:*",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.2",
     "hono": "~4.13.9",

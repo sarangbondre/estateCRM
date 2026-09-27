@@ -151,6 +151,9 @@ export class MemoryUsers implements UserRepo {
       this.m.touches++;
     }
   }
+  async getMany(tenantId: string, ids: string[]) {
+    return ids.map((id) => this.m.users.get(id)).filter((u): u is User & { emailHash?: string } => !!u && u.tenantId === tenantId).map(strip);
+  }
   async listIdle(before: Date, limit: number) {
     return [...this.m.users.values()]
       .filter((u) => u.status === 'active' && u.lastSeenAt && u.lastSeenAt < before)

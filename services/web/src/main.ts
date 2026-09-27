@@ -23,6 +23,14 @@ import { PgRateLimiter, PgStreamLeases } from './adapters/db/limits';
 import { HttpDownstream } from './adapters/downstream';
 import { buildApi } from './adapters/http/api';
 import type { WebService } from './adapters/http/api';
+import { containsContact } from '@11e/redaction';
+import { sql } from '@11e/db';
+import { AuditAndNotifications } from './application/audit';
+import { Users } from './application/users';
+import { IDLE_TIMEOUT_MS } from './domain/users';
+import { sha256 } from './adapters/crypto';
+import { DbAuditRepo } from './adapters/db/audit';
+import { DbNotificationRepo } from './adapters/db/notifications';
 import { JoseSigner } from './adapters/signer';
 import { SupabaseAuthProvider } from './adapters/supabase';
 import type { SupabaseSettings } from './adapters/supabase';
@@ -93,7 +101,51 @@ export function createRuntime(env: NodeJS.ProcessEnv = process.env): Runtime {
     publicTenantId: config.tenantId,
   });
   const staffAuth = { sessions, supabase, appOrigin: config.appOrigin };
+  const onUserChanged = (userId: string) => {
+    sessions.evict(userId);
+    tokens.evictUser(userId);
+  };
+  const userAdmin = new Users({
+    users,
+    uow,
+    auth,
+    clock,
+    hasher: { hash: (email) => keyring.hmac('email-hash', email).toString('hex') },
+    onUserChanged,
+  });
+  const audit = new AuditAndNotifications({
+    audit: new DbAuditRepo(db),
+    notifications: new DbNotificationRepo(db),
+    users,
+    clock,
+    looksLikePii: containsContact,
+    onScrubbed: () => obs.logger.warn({ code: 'audit_details_scrubbed' }, 'PII removed from audit details'),
+    onChainBroken: (tenantId) => obs.logger.error({ code: 'audit_chain_broken', tenantId }, 'audit hash chain broken'),
+  });
+  const jobs = {
+    'invitation-expire': () => userAdmin.expireInvitations(),
+    'idle-session-sweep': async () => {
+      // Sessions idle > 12 h are refused on their next request (session-expired); drop them from this instance's caches.
+      const idle = await users.listIdle(new Date(clock.now().getTime() - IDLE_TIMEOUT_MS), 500);
+      for (const u of idle) onUserChanged(u.id);
+      return { processed: idle.length, remaining: 0 };
+    },
+    'notification-prune': () => audit.pruneNotifications(),
+    'rate-limit-prune': async () => {
+      const processed = await limiter.prune(new Date(clock.now().getTime() - 3600_000), 5000);
+      return { processed, remaining: processed >= 5000 ? 1 : 0 };
+    },
+    'audit-chain-verify': () => audit.verifyChains(sha256),
+    'signing-key-rotate': () => tokens.rotate(),
+    'keep-alive': async () => {
+      await sql`select 1`.execute(db);
+      return { processed: 1 };
+    },
+  };
   const svc = buildApi({
+    users: userAdmin,
+    audit,
+    platform: { db, obs, audit, jobs },
     limiter,
     readyChecks: () => downstream.states(),
     gateway: { gateway, staffAuth, keyring },
