@@ -7,3 +7,9 @@
 .env.*
 node_modules/
 .DS_Store
+.turbo/
+dist/
+.next/
+.vercel/
+coverage/
+*.env.local

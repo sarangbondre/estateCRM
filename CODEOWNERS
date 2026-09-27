@@ -1,0 +1,12 @@
+# Each service folder maps to its owner (CLAUDE.md §3.9). Phase 1: one owner.
+/services/web/ @sarangbondre
+/services/intake/ @sarangbondre
+/services/records/ @sarangbondre
+/services/journeys/ @sarangbondre
+/services/crm-engine/ @sarangbondre
+/services/listings/ @sarangbondre
+/services/insight/ @sarangbondre
+/libs/ @sarangbondre
+/contracts/ @sarangbondre
+/infra/ @sarangbondre
+/docs/ @sarangbondre

@@ -1,0 +1,14 @@
+{
+  "name": "@11e/journeys",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "echo \"build: not implemented yet (see docs/05-tasks.md)\"",
+    "test": "echo \"no tests yet\"",
+    "lint": "echo \"lint configured in F-02\""
+  }
+}
