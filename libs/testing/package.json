@@ -18,7 +18,14 @@
       "default": "./dist/index.js"
     }
   },
+  "bin": {
+    "11e-synth": "./dist/cli/synth.js"
+  },
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@11e/vocabulary": "workspace:*",
+    "exceljs": "~4.4.0"
+  }
 }

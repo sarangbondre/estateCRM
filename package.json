@@ -27,7 +27,8 @@
     "db:env": "node infra/scripts/local-roles.mjs --env",
     "db:verify": "node infra/scripts/verify-platform.mjs",
     "dev": "pnpm db:start && turbo run dev",
-    "db:schedules": "node infra/scripts/local-roles.mjs --schedules"
+    "db:schedules": "node infra/scripts/local-roles.mjs --schedules",
+    "synth": "node libs/testing/dist/cli/synth.js"
   },
   "devDependencies": {
     "@asyncapi/parser": "^3.6.3",
