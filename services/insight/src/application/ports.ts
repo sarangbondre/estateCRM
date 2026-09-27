@@ -1,5 +1,6 @@
 // Ports of the insight application layer (LLD §2). Adapters implement them; use cases depend only on these.
 import type { DemandDims, FactDims, OfferDims } from '../domain/readmodel/rollupKeys.js';
+import type { DayRange } from '../domain/dates.js';
 import type { LocationIndex, ValidatedPlan, VocabularyView } from '../domain/plans/validator.js';
 import type { RmTable, RmTables } from '../domain/readmodel/rows.js';
 
@@ -63,6 +64,47 @@ export interface ReferenceData {
 export interface ReadModelInfo {
   /** rm_state.last_event_at ("data as of"). */
   dataAsOf(tenantId: string): Promise<Date | null>;
+}
+
+// ------------------------------------------------------------------------------------------ dashboards (INS-02)
+
+/** Dashboard filters on rollup / fact dimensions (stored fields only). */
+export interface DimFilter {
+  segment?: string;
+  dealType?: string;
+  market?: string;
+  propertyType?: string;
+  micromarket?: string;
+  ownerUserId?: string;
+  saleMode?: string;
+  tenancyStatus?: string;
+}
+
+export type CountRow = { key: string | null; n: number };
+
+export interface DashboardReader {
+  /** SUM(n) of rm_offer_rollup grouped by the given dimension columns. */
+  offerRollup(tenantId: string, f: DimFilter, by: readonly string[], statuses?: readonly string[]): Promise<(Record<string, string | null> & { n: number })[]>;
+  /** SUM(n) of rm_demand_rollup (open demand: no exit, not Closed) grouped by the given columns. */
+  demandRollup(tenantId: string, f: DimFilter, by: readonly string[]): Promise<(Record<string, string | null> & { n: number })[]>;
+  /** SUM(n) of rm_daily_fact for metrics over an IST day range, grouped by one dimension (or the metric). */
+  facts(tenantId: string, metrics: readonly string[], range: DayRange, f: DimFilter, by: 'metric' | 'source_type' | 'reason' | 'owner_user_id'): Promise<CountRow[]>;
+  /** Queue counts per section summed over the team (or one user). */
+  queueCounts(tenantId: string, userId?: string): Promise<Record<string, number>>;
+  openSourcingRequests(tenantId: string): Promise<number>;
+  siteVisitsScheduled(tenantId: string, range: DayRange): Promise<number>;
+  followUpsDue(tenantId: string, today: string, ownerUserId?: string): Promise<number>;
+  stock(tenantId: string): Promise<{ properties: number | null; projects: number }>;
+  deskItems(tenantId: string): Promise<{ record_scope: string | null; side: string | null; sector: string | null; participant_role: string | null; with_property: boolean; n: number }[]>;
+  watchlist(tenantId: string, today: string, horizon: string): Promise<{ bySignal: CountRow[]; deadlinesSoon: number; openTasks: number }>;
+  uploads(tenantId: string, range: DayRange): Promise<{
+    bySource: { source: string | null; uploads: number; accepted: number; rejected: number; needsReview: number; lastStartedAt: Date | null }[];
+    rejectionReasons: CountRow[];
+    possibleRepeats: number;
+  }>;
+  reviewOpenByReason(tenantId: string): Promise<CountRow[]>;
+  mergeCandidates(tenantId: string, range: DayRange): Promise<CountRow[]>;
+  sideDefaulted(tenantId: string, range: DayRange): Promise<CountRow[]>;
 }
 
 export interface VocabularyReleaseDoc {

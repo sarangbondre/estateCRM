@@ -202,7 +202,7 @@ export function validatePlan(
       value = scalarValue(spec, f.value, `${path}.value`);
     }
     resolved.push({ spec, op: f.op, value });
-    canonicalFilters.push(f.op === 'is_null' || f.op === 'not_null' ? { field: f.field, op: f.op } : { field: f.field, op: f.op, value });
+    canonicalFilters.push({ field: f.field, op: f.op, value: f.op === 'is_null' || f.op === 'not_null' ? null : value });
   });
   // Implied values from translated terms ("resale" → market Secondary) unless the plan set that field itself.
   for (const imp of implied) {

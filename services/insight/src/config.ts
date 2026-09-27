@@ -3,7 +3,7 @@
 export const SERVICE = 'insight';
 export const SCHEMA = 'insight';
 /** Newest file in migrations/ (a test keeps them in step). /health/ready reports "behind" until it is applied. */
-export const EXPECTED_MIGRATION = '0003';
+export const EXPECTED_MIGRATION = '0004';
 
 export interface Config {
   port: number;

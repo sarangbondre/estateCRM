@@ -132,7 +132,13 @@ export interface InsightDb extends OutboxDb, RmDb {
   rm_offer_rollup: Stamped<OfferRollupRow>;
   rm_demand_rollup: Stamped<DemandRollupRow>;
   rm_daily_fact: Stamped<DailyFactRow>;
-  rm_state: Stamped<{ last_event_at: Date | null; lag_seconds: number | null; events_applied: number }>;
+  rm_state: Stamped<{
+    last_event_at: Date | null;
+    lag_seconds: number | null;
+    events_applied: number;
+    property_count: number | null;
+    stock_counted_at: Date | null;
+  }>;
   rm_queue_counts: Stamped<{ user_id: string; counts: unknown }>;
   rm_user: Stamped<{ user_id: string; role: string; active: boolean }>;
   conversation: Stamped<ConversationRow>;

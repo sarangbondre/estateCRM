@@ -1,9 +1,12 @@
 // HTTP adapters: one svc.op(...) per contract operation, calling application use cases (CLAUDE.md §3.1).
 import { requireStaff } from '@11e/auth';
 import type { operations } from '@11e/contracts/insight';
-import { HttpError, forbidden } from '@11e/http';
+import { HttpError, badRequest, forbidden } from '@11e/http';
 import type { Service } from '@11e/http';
+import { getDashboard } from '../application/dashboards.js';
+import type { DashboardQuery } from '../application/dashboards.js';
 import type { Caller, RunQueryOutcome } from '../application/queries.js';
+import type { DashboardName } from '../domain/dashboards/definitions.js';
 import { planCatalogue, runQuery } from '../application/queries.js';
 import type { QueryPlan } from '../domain/plans/types.js';
 import type { AppDeps } from '../deps.js';
@@ -41,4 +44,19 @@ export function registerRoutes(svc: Service<operations>, deps: AppDeps, wired: W
     deps.obs.loggerFor(c).info({ code: body.plan.planId, count: outcome.result.rows.length }, 'query run');
     return c.json(outcome.result, 200);
   });
+
+  const dashboard = (name: DashboardName) => async (c: Parameters<typeof callerOf>[0], query: DashboardQuery) => {
+    const caller = callerOf(c);
+    const r = await getDashboard(wired.dashboards, caller.tenantId, name, query);
+    if (!r.ok) {
+      if (r.code === 'validation-failed') throw badRequest(r.errors);
+      throw new HttpError(400, 'unknown-vocabulary-value', { errors: r.errors });
+    }
+    c.header('cache-control', 'private, max-age=30');
+    return c.json(r.dashboard, 200);
+  };
+  svc.op('getDemandDashboard', (c, { query }) => dashboard('demand')(c, query as DashboardQuery));
+  svc.op('getSupplyDashboard', (c, { query }) => dashboard('supply')(c, query as DashboardQuery));
+  svc.op('getScopesDashboard', (c, { query }) => dashboard('scopes')(c, query as DashboardQuery));
+  svc.op('getQualityDashboard', (c, { query }) => dashboard('quality')(c, query as DashboardQuery));
 }

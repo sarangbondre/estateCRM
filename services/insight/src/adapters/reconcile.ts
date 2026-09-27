@@ -30,6 +30,12 @@ export async function reconcileRollups(db: Kysely<InsightDb>, tenantId: string):
           from rm_demand
          where tenant_id = ${tenantId} and code is not null and void_reason is null and merged_into_id is null
          group by ${sql.join(demandExpr)}`.execute(trx);
+      // Stock tile: distinct properties with a counted offer (nightly, LLD §4.8).
+      await sql`update rm_state set property_count = (
+          select count(distinct property_id) from rm_offer
+           where tenant_id = ${tenantId} and code is not null and void_reason is null and merged_into_id is null),
+        stock_counted_at = now()
+        where tenant_id = ${tenantId}`.execute(trx);
       return { offers: Number(offers.numAffectedRows ?? 0), demands: Number(demands.numAffectedRows ?? 0) };
     },
     { statementTimeoutMs: 50_000, retries: 0 },
