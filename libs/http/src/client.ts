@@ -159,7 +159,15 @@ export function createHttpClient(options: ClientOptions): HttpClient {
           signal: AbortSignal.timeout(timeoutMs),
         });
         const durationMs = Math.round(performance.now() - started);
-        options.onCall?.({ name: options.name, method, path, status: res.status, durationMs, attempt });
+        options.onCall?.({
+          name: options.name,
+          method,
+          path,
+          status: res.status,
+          durationMs,
+          attempt,
+          ...(req.correlationId ? { correlationId: req.correlationId } : {}),
+        });
         const serverError = res.status >= 500 || res.status === 429;
         breaker.after(!serverError);
         if (serverError && attempt < attempts) {
@@ -174,7 +182,15 @@ export function createHttpClient(options: ClientOptions): HttpClient {
       } catch (err) {
         if (err instanceof DownstreamError) throw err;
         const durationMs = Math.round(performance.now() - started);
-        options.onCall?.({ name: options.name, method, path, status: 'error', durationMs, attempt });
+        options.onCall?.({
+          name: options.name,
+          method,
+          path,
+          status: 'error',
+          durationMs,
+          attempt,
+          ...(req.correlationId ? { correlationId: req.correlationId } : {}),
+        });
         breaker.after(false);
         lastError = err;
         if (attempt < attempts) {

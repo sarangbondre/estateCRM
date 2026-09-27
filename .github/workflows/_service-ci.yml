@@ -9,6 +9,11 @@ on:
       path:
         required: true
         type: string
+      database:
+        description: Start the local Supabase Postgres (platform bootstrap applied) for integration tests
+        required: false
+        type: boolean
+        default: true
 jobs:
   ci:
     name: ${{ inputs.service }}
@@ -22,13 +27,14 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Lint
-        run: pnpm --filter "./${{ inputs.path }}" run lint
+      - uses: supabase/setup-cli@v1
+        if: inputs.database
+        with:
+          version: 2.118.0
+      - name: Local Postgres (platform bootstrap)
+        if: inputs.database
+        run: supabase --workdir infra db start && node infra/scripts/local-roles.mjs --env > /dev/null
       - name: Layer check
         run: pnpm exec depcruise ${{ inputs.path }} --config .dependency-cruiser.cjs
-      - name: Typecheck
-        run: pnpm --filter "./${{ inputs.path }}" run typecheck
-      - name: Tests (unit, integration, contract)
-        run: pnpm --filter "./${{ inputs.path }}" run test
-      - name: Build
-        run: pnpm --filter "./${{ inputs.path }}" run build
+      - name: Lint, typecheck, tests (unit, integration, contract), build
+        run: pnpm turbo run lint typecheck test build --filter "./${{ inputs.path }}"

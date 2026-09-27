@@ -121,7 +121,10 @@ describe('per consumer', () => {
   });
 
   it('records relay throughput, unroutable rows, backlog and lag', async () => {
-    red.recordRelay({ processed: 120, unroutable: 2, remaining: 30, durationMs: 50 }, 42);
+    red.recordRelay(
+      { processed: 120, unroutable: 2, remaining: 30, durationMs: 50, oldestPendingAgeSec: null },
+      42,
+    );
     expect(await sum(METRICS.relayPublished)).toBe(120);
     expect(await sum(METRICS.relayUnroutable)).toBe(2);
     expect((await reader.points(METRICS.relayBacklog))[0]?.value).toBe(30);
@@ -145,7 +148,10 @@ describe('observe() hooks', () => {
     });
     obs.drainHooks.onResult('q_journeys', drain({ processed: 5, deadLettered: 1, remaining: 2 }));
     obs.drainHooks.onResult('q_journeys', drain({ remaining: null }));
-    obs.onRelay({ processed: 3, unroutable: 0, remaining: 0, durationMs: 9 }, 12.4);
+    obs.onRelay(
+      { processed: 3, unroutable: 0, remaining: 0, durationMs: 9, oldestPendingAgeSec: null },
+      12.4,
+    );
     obs.onCall({
       name: 'records',
       method: 'GET',
