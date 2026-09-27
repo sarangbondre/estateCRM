@@ -64,7 +64,10 @@ describe('strict mode chunk processing', () => {
     const rows = batches.flatMap((b) => b.data['rows'] as Record<string, unknown>[]);
     expect(rows).toHaveLength(manifest.totals.loaded);
     expect(batches.every((b) => b.aggregateType === 'upload_batch' && b.aggregateVersion === 1)).toBe(true);
-    const payload = JSON.stringify(batches.map((b) => b.data));
+    // ids and hashes (UUIDs, 12-hex refs, sha256) can contain phone-like digit runs: scan the other values only
+    const payload = JSON.stringify(batches.map((b) => b.data))
+      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<uuid>')
+      .replace(/\b[0-9a-f]{12,64}\b/gi, '<hex>');
     expect(findPhoneLikeNumbers(payload).filter((p) => isSyntheticPhone(p))).toEqual([]);
     expect(payload).not.toMatch(/@example\.(com|in)/);
     expect(rows.filter((r) => r['needsReview']).length).toBe(manifest.totals.needsReview);
