@@ -146,10 +146,13 @@ describe('jobs', () => {
       .where('tenant_id', '=', h.tenant)
       .where('id', '=', data.offerId)
       .execute();
-    for (let i = 0; i < 50; i++) {
-      const r = await job('ceiling-sweep');
-      expect(r.status).toBe(200);
-      if (!((await r.json()) as { more: boolean }).more) break;
+    // Finish any cycle a previous run left in its checkpoint, then run one full cycle.
+    for (let cycle = 0; cycle < 2; cycle++) {
+      for (let i = 0; i < 200; i++) {
+        const r = await job('ceiling-sweep');
+        expect(r.status).toBe(200);
+        if (!((await r.json()) as { more: boolean }).more) break;
+      }
     }
     expect((await h.tx((s) => s.getPublication('offer', data.offerId)))?.level).toBe('Private');
   });

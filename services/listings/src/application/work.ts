@@ -56,9 +56,10 @@ async function publishPhoto(
     store.getPhotoFull(item.photoId),
   );
   if (!photo || photo.status !== 'ready' || !photo.privatePath || photo.publicPath) return 'done';
-  const publicName = photo.publicName ?? publicNameFrom(s.random.bytes(16));
+  const publicName = photo.publicName ?? publicNameFrom(s.random.bytes(24));
   const ext = photo.privatePath.split('.').pop() ?? 'jpg';
-  const publicPath = `${item.tenantId}/${publicName}.${ext}`;
+  // No tenant id in public URLs: the name alone is unguessable and holds no digits.
+  const publicPath = `${publicName}.${ext}`;
   await store0.copyToPublic(photo.privatePath, publicPath);
   await s.uow.run(item.tenantId, `work-photo-${item.photoId}`, async (store) => {
     await store.setPhotoPublic(photo.id, publicName, publicPath);

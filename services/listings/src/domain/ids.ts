@@ -35,7 +35,10 @@ export function apiKeyFrom(random: Uint8Array): string {
 /** First 8 characters, for display only ("lk_live_"). The contract calls them the prefix. */
 export const apiKeyDisplayPrefix = (key: string) => key.slice(0, 10);
 
-/** Random public file name for a photo copy (never the photo id). */
+/**
+ * Random public file name for a photo copy: 24 lower-case letters (≈ 112 bits), never the photo id. Letters only, so
+ * a public URL never holds a digit run that could read as a phone number (M8 output scans).
+ */
 export function publicNameFrom(random: Uint8Array): string {
-  return Array.from(random.slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(random.slice(0, 24), (b) => String.fromCharCode(97 + (b % 26))).join('');
 }
