@@ -19,6 +19,17 @@
     }
   },
   "files": [
-    "dist"
-  ]
+    "dist",
+    "sql"
+  ],
+  "dependencies": {
+    "kysely": "~0.29.6",
+    "pg": "~8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  },
+  "bin": {
+    "11e-migrate": "./dist/cli/migrate.js"
+  }
 }
