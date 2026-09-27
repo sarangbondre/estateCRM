@@ -20,4 +20,6 @@ export interface AppDeps {
   website: WebsiteAuth;
   rateLimiter: RateLimiter;
   keyHasher: KeyHasher;
+  /** Contract response validation (default: on under NODE_ENV=test, see libs/http). */
+  validateResponses?: boolean;
 }

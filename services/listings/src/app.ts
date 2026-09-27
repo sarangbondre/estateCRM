@@ -28,6 +28,7 @@ export function buildApp(deps: AppDeps): Service<operations> {
       const r = await checkDbReady(db, EXPECTED_MIGRATION);
       return { ok: r.ok, checks: { db: r.ok ? 'ok' : (r.reason ?? 'down') } };
     },
+    ...(deps.validateResponses !== undefined ? { validateResponses: deps.validateResponses } : {}),
     middleware: [obs.middleware],
     operationMiddleware: [deps.auth],
     onRequestEnd: obs.onRequestEnd,

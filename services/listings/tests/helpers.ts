@@ -95,7 +95,9 @@ export interface Harness {
 
 let versionSeq = 1;
 
-export async function harness(options: { environment?: string } = {}): Promise<Harness> {
+export async function harness(
+  options: { environment?: string; validateResponses?: boolean } = {},
+): Promise<Harness> {
   await ensureMigrated();
   const config = loadConfig({ ...env, ENVIRONMENT_NAME: options.environment ?? 'test' });
   const handle = createDb<ListingsDb>({
@@ -152,6 +154,7 @@ export async function harness(options: { environment?: string } = {}): Promise<H
     auth,
     services,
     ...platform,
+    ...(options.validateResponses !== undefined ? { validateResponses: options.validateResponses } : {}),
   };
   const svc = buildApp(deps);
   const tenant = randomUUID();
