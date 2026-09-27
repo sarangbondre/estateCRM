@@ -8,7 +8,8 @@ import { buildApp } from './app.js';
 import { SCHEMA, SERVICE, loadConfig } from './config.js';
 import type { Config } from './config.js';
 import type { App, IntakePolicy } from './application/context.js';
-import type { FileStore, LocalityDirectory } from './application/ports.js';
+import type { FileStore, LocalityDirectory, ModelClassifier } from './application/ports.js';
+import { huggingFaceClassifier, unavailableClassifier } from './adapters/model.js';
 import type { ReleaseSource } from './application/vocabulary.js';
 import { createRecordsClient } from './adapters/records.js';
 import type { IntakeDb } from './adapters/db.js';
@@ -36,6 +37,7 @@ export interface Overrides {
   files?: FileStore;
   localities?: LocalityDirectory;
   releases?: ReleaseSource;
+  model?: ModelClassifier;
 }
 
 const noLocalities: LocalityDirectory = { resolver: () => Promise.resolve(() => undefined) };
@@ -57,6 +59,16 @@ export function composeApp(config: Config, db: Kysely<IntakeDb>, overrides: Over
     anonymiser: () => (cells) => [...cells],
     localities: overrides.localities ?? records ?? noLocalities,
     releases: overrides.releases ?? records,
+    model:
+      overrides.model ??
+      (config.hfToken
+        ? huggingFaceClassifier({
+            token: config.hfToken,
+            model: config.hfModel,
+            endpointUrl: config.hfEndpointUrl,
+            concurrency: config.pilotMode ? 5 : 20,
+          })
+        : unavailableClassifier),
   };
 }
 

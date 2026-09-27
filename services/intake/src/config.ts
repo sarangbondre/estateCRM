@@ -25,6 +25,10 @@ export interface Config {
   chunkConcurrency: number;
   /** records base URL (vocabulary, micromarkets). */
   recordsUrl: string | undefined;
+  /** Hugging Face (ADR-0004): token (secret), model id and OpenAI-compatible endpoint. */
+  hfToken: string | undefined;
+  hfModel: string;
+  hfEndpointUrl: string;
 }
 
 export class ConfigError extends Error {
@@ -58,5 +62,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     chunkSize: Number(get('CHUNK_SIZE') ?? (pilotMode ? 500 : 2000)),
     chunkConcurrency: Number(get('CHUNK_CONCURRENCY') ?? (pilotMode ? 5 : 12)),
     recordsUrl: get('RECORDS_URL'),
+    hfToken: get('HF_TOKEN'),
+    hfModel: get('HF_MODEL') ?? 'meta-llama/Llama-3.1-8B-Instruct',
+    hfEndpointUrl: get('HF_ENDPOINT_URL') ?? 'https://router.huggingface.co',
   };
 }

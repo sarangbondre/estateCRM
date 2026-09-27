@@ -5,6 +5,7 @@ import type {
   FileStore,
   IdGenerator,
   LocalityDirectory,
+  ModelClassifier,
   SpreadsheetReader,
   UnitOfWork,
 } from './ports.js';
@@ -51,6 +52,8 @@ export interface App {
   localities: LocalityDirectory;
   /** records vocabulary releases; undefined when records is not configured. */
   releases: ReleaseSource | undefined;
+  /** Redacted-text classifier (Hugging Face); unavailable without a token. */
+  model: ModelClassifier;
 }
 
 export interface StaffActor {

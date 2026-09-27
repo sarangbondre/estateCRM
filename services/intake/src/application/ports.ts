@@ -388,3 +388,26 @@ export interface UnitOfWork {
   repos: Repositories;
   transaction<T>(fn: (tx: Tx) => Promise<T>, options?: { timeoutMs?: number }): Promise<T>;
 }
+
+// ---- model (ADR-0004) ----------------------------------------------------------------------------------------------
+
+/** Raw model answer for one item (validated against the vocabulary by the domain before use). */
+export interface ModelOutput {
+  id?: unknown;
+  recordScope?: unknown;
+  dealTypes?: unknown;
+  market?: unknown;
+  segment?: unknown;
+  propertyTypes?: unknown;
+  side?: unknown;
+  confidence?: unknown;
+}
+
+export class ModelUnavailableError extends Error {
+  override readonly name = 'ModelUnavailableError';
+}
+
+/** Classifies REDACTED texts (never raw PII), ≤ 20 per call. Throws ModelUnavailableError. */
+export interface ModelClassifier {
+  classify(items: readonly { id: string; text: string }[]): Promise<ModelOutput[]>;
+}
