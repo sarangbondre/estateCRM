@@ -471,6 +471,9 @@ importers:
       '@11e/outbox':
         specifier: workspace:*
         version: link:../../libs/outbox
+      '@11e/redaction':
+        specifier: workspace:*
+        version: link:../../libs/redaction
       '@11e/vocabulary':
         specifier: workspace:*
         version: link:../../libs/vocabulary

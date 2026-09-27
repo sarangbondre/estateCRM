@@ -3,6 +3,8 @@
 import type { WorkHandler } from '@11e/outbox';
 import { runInspection } from '../application/inspection.js';
 import { runSplit } from '../application/split.js';
+import type { ChunkMessage } from '../application/split.js';
+import { processChunk } from '../application/chunk.js';
 import type { InspectMessage } from '../application/inspection.js';
 import type { AppDeps } from '../deps.js';
 import type { IntakeDb } from './db.js';
@@ -23,10 +25,18 @@ export function uploadMessage(payload: unknown): InspectMessage {
   };
 }
 
+export function chunkMessage(payload: unknown): ChunkMessage {
+  const base = uploadMessage(payload);
+  const n = (payload as Record<string, unknown>)['chunkNo'];
+  if (typeof n !== 'number' || !Number.isInteger(n) || n < 1) throw new Error('bad work message: chunkNo');
+  return { ...base, chunkNo: n };
+}
+
 export function workHandlers(deps: AppDeps): Record<string, WorkHandler<IntakeDb>> {
   const { app } = deps;
   return {
     q_intake_inspect: (payload) => runInspection(app, app.sheets, uploadMessage(payload)),
     q_intake_split: (payload) => runSplit(app, uploadMessage(payload)),
+    q_intake_chunks: (payload) => processChunk(app, chunkMessage(payload)),
   };
 }

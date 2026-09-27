@@ -8,7 +8,12 @@ import type { NewEvent, Repositories, Tx, UnitOfWork } from '../application/port
 import { SCHEMA, SERVICE } from '../config.js';
 import type { IntakeDb } from './db.js';
 import { migrationMapRepository, rowErrorRepository } from './repositories/reports.js';
-import { chunkRepository, fingerprintRepository, rawRowRepository } from './repositories/processing.js';
+import {
+  chunkRepository,
+  fingerprintRepository,
+  rawRowRepository,
+  reviewItemRepository,
+} from './repositories/processing.js';
 import { templateRepository, vocabularyRepository } from './repositories/templates.js';
 import { uploadRepository } from './repositories/uploads.js';
 
@@ -20,6 +25,7 @@ export function repositories(db: Db): Repositories {
     chunks: chunkRepository(db),
     fingerprints: fingerprintRepository(db),
     rawRows: rawRowRepository(db),
+    reviews: reviewItemRepository(db),
     rowErrors: rowErrorRepository(db),
     migration: migrationMapRepository(db),
     templates: templateRepository(db),

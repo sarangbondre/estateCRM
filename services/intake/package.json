@@ -23,6 +23,7 @@
     "@11e/http": "workspace:*",
     "@11e/observability": "workspace:*",
     "@11e/outbox": "workspace:*",
+    "@11e/redaction": "workspace:*",
     "@11e/vocabulary": "workspace:*",
     "exceljs": "~4.4.0",
     "@hono/node-server": "^2.1.1",

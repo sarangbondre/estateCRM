@@ -6,9 +6,11 @@ import type {
   ChunkRepository,
   ChunkStatus,
   FingerprintRepository,
+  RawRowRecord,
   RawRowRepository,
+  ReviewItemRepository,
 } from '../../application/ports.js';
-import type { IntakeDb, UploadChunksTable } from '../db.js';
+import type { IntakeDb, RawRowsTable, UploadChunksTable } from '../db.js';
 
 type Db = Kysely<IntakeDb> | Transaction<IntakeDb>;
 
@@ -236,12 +238,169 @@ export function fingerprintRepository(db: Db): FingerprintRepository {
   };
 }
 
+const toRawRow = (r: Selectable<RawRowsTable>): RawRowRecord => ({
+  id: r.id,
+  tenantId: r.tenant_id,
+  partitionMonth: r.partition_month,
+  uploadId: r.upload_id,
+  chunkNo: r.chunk_no,
+  batchNo: r.batch_no,
+  rowNo: r.row_no,
+  sheetName: r.sheet_name,
+  original: r.original,
+  normalised: r.normalised ?? {},
+  externalSource: r.external_source as 'extractor' | 'upload',
+  externalRef: r.external_ref,
+  parentExternalRef: r.parent_external_ref,
+  contentHash: r.content_hash,
+  outcome: r.outcome as RawRowRecord['outcome'],
+  needsReview: r.needs_review,
+  reviewReasonText: r.review_reason_text,
+  reasonCodes: r.reason_codes ?? [],
+  primaryReasonCode: r.primary_reason_code,
+  detailCode: r.detail_code,
+  recordScope: r.record_scope,
+  side: r.side,
+  market: r.market,
+  segment: r.segment,
+  dealTypes: r.deal_types ?? [],
+  propertyTypes: r.property_types ?? [],
+  usedModel: r.used_model,
+  anonymised: r.anonymised,
+});
+
 export function rawRowRepository(db: Db): RawRowRepository {
   return {
     async ensurePartition(month) {
       await sql`select intake.ensure_raw_rows_partition(${month.toISOString().slice(0, 10)}::date)`.execute(
         db,
       );
+    },
+
+    async insertMany(rows) {
+      for (let i = 0; i < rows.length; i += 250) {
+        const part = rows.slice(i, i + 250);
+        const tenantId = part[0]?.tenantId;
+        if (!tenantId) continue;
+        await tenantScope(db, tenantId)
+          .insertInto(
+            'raw_rows',
+            part.map((r) => ({
+              id: r.id,
+              partition_month: r.partitionMonth,
+              upload_id: r.uploadId,
+              chunk_no: r.chunkNo,
+              batch_no: r.batchNo,
+              row_no: r.rowNo,
+              sheet_name: r.sheetName,
+              original: JSON.stringify(r.original),
+              normalised: JSON.stringify(r.normalised),
+              external_source: r.externalSource,
+              external_ref: r.externalRef,
+              parent_external_ref: r.parentExternalRef,
+              content_hash: r.contentHash,
+              outcome: r.outcome,
+              needs_review: r.needsReview,
+              review_reason_text: r.reviewReasonText,
+              reason_codes: r.reasonCodes,
+              primary_reason_code: r.primaryReasonCode,
+              detail_code: r.detailCode,
+              record_scope: r.recordScope,
+              side: r.side,
+              market: r.market,
+              segment: r.segment,
+              deal_types: r.dealTypes,
+              property_types: r.propertyTypes,
+              used_model: r.usedModel,
+              anonymised: r.anonymised,
+            })),
+          )
+          .onConflict((oc) => oc.columns(['tenant_id', 'upload_id', 'row_no', 'partition_month']).doNothing())
+          .execute();
+      }
+    },
+
+    async batch(tenantId, uploadId, batchNo) {
+      const rows = await tenantScope(db, tenantId)
+        .selectFrom('raw_rows')
+        .selectAll()
+        .where('upload_id', '=', uploadId)
+        .where('batch_no', '=', batchNo)
+        .where('outcome', '=', 'accepted')
+        .orderBy('row_no')
+        .limit(500)
+        .execute();
+      return (rows as Selectable<RawRowsTable>[]).map(toRawRow);
+    },
+
+    async rejected(tenantId, uploadId, afterRowNo, limit) {
+      const rows = await tenantScope(db, tenantId)
+        .selectFrom('raw_rows')
+        .selectAll()
+        .where('upload_id', '=', uploadId)
+        .where('outcome', '=', 'rejected')
+        .where('row_no', '>', afterRowNo)
+        .orderBy('row_no')
+        .limit(limit)
+        .execute();
+      return (rows as Selectable<RawRowsTable>[]).map(toRawRow);
+    },
+
+    async find(tenantId, rowId) {
+      const r = await tenantScope(db, tenantId)
+        .selectFrom('raw_rows')
+        .selectAll()
+        .where('id', '=', rowId)
+        .executeTakeFirst();
+      return r ? toRawRow(r as Selectable<RawRowsTable>) : undefined;
+    },
+
+    async purge(tenantId, uploadId, limit) {
+      const r = await sql<{ n: string }>`with doomed as (
+          select id, partition_month from intake.raw_rows
+          where tenant_id = ${tenantId} and upload_id = ${uploadId} limit ${limit})
+        delete from intake.raw_rows r using doomed d
+        where r.id = d.id and r.partition_month = d.partition_month and r.tenant_id = ${tenantId}
+        returning 1 as n`.execute(db);
+      return r.rows.length;
+    },
+  };
+}
+
+export function reviewItemRepository(db: Db): ReviewItemRepository {
+  return {
+    async insertMany(items) {
+      const ids: string[] = [];
+      for (let i = 0; i < items.length; i += 500) {
+        const part = items.slice(i, i + 500);
+        const tenantId = part[0]?.tenantId;
+        if (!tenantId) continue;
+        const rows = await tenantScope(db, tenantId)
+          .insertInto(
+            'review_items',
+            part.map((r) => ({
+              id: r.id,
+              upload_id: r.uploadId,
+              row_id: r.rowId,
+              row_no: r.rowNo,
+              external_ref: r.externalRef,
+              reason_code: r.reasonCode,
+              detail_code: r.detailCode,
+              review_reason_text: r.reviewReasonText,
+              current: JSON.stringify(r.current),
+              suggested: r.suggested ? JSON.stringify(r.suggested) : null,
+              context: JSON.stringify(r.context),
+              vocabulary_version: r.vocabularyVersion,
+              note: null,
+              resolved_by: null,
+            })),
+          )
+          .onConflict((oc) => oc.columns(['tenant_id', 'row_id']).doNothing())
+          .returning('id')
+          .execute();
+        ids.push(...rows.map((r) => r.id));
+      }
+      return ids;
     },
   };
 }

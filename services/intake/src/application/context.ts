@@ -1,6 +1,14 @@
 // What every use case receives: ports, policy and the acting principal.
 import type { StaffRoleName } from '../domain/upload.js';
-import type { Clock, FileStore, IdGenerator, SpreadsheetReader, UnitOfWork } from './ports.js';
+import type {
+  Clock,
+  FileStore,
+  IdGenerator,
+  LocalityDirectory,
+  SpreadsheetReader,
+  UnitOfWork,
+} from './ports.js';
+import type { ReleaseSource } from './vocabulary.js';
 
 /** Tenant policy from configuration (intake LLD §4.3, §4.9, §7; R-15, R-22). */
 export interface IntakePolicy {
@@ -39,6 +47,10 @@ export interface App {
   policy: IntakePolicy;
   /** Builds the anonymiser for one upload's header (tenant-keyed, deterministic). */
   anonymiser(tenantId: string, header: readonly string[]): RowAnonymiser;
+  /** records micromarket hierarchy (locality normalisation). */
+  localities: LocalityDirectory;
+  /** records vocabulary releases; undefined when records is not configured. */
+  releases: ReleaseSource | undefined;
 }
 
 export interface StaffActor {

@@ -268,9 +268,77 @@ export interface VocabularyRepository {
   legacyTerms(tenantId: string, version: string): Promise<LegacyTermRow[]>;
 }
 
+export interface RawRowRecord {
+  id: string;
+  tenantId: string;
+  partitionMonth: Date;
+  uploadId: string;
+  chunkNo: number;
+  batchNo: number | null;
+  rowNo: number;
+  sheetName: string | null;
+  /** header → cell text as read (anonymised when the switch is on). PII. */
+  original: Record<string, string | null>;
+  /** IntakeRow data fields. PII. */
+  normalised: Record<string, unknown>;
+  externalSource: 'extractor' | 'upload';
+  externalRef: string;
+  parentExternalRef: string | null;
+  contentHash: string;
+  outcome: 'accepted' | 'rejected' | 'unchanged';
+  needsReview: boolean;
+  reviewReasonText: string | null;
+  reasonCodes: string[];
+  primaryReasonCode: string | null;
+  detailCode: string | null;
+  recordScope: string | null;
+  side: string | null;
+  market: string | null;
+  segment: string | null;
+  dealTypes: string[];
+  propertyTypes: string[];
+  usedModel: boolean;
+  anonymised: boolean;
+}
+
 export interface RawRowRepository {
   /** Creates the month partition of raw_rows (split job, before any chunk writes rows). */
   ensurePartition(month: Date): Promise<void>;
+  /** Idempotent insert (ON CONFLICT DO NOTHING on upload + row number). */
+  insertMany(rows: readonly RawRowRecord[]): Promise<void>;
+  /** Accepted rows of one emitted batch in row order (≤ 500). */
+  batch(tenantId: string, uploadId: string, batchNo: number): Promise<RawRowRecord[]>;
+  /** Rejected rows in row order after `afterRowNo` (finalize builds the rejected-rows file). */
+  rejected(tenantId: string, uploadId: string, afterRowNo: number, limit: number): Promise<RawRowRecord[]>;
+  find(tenantId: string, rowId: string): Promise<RawRowRecord | undefined>;
+  /** Retention: deletes up to `limit` rows of an upload; returns how many were deleted. */
+  purge(tenantId: string, uploadId: string, limit: number): Promise<number>;
+}
+
+export interface ReviewItemRecord {
+  id: string;
+  tenantId: string;
+  uploadId: string;
+  rowId: string;
+  rowNo: number;
+  externalRef: string;
+  reasonCode: string;
+  detailCode: string;
+  reviewReasonText: string | null;
+  current: Record<string, unknown>;
+  suggested: Record<string, unknown> | null;
+  context: Record<string, unknown>;
+  vocabularyVersion: string;
+}
+
+export interface ReviewItemRepository {
+  /** ON CONFLICT (row_id) DO NOTHING; returns the ids actually inserted. */
+  insertMany(items: readonly ReviewItemRecord[]): Promise<string[]>;
+}
+
+/** Records' micromarket hierarchy (reference data): locality alias → canonical name. */
+export interface LocalityDirectory {
+  resolver(tenantId: string): Promise<(name: string) => string | undefined>;
 }
 
 export interface Repositories {
@@ -278,6 +346,7 @@ export interface Repositories {
   chunks: ChunkRepository;
   fingerprints: FingerprintRepository;
   rawRows: RawRowRepository;
+  reviews: ReviewItemRepository;
   rowErrors: RowErrorRepository;
   migration: MigrationMapRepository;
   templates: TemplateRepository;

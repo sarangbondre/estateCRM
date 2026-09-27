@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { expect } from 'vitest';
 import { runInspection } from '../../src/application/inspection.js';
 import { runSplit } from '../../src/application/split.js';
+import { processChunk } from '../../src/application/chunk.js';
 import type { Harness } from './harness.js';
 import { XLSX_MIME } from './files.js';
 
@@ -65,6 +66,20 @@ export async function uploadAndSplit(
   expect(s.status).toBe(202);
   await runSplit(h.app, { tenantId: tenant, uploadId: u.id, correlationId: 'test' });
   return u;
+}
+
+/** Runs the chunk handler for every chunk of the upload (in order, as one worker would). */
+export async function processAll(h: Harness, tenant: string, uploadId: string): Promise<void> {
+  const chunks = await h.db
+    .selectFrom('upload_chunks')
+    .select('chunk_no')
+    .where('tenant_id', '=', tenant)
+    .where('upload_id', '=', uploadId)
+    .orderBy('chunk_no')
+    .execute();
+  for (const c of chunks) {
+    await processChunk(h.app, { tenantId: tenant, uploadId, chunkNo: c.chunk_no, correlationId: 'test' });
+  }
 }
 
 /** POST /inspect then the q_intake_inspect handler (called directly: tests never depend on shared queue state). */

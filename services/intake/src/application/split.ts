@@ -22,6 +22,18 @@ export interface ChunkMessage {
 export interface ChunkLine {
   r: number;
   c: (string | null)[];
+  /** 1 = the row's external reference appeared earlier in the file (duplicate-external-ref). */
+  d?: 1;
+}
+
+/** Column holding the row's external reference: record_id (strict or mapped), else a mapped external_id. */
+export function refColumn(upload: Upload): number {
+  const header = upload.header ?? [];
+  if (upload.mode === 'strict') return header.findIndex((h) => normaliseHeader(h) === 'record_id');
+  const map = upload.columnMap ?? {};
+  const byTarget = (t: string) => header.findIndex((h) => map[h] === t);
+  const rid = byTarget('record_id');
+  return rid >= 0 ? rid : byTarget('external_id');
 }
 
 export const encodeChunk = (lines: readonly ChunkLine[]) =>
@@ -137,6 +149,8 @@ async function writeChunks(app: App, upload: Upload): Promise<SplitPlan> {
   let loadHeaderSeen = false;
   let migrationHeaderSeen = false;
   let migrationSheetFound = false;
+  const refIdx = refColumn(upload);
+  const seenRefs = new Set<string>();
 
   const flush = async () => {
     if (!buffer.length) return;
@@ -167,7 +181,13 @@ async function writeChunks(app: App, upload: Upload): Promise<SplitPlan> {
       rowCount += 1;
       if (rowCount > app.policy.maxRows) throw new TooManyRows();
       const cells = header.map((_, i) => row.cells[i] ?? null);
-      buffer.push({ r: row.rowNo - 1, c: anonymise ? anonymise(cells) : cells });
+      const line: ChunkLine = { r: row.rowNo - 1, c: anonymise ? anonymise(cells) : cells };
+      const ref = refIdx >= 0 ? (cells[refIdx] ?? '').trim().toLowerCase() : '';
+      if (ref) {
+        if (seenRefs.has(ref)) line.d = 1;
+        else seenRefs.add(ref);
+      }
+      buffer.push(line);
       if (buffer.length >= chunkSize) await flush();
     } else if (row.sheet !== null && normaliseHeader(row.sheet) === MIGRATION_SHEET) {
       migrationSheetFound = true;

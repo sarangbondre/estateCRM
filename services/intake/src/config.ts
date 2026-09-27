@@ -23,6 +23,8 @@ export interface Config {
   pilotMode: boolean;
   chunkSize: number;
   chunkConcurrency: number;
+  /** records base URL (vocabulary, micromarkets). */
+  recordsUrl: string | undefined;
 }
 
 export class ConfigError extends Error {
@@ -55,5 +57,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     pilotMode,
     chunkSize: Number(get('CHUNK_SIZE') ?? (pilotMode ? 500 : 2000)),
     chunkConcurrency: Number(get('CHUNK_CONCURRENCY') ?? (pilotMode ? 5 : 12)),
+    recordsUrl: get('RECORDS_URL'),
   };
 }
