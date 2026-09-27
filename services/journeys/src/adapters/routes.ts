@@ -3,6 +3,7 @@ import type { operations } from '@11e/contracts/journeys';
 import type { Service } from '@11e/http';
 import type { AppDeps } from '../deps.js';
 import { createHttp } from './http.js';
+import { registerDealRoutes } from './routes-deals.js';
 import { registerProposalRoutes } from './routes-proposals.js';
 import { registerQueueRoutes } from './routes-queues.js';
 import { registerSubjectRoutes } from './routes-subjects.js';
@@ -12,4 +13,5 @@ export function registerRoutes(svc: Service<operations>, deps: AppDeps): void {
   registerQueueRoutes(svc, http);
   registerSubjectRoutes(svc, http);
   registerProposalRoutes(svc, http);
+  registerDealRoutes(svc, http);
 }
