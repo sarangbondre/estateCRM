@@ -1,0 +1,24 @@
+#!/bin/sh
+# momentum post-merge hook (Phase 31a — Ecosystem Lifecycle Spine, ADR-0016).
+#
+# Records a merge that arrived locally as an attributed ecosystem event.
+#
+# This is the local half of the forge-API blind spot: a `gh pr merge` executes
+# server-side, where no local hook can fire, so that merge is captured here on
+# the next fetch/pull that brings it down. Partial by construction — momentum
+# is forge-neutral and ships no webhook. Documented in ADR-0016 rather than
+# papered over.
+#
+# NEVER blocks; every path exits 0.
+#
+# Bypass:  MOMENTUM_SKIP_HOOKS=1 git merge ...
+[ -n "${MOMENTUM_SKIP_HOOKS:-}" ] && exit 0
+dir=$(dirname "$0")
+if command -v node >/dev/null 2>&1; then
+  # stderr is deliberately NOT redirected: the cross-repo routing banner
+  # (Phase 31b) is written there. run-check.js wraps this branch in a
+  # try/catch, so failures stay silent without suppressing the message the
+  # hook exists to surface.
+  node "$dir/run-check.js" post-merge || true
+fi
+exit 0

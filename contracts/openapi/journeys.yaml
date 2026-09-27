@@ -1,0 +1,3557 @@
+# 11 Estates CRM — journeys OpenAPI (Stage 4 LLD). Shared components: ./_common.yaml
+# Rules: docs/04-lld/conventions.md · Design: docs/04-lld/journeys.md
+openapi: 3.1.0
+info: {title: 11 Estates CRM — journeys (work management) API, version: 0.1.0, description: 'Service S3 (HLD §2). Owns queues
+    and call attempts, capacities, life curve, the Commercial axis of offers and demands, exits, sourcing requests, proposals,
+    site visits, deals, lease renewals, notifications and watchlist tasks. Conventions: docs/04-lld/conventions.md. LLD: docs/04-lld/journeys.md.
+    Events: contracts/asyncapi/events.yaml.'}
+servers:
+- url: https://{service}.internal.11estates.in
+  description: Vercel project `journeys` (bom1). Reached only via web (staff), pg_cron (internal) or service tokens.
+  variables:
+    service: {default: journeys}
+tags:
+- {name: Queues}
+- {name: Calls}
+- {name: Life curve}
+- {name: Offers}
+- {name: Demands}
+- {name: Sourcing requests}
+- {name: Proposals}
+- {name: Public proposal page}
+- {name: Site visits}
+- {name: Deals}
+- {name: Notifications}
+- {name: Watchlist tasks}
+- {name: Settings}
+- {name: Internal}
+- {name: Health}
+security:
+- staffViaWeb: []
+paths:
+  /v1/queues/me:
+    get:
+      operationId: getMyQueue
+      summary: 'My queue summary: sections with counts, capacity and today''s plan (P-01, C-01)'
+      tags: [Queues]
+      description: Target p95 ≤ 1 s (NFR-8); one index-only count per section. Team (supply/demand) comes from the user's
+        capacity row; Admin/Manager see both teams' sections.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      responses:
+        '200':
+          description: Queue summary
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/QueueSummary'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+  /v1/queues/me/sections/{section}:
+    get:
+      operationId: listMyQueueSection
+      summary: Items of one section of my queue, in computed order
+      tags: [Queues]
+      description: 'Order: must_call and date-driven sections by (overdue desc, dueAt asc, id); should_call by (rank desc,
+        id). Drag-reorder is not allowed (rank is computed).'
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/Limit}
+      - {$ref: ./_common.yaml#/components/parameters/Cursor}
+      - name: section
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [must_call, should_call, sourcing_requests, watchlist_tasks, to_contact, to_qualify, reconfirm_due, needs_sourcing,
+            in_sourcing, sourcing_requests_open, open_matches, proposals_out, site_visits_this_week, deals_follow_up, dormant_revisits]
+      - name: plannedOnly
+        in: query
+        required: false
+        schema: {type: boolean, default: false}
+        description: 'should_call: only the items that fit today''s capacity'
+      responses:
+        '200':
+          description: Queue items
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/QueueItemPage'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-pagination: cursor (limit default 25, max 100); response {items, nextCursor}
+  /v1/queues/users/{userId}:
+    get:
+      operationId: getUserQueue
+      summary: A team member's queue summary (Manager view)
+      tags: [Queues]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - name: userId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Queue summary
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/QueueSummary'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+  /v1/queues/users/{userId}/sections/{section}:
+    get:
+      operationId: listUserQueueSection
+      summary: Items of one section of a team member's queue (Manager view)
+      tags: [Queues]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/Limit}
+      - {$ref: ./_common.yaml#/components/parameters/Cursor}
+      - name: userId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      - name: section
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [must_call, should_call, sourcing_requests, watchlist_tasks, to_contact, to_qualify, reconfirm_due, needs_sourcing,
+            in_sourcing, sourcing_requests_open, open_matches, proposals_out, site_visits_this_week, deals_follow_up, dormant_revisits]
+      responses:
+        '200':
+          description: Queue items
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/QueueItemPage'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-pagination: cursor (limit default 25, max 100); response {items, nextCursor}
+  /v1/queue-items/reassign:
+    post:
+      operationId: reassignQueueItems
+      summary: Bulk reassign open queue items (≤100) to another user (C-19)
+      tags: [Queues]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReassignRequest'}
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReassignResult'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [audit.recorded.v1]
+  /v1/capacities:
+    get:
+      operationId: listCapacities
+      summary: Daily call capacities of all users (D-10)
+      tags: [Queues]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/Limit}
+      - {$ref: ./_common.yaml#/components/parameters/Cursor}
+      - name: team
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [supply, demand]
+      responses:
+        '200':
+          description: Capacities
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CapacityPage'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-pagination: cursor (limit default 25, max 100); response {items, nextCursor}
+  /v1/capacities/{userId}:
+    get:
+      operationId: getCapacity
+      summary: One user's daily capacity (self, or Manager/Admin for anyone)
+      tags: [Queues]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - name: userId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Capacity
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Capacity'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-role-rules: Agents may read only their own row.
+    put:
+      operationId: putCapacity
+      summary: Set a user's daily call capacity (default 40, A-36)
+      tags: [Queues]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IfMatch}
+      - name: userId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CapacityPut'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Capacity'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '412': {$ref: ./_common.yaml#/components/responses/PreconditionFailed}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+      x-roles: [Admin, Manager]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: PUT is idempotent; If-Match (row version) → 412 on mismatch
+      x-emits: [audit.recorded.v1]
+  /v1/calls:
+    post:
+      operationId: logCall
+      summary: Log a call or meeting outcome (C-08); drives life curve, attempts, retire
+      tags: [Calls]
+      description: 'One transaction: insert call, update queue item (done / attempts), and by outcome: confirmed → life curve
+        day 0 (+ Upcoming→Available if availableNow, Dormant demand → reactivated, New demand → Contacted); no_answer → attempt+1,
+        reschedule next working day, 3rd consecutive → personUnreachable=true and item closed (offer) or moved to to_contact/unreachable
+        (demand); already_gone / unwilling (offer only) → Inactive + offer.retired.v1. confirmed on an Inactive offer reactivates
+        it (R-12; derived status, usually Available). Every call emits call.logged.v1 (records sets the unreachable flag from
+        personUnreachable).'
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CallCreate'}
+      responses:
+        '201':
+          description: Call logged
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CallResult'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+      x-roles: [Admin, Manager, Demand agent, Supply agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [call.logged.v1, offer.confirmed.v1, demand.confirmed.v1, lifecycle.stage_changed.v1, offer.commercial_status_changed.v1,
+        demand.status_changed.v1, demand.reactivated.v1, offer.retired.v1]
+      x-role-rules: 'subjectType=offer: Admin, Manager, Supply agent (Demand agent only for an offer sourced for a demand
+        they own). subjectType=demand: Admin, Manager, Demand agent.'
+    get:
+      operationId: listCalls
+      summary: Call history for a subject or a person (P-04)
+      tags: [Calls]
+      description: At least one of subjectId, personId or loggedBy is required (400 otherwise). Sorted by loggedAt desc.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/Limit}
+      - {$ref: ./_common.yaml#/components/parameters/Cursor}
+      - name: subjectId
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: personId
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: loggedBy
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: from
+        in: query
+        required: false
+        schema: {type: string, format: date}
+      - name: to
+        in: query
+        required: false
+        schema: {type: string, format: date}
+      responses:
+        '200':
+          description: Calls
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CallPage'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-pagination: cursor (limit default 25, max 100); response {items, nextCursor}
+  /v1/life-curves/{subjectType}/{subjectId}:
+    get:
+      operationId: getLifeCurve
+      summary: Life curve for an offer or demand (stage, day count, thresholds)
+      tags: [Life curve]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - name: subjectType
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [offer, demand]
+      - name: subjectId
+        in: path
+        required: true
+        schema: {type: string}
+        description: UUID or display code
+      responses:
+        '200':
+          description: Life curve
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LifeCurve'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+  /v1/offers/{idOrCode}/journey:
+    get:
+      operationId: getOfferJourney
+      summary: 'Offer work state: Commercial axis, life curve, queue, signals (P-02)'
+      tags: [Offers]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      responses:
+        '200':
+          description: Offer journey
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OfferJourney'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+  /v1/offers/{idOrCode}/retire:
+    post:
+      operationId: retireOffer
+      summary: Retire an offer to Inactive (already gone / unwilling / other) (C-17, US-18)
+      tags: [Offers]
+      description: 409 invalid-transition if Closed/Inactive or an open deal exists on the offer.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RetireRequest'}
+      responses:
+        '200':
+          description: Retired
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OfferJourney'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Supply agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [offer.retired.v1, offer.commercial_status_changed.v1, audit.recorded.v1]
+  /v1/demands/{idOrCode}/journey:
+    get:
+      operationId: getDemandJourney
+      summary: 'Demand work state: Commercial axis, exit, qualification, life curve (P-03)'
+      tags: [Demands]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      responses:
+        '200':
+          description: Demand journey
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DemandJourney'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+  /v1/demands/{idOrCode}/qualify:
+    post:
+      operationId: qualifyDemand
+      summary: Mark a demand qualified (C-09); triggers the inventory check
+      tags: [Demands]
+      description: All four checklist items must be true (400 qualification-incomplete). Commercial → Active; life curve reset
+        (the qualifying call is a confirmation). crm-engine runs matching on demand.qualified.v1.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/QualifyRequest'}
+      responses:
+        '200':
+          description: Qualified
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DemandJourney'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [demand.qualified.v1, demand.status_changed.v1, demand.confirmed.v1, lifecycle.stage_changed.v1]
+  /v1/demands/{idOrCode}/exit:
+    post:
+      operationId: exitDemand
+      summary: 'Exit a demand: Lost, Dormant or Invalid (C-16, US-26)'
+      tags: [Demands]
+      description: 409 exit-blocked-by-open-deal while a deal is open (cancel it first). Closes queue items and open sourcing
+        requests; notifies owners of matched offers. Dormant pauses the life curve until revisitDate.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ExitRequest'}
+      responses:
+        '200':
+          description: Exited
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DemandJourney'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [demand.exited.v1, lifecycle.stage_changed.v1, sourcing_request.updated.v1, audit.recorded.v1]
+  /v1/demands/{idOrCode}/reactivate:
+    post:
+      operationId: reactivateDemand
+      summary: Return an exited demand to Active (Dormant revisit; Lost/Invalid = Manager override)
+      tags: [Demands]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReactivateRequest'}
+      responses:
+        '200':
+          description: Reactivated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DemandJourney'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [demand.reactivated.v1, demand.status_changed.v1, lifecycle.stage_changed.v1, demand.confirmed.v1, audit.recorded.v1]
+      x-role-rules: 'Dormant: Admin, Manager, Demand agent. Lost / Invalid: Admin, Manager only (PRD §2.1 ''overriding exits'').'
+  /v1/sourcing-requests:
+    post:
+      operationId: createSourcingRequest
+      summary: Raise a sourcing request to the supply team (C-11, US-22)
+      tags: [Sourcing requests]
+      description: Demand must be qualified and not exited (409 invalid-transition). Commercial → Sourcing unless the demand
+        already has a confirmed match. Queue item in the assignee's sourcing_requests section; notification to the assignee.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SourcingRequestCreate'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SourcingRequest'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [sourcing_request.created.v1, demand.sourcing_started.v1, demand.status_changed.v1]
+    get:
+      operationId: listSourcingRequests
+      summary: List sourcing requests
+      tags: [Sourcing requests]
+      description: Sorted by (dueDate asc, id).
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/Limit}
+      - {$ref: ./_common.yaml#/components/parameters/Cursor}
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [Open, In progress, Fulfilled, Cancelled]
+      - name: assigneeUserId
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: requestedBy
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: demandId
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Sourcing requests
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SourcingRequestPage'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-pagination: cursor (limit default 25, max 100); response {items, nextCursor}
+  /v1/sourcing-requests/{idOrCode}:
+    get:
+      operationId: getSourcingRequest
+      summary: Get a sourcing request
+      tags: [Sourcing requests]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      responses:
+        '200':
+          description: Sourcing request
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SourcingRequest'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+    patch:
+      operationId: updateSourcingRequest
+      summary: Update status, assignee, due date or priority
+      tags: [Sourcing requests]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IfMatch}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: {$ref: '#/components/schemas/SourcingRequestPatch'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SourcingRequest'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '412': {$ref: ./_common.yaml#/components/responses/PreconditionFailed}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: If-Match (row version) → 412 on mismatch; JSON Merge Patch is idempotent
+      x-emits: [sourcing_request.updated.v1, demand.status_changed.v1]
+      x-role-rules: 'Requester (Demand agent), Admin, Manager: all fields. Assignee (Supply agent): status only (In progress
+        / Fulfilled).'
+  /v1/proposals:
+    post:
+      operationId: createProposal
+      summary: Create a proposal from confirmed matches (C-13, US-23)
+      tags: [Proposals]
+      description: 'Every matchId must be a Confirmed match of this demand (journeys'' match projection; 409 match-not-confirmed).
+        Status Preparing: a work item builds the content snapshot off the request path from records'' existing GET endpoints
+        (offer, property incl. building name, photos; service token issued by web, R-2) and the MahaRERA number from listings
+        GET /v1/publication-settings; then Ready.'
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProposalCreate'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Proposal'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: []
+    get:
+      operationId: listProposals
+      summary: List proposals
+      tags: [Proposals]
+      description: Sorted by (createdAt desc, id).
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/Limit}
+      - {$ref: ./_common.yaml#/components/parameters/Cursor}
+      - name: demandId
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [Preparing, Ready, Sent, Failed]
+      - name: createdBy
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Proposals
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProposalPage'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-pagination: cursor (limit default 25, max 100); response {items, nextCursor}
+  /v1/proposals/{idOrCode}:
+    get:
+      operationId: getProposal
+      summary: Get a proposal
+      tags: [Proposals]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      responses:
+        '200':
+          description: Proposal
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Proposal'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+    patch:
+      operationId: updateProposal
+      summary: Change options or cover note (not after Sent)
+      tags: [Proposals]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IfMatch}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: {$ref: '#/components/schemas/ProposalPatch'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Proposal'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '412': {$ref: ./_common.yaml#/components/responses/PreconditionFailed}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: If-Match (row version) → 412 on mismatch; JSON Merge Patch is idempotent
+      x-emits: []
+  /v1/proposals/{idOrCode}/pdf:
+    post:
+      operationId: generateProposalPdf
+      summary: Queue PDF generation (async, off the request path)
+      tags: [Proposals]
+      description: 409 proposal-not-ready while Preparing. Enqueues a work item on q_journeys_work; the PDF is written to
+        the private journeys bucket.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: []
+    get:
+      operationId: getProposalPdf
+      summary: PDF status and a 5-minute signed download URL
+      tags: [Proposals]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      responses:
+        '200':
+          description: PDF status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProposalPdf'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+  /v1/proposals/{idOrCode}/share-link:
+    post:
+      operationId: createProposalShareLink
+      summary: Create (or replace) the private share link, 14-day expiry (A-40)
+      tags: [Proposals]
+      description: Generates a 32-byte random token; only its SHA-256 hash is stored. Any previous active link is revoked.
+        The token is returned once.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ShareLinkCreate'}
+      responses:
+        '201':
+          description: Share link
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ShareLink'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [audit.recorded.v1]
+    delete:
+      operationId: revokeProposalShareLink
+      summary: Revoke the active share link
+      tags: [Proposals]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      responses:
+        '204': {description: Revoked}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: DELETE is idempotent (repeat returns 204)
+      x-emits: [audit.recorded.v1]
+  /v1/proposals/{idOrCode}/mark-sent:
+    post:
+      operationId: markProposalSent
+      summary: Mark the proposal sent (logs date and channel; the system sends nothing)
+      tags: [Proposals]
+      description: Offers → In proposal, demand → Proposal shared (derived-status rule, never moves backwards). Queue item
+        proposals_out for the owner.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MarkSentRequest'}
+      responses:
+        '200':
+          description: Sent
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Proposal'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [proposal.sent.v1, offer.commercial_status_changed.v1, demand.status_changed.v1]
+  /v1/proposals/{idOrCode}/feedback:
+    post:
+      operationId: recordProposalFeedback
+      summary: Record client feedback per option
+      tags: [Proposals]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProposalFeedback'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Proposal'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [proposal.feedback_recorded.v1]
+  /p/{token}:
+    get:
+      operationId: getPublicProposal
+      summary: Public proposal page for a share-link token (no staff auth)
+      tags: [Public proposal page]
+      description: 'Served through web''s public route /p/{token} (no Supabase JWT; web forwards with a service token scoped
+        to this route). Returns the frozen snapshot. Unknown token → 404 link-not-found; expired or revoked → 410 link-expired.
+        Each open is recorded (count, time, salted IP hash). Accept: text/html returns the rendered page; application/json
+        returns the snapshot. Response headers: Cache-Control: no-store, X-Robots-Tag: noindex, Referrer-Policy: no-referrer.'
+      security: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - name: token
+        in: path
+        required: true
+        schema: {type: string, pattern: '^[A-Za-z0-9_-]{43}$'}
+        description: base64url 32-byte token; looked up by SHA-256 hash
+      responses:
+        '200':
+          description: Proposal snapshot
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicProposal'}
+            text/html:
+              schema: {type: string}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '410': {$ref: '#/components/responses/Gone'}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: []
+      x-rate-limit: 30/min per IP and 120/min per token (enforced at web edge)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-auth: proposal share-link token (path); token-scoped to one proposal, read-only, expires ≤ 14 days
+  /v1/site-visits:
+    post:
+      operationId: scheduleSiteVisit
+      summary: Schedule a site visit (C-14)
+      tags: [Site visits]
+      description: Offers must be live (not Closed/Inactive) and linked to the demand by a match (409 offer-not-matched).
+        Queue item site_visits_this_week; notifications to attendees.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SiteVisitCreate'}
+      responses:
+        '201':
+          description: Scheduled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteVisit'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+      x-roles: [Admin, Manager, Demand agent, Supply agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [site_visit.scheduled.v1]
+    get:
+      operationId: listSiteVisits
+      summary: List site visits
+      tags: [Site visits]
+      description: Sorted by (scheduledAt asc, id).
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/Limit}
+      - {$ref: ./_common.yaml#/components/parameters/Cursor}
+      - name: demandId
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: offerId
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: attendeeUserId
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [Scheduled, Completed, Cancelled]
+      - name: from
+        in: query
+        required: false
+        schema: {type: string, format: date-time}
+      - name: to
+        in: query
+        required: false
+        schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: Site visits
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteVisitPage'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-pagination: cursor (limit default 25, max 100); response {items, nextCursor}
+  /v1/site-visits/{idOrCode}:
+    get:
+      operationId: getSiteVisit
+      summary: Get a site visit
+      tags: [Site visits]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      responses:
+        '200':
+          description: Site visit
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteVisit'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+    patch:
+      operationId: updateSiteVisit
+      summary: Reschedule, change offers/attendees or cancel
+      tags: [Site visits]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IfMatch}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: {$ref: '#/components/schemas/SiteVisitPatch'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteVisit'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '412': {$ref: ./_common.yaml#/components/responses/PreconditionFailed}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: If-Match (row version) → 412 on mismatch; JSON Merge Patch is idempotent
+      x-emits: []
+  /v1/site-visits/{idOrCode}/complete:
+    post:
+      operationId: completeSiteVisit
+      summary: Record the visit outcome; resets both life curves (US-24)
+      tags: [Site visits]
+      description: Visited offers → Site visit and the demand → Site visit (derived-status rule). Client no-show does not
+        reset the demand's life curve; owner no-show does not reset the offer's.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SiteVisitComplete'}
+      responses:
+        '200':
+          description: Completed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteVisit'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [site_visit.completed.v1, offer.confirmed.v1, demand.confirmed.v1, lifecycle.stage_changed.v1, offer.commercial_status_changed.v1,
+        demand.status_changed.v1]
+  /v1/deals:
+    post:
+      operationId: openDeal
+      summary: Open a deal (In process) for one demand and one offer (C-15, US-25)
+      tags: [Deals]
+      description: nextAction + followUpDate (≥ today) required. 409 deal-already-open if the demand has an open deal, or
+        the offer has one and is not a multi-unit project configuration. Offer and demand → In process.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DealCreate'}
+      responses:
+        '201':
+          description: Opened
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Deal'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [deal.opened.v1, deal.updated.v1, offer.commercial_status_changed.v1, demand.status_changed.v1]
+    get:
+      operationId: listDeals
+      summary: List deals
+      tags: [Deals]
+      description: Open deals sorted by (followUpDate asc, id) so overdue come first; closed/cancelled by (updatedAt desc,
+        id).
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/Limit}
+      - {$ref: ./_common.yaml#/components/parameters/Cursor}
+      - name: stage
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [Negotiation, Documentation, Stamp duty & registration, Closed, Cancelled]
+      - name: demandId
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: offerId
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: ownerUserId
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: followUpDue
+        in: query
+        required: false
+        schema: {type: boolean}
+        description: followUpDate ≤ today, open deals only
+      responses:
+        '200':
+          description: Deals
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DealPage'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-pagination: cursor (limit default 25, max 100); response {items, nextCursor}
+  /v1/deals/{idOrCode}:
+    get:
+      operationId: getDeal
+      summary: Get a deal
+      tags: [Deals]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      responses:
+        '200':
+          description: Deal
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Deal'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+    patch:
+      operationId: updateDeal
+      summary: Advance stage, update terms / next action / follow-up; stage=Closed closes the deal (saga start)
+      tags: [Deals]
+      description: 'Close (HLD §5.4): one transaction sets deal Closed, offer Closed (unless a project configuration with
+        units left), demand Closed, closes queue items, schedules a lease renewal for 11-month leases, and writes the outbox
+        events.'
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IfMatch}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: {$ref: '#/components/schemas/DealPatch'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Deal'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '412': {$ref: ./_common.yaml#/components/responses/PreconditionFailed}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: If-Match (row version) → 412 on mismatch; JSON Merge Patch is idempotent
+      x-emits: [deal.updated.v1, deal.closed.v1, offer.commercial_status_changed.v1, demand.status_changed.v1, audit.recorded.v1]
+  /v1/deals/{idOrCode}/cancel:
+    post:
+      operationId: cancelDeal
+      summary: 'Cancel a deal (compensation): offer → Available, demand → Active; deal kept'
+      tags: [Deals]
+      description: 'Open deal: Admin, Manager, Demand agent. Closed deal (token refunded after close): Admin, Manager only;
+        also cancels a scheduled lease renewal. Statuses are re-derived from remaining engagements (floor Available / Active).'
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DealCancel'}
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Deal'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [deal.cancelled.v1, deal.updated.v1, offer.commercial_status_changed.v1, demand.status_changed.v1, lifecycle.stage_changed.v1,
+        audit.recorded.v1]
+      x-role-rules: 'Cancelling a Closed deal: Admin, Manager only.'
+  /v1/deals/{idOrCode}/follow-ups:
+    post:
+      operationId: logDealFollowUp
+      summary: Log a follow-up on an open deal and set the next one (resets both life curves)
+      tags: [Deals]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      - {$ref: ./_common.yaml#/components/parameters/IdOrCode}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DealFollowUp'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Deal'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [deal.updated.v1, demand.confirmed.v1, offer.confirmed.v1, lifecycle.stage_changed.v1]
+      x-role-rules: 'Supply agent: supply-side notes only (PRD §2.3).'
+  /v1/lease-renewals:
+    get:
+      operationId: listLeaseRenewals
+      summary: Scheduled lease renewals (month 10 of 11-month leases, US-16)
+      tags: [Deals]
+      description: Sorted by (dueOn asc, id).
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/Limit}
+      - {$ref: ./_common.yaml#/components/parameters/Cursor}
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [scheduled, emitted, cancelled]
+      - name: dueBefore
+        in: query
+        required: false
+        schema: {type: string, format: date}
+      responses:
+        '200':
+          description: Lease renewals
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LeaseRenewalPage'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-pagination: cursor (limit default 25, max 100); response {items, nextCursor}
+  /v1/notifications:
+    get:
+      operationId: listNotifications
+      summary: My in-app notifications (FR-NTF-1)
+      tags: [Notifications]
+      description: Sorted by (createdAt desc, id). Kept 90 days.
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/Limit}
+      - {$ref: ./_common.yaml#/components/parameters/Cursor}
+      - name: unreadOnly
+        in: query
+        required: false
+        schema: {type: boolean, default: false}
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPage'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-pagination: cursor (limit default 25, max 100); response {items, nextCursor}
+  /v1/notifications/unread-count:
+    get:
+      operationId: getUnreadCount
+      summary: Unread notification count (sidebar badge)
+      tags: [Notifications]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      responses:
+        '200':
+          description: Count
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UnreadCount'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+  /v1/notifications/mark-read:
+    post:
+      operationId: markNotificationsRead
+      summary: Mark notifications read (by ids or up to a time)
+      tags: [Notifications]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MarkReadRequest'}
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MarkReadResult'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body; naturally
+        idempotent (read_at set once)
+      x-emits: []
+  /v1/watchlist-tasks:
+    get:
+      operationId: listWatchlistTasks
+      summary: Supply follow-up tasks for Market Signals (D-14, US-36)
+      tags: [Watchlist tasks]
+      description: 'Sorted by (deadlineDate asc nulls last, id): deadlines within 14 days first.'
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/Limit}
+      - {$ref: ./_common.yaml#/components/parameters/Cursor}
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [Open, Done, Cancelled]
+      - name: assigneeUserId
+        in: query
+        required: false
+        schema: {type: string, format: uuid}
+      - name: deadlineWithinDays
+        in: query
+        required: false
+        schema: {type: integer, minimum: 0, maximum: 365}
+      responses:
+        '200':
+          description: Tasks
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WatchlistTaskPage'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-pagination: cursor (limit default 25, max 100); response {items, nextCursor}
+  /v1/watchlist-tasks/{taskId}:
+    patch:
+      operationId: updateWatchlistTask
+      summary: Assign, set due date or cancel a watchlist task
+      tags: [Watchlist tasks]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IfMatch}
+      - name: taskId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: {$ref: '#/components/schemas/WatchlistTaskPatch'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WatchlistTask'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '412': {$ref: ./_common.yaml#/components/responses/PreconditionFailed}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: If-Match (row version) → 412 on mismatch; JSON Merge Patch is idempotent
+      x-emits: []
+  /v1/watchlist-tasks/{taskId}/complete:
+    post:
+      operationId: completeWatchlistTask
+      summary: Close a watchlist follow-up task
+      tags: [Watchlist tasks]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IdempotencyKey}
+      - name: taskId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WatchlistTaskComplete'}
+      responses:
+        '200':
+          description: Done
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WatchlistTask'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Supply agent]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: Idempotency-Key (UUID, 24 h, per user+route); replay returns the original status and body
+      x-emits: [watchlist_task.completed.v1]
+  /v1/settings/life-curve-thresholds:
+    get:
+      operationId: getLifeCurveThresholds
+      summary: Life-curve thresholds per category
+      tags: [Settings]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      responses:
+        '200':
+          description: Thresholds
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LifeCurveThresholds'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+    put:
+      operationId: putLifeCurveThresholds
+      summary: Replace life-curve thresholds (Admin); recomputes nextChangeOn
+      tags: [Settings]
+      description: 'Validation: fresh < ageing < stale per category. Stage changes caused by new thresholds are applied by
+        the next life-curve-nightly run (or immediately via the job endpoint).'
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IfMatch}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LifeCurveThresholds'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LifeCurveThresholds'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '412': {$ref: ./_common.yaml#/components/responses/PreconditionFailed}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: PUT is idempotent; If-Match (row version) → 412 on mismatch
+      x-emits: [audit.recorded.v1]
+  /v1/settings/queue-weights:
+    get:
+      operationId: getQueueWeights
+      summary: Should call ranking weights
+      tags: [Settings]
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      responses:
+        '200':
+          description: Weights
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/QueueWeights'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+    put:
+      operationId: putQueueWeights
+      summary: Replace Should call ranking weights (Admin)
+      tags: [Settings]
+      description: Should call ranks are recomputed by the next rank refresh (≤ 5 min, rank-refresh job).
+      security:
+      - staffViaWeb: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/IfMatch}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/QueueWeights'}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/QueueWeights'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '412': {$ref: ./_common.yaml#/components/responses/PreconditionFailed}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: [Admin]
+      x-rate-limit: 20/s per user, burst 40 (token bucket at web)
+      x-timeout-ms: 2000
+      x-idempotency: PUT is idempotent; If-Match (row version) → 412 on mismatch
+      x-emits: [audit.recorded.v1]
+  /internal/v1/subject-states:
+    get:
+      operationId: listSubjectStates
+      summary: Life stage and Commercial axis per subject, for consumers rebuilding a projection
+      tags: [Internal]
+      description: 'Callers: crm-engine, listings, insight (serviceToken aud=journeys, issued by web, verified via JWKS, R-2).
+        Never used on a user request path. Sorted by (updatedAt, id).'
+      security:
+      - serviceToken: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - {$ref: ./_common.yaml#/components/parameters/Limit}
+      - {$ref: ./_common.yaml#/components/parameters/Cursor}
+      - name: subjectType
+        in: query
+        required: true
+        schema:
+          type: string
+          enum: [offer, demand]
+      - name: updatedSince
+        in: query
+        required: false
+        schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: States
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SubjectStatePage'}
+        '400': {$ref: ./_common.yaml#/components/responses/BadRequest}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
+        '429': {$ref: ./_common.yaml#/components/responses/TooMany}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: []
+      x-rate-limit: 10/s per calling service
+      x-timeout-ms: 2000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-pagination: cursor (limit default 25, max 100); response {items, nextCursor}
+      x-caller: crm-engine, listings, insight (projection rebuild only)
+  /internal/v1/relay:
+    post:
+      operationId: relayOutbox
+      summary: Relay unpublished outbox rows into consumer pgmq queues
+      tags: [Internal]
+      description: 'Invoked every minute by Supabase pg_cron + pg_net and poked after commits. Claims up to 500 outbox rows
+        (FOR UPDATE SKIP LOCKED, ordered by occurred_at), sends one copy per subscribed consumer queue (subscriptions from
+        contracts/asyncapi/events.yaml) and sets published_at. Timeout 10 s: batch work, not on a user request path.'
+      security:
+      - cronSecret: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      responses:
+        '200':
+          description: Relay batch result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RelayResult'}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '503': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: []
+      x-rate-limit: 1 call/min per job (pg_cron); internal only
+      x-timeout-ms: 10000
+      x-idempotency: 'safe to re-run: work is claimed with FOR UPDATE SKIP LOCKED; events deduped on eventId'
+      x-emits: []
+      x-caller: pg_cron (every minute) + post-commit poke
+      x-timeout-reason: batch relay of ≤500 outbox rows; internal, not a user request (R-5)
+  /internal/v1/drain/{queue}:
+    post:
+      operationId: drainQueue
+      summary: Drain a pgmq queue owned by this service
+      tags: [Internal]
+      description: 'Reads up to 100 messages (visibility timeout 60 s), dedupes on eventId via processed_events, applies each
+        in its own transaction, deletes on success. After 5 failed reads a message moves to <queue>_dlq (alarm on depth >
+        0). Timeout 55 s: stays under the Hobby function limit; remaining messages are picked up by the next minute''s call.'
+      security:
+      - cronSecret: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - name: queue
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [q_journeys, q_journeys_work]
+      responses:
+        '200':
+          description: Drain batch result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DrainResult'}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '503': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: []
+      x-rate-limit: 1 call/min per job (pg_cron); internal only
+      x-timeout-ms: 55000
+      x-idempotency: 'safe to re-run: work is claimed with FOR UPDATE SKIP LOCKED; events deduped on eventId'
+      x-emits: [offer.commercial_status_changed.v1, demand.status_changed.v1, lifecycle.stage_changed.v1, sourcing_request.updated.v1]
+      x-caller: pg_cron (every minute per queue)
+      x-timeout-reason: consumer batch under the function limit; internal, not a user request (R-5)
+  /internal/v1/jobs/{name}:
+    post:
+      operationId: runJob
+      summary: Run a scheduled job (one bounded batch; continues on the next call)
+      tags: [Internal]
+      description: 'Jobs:
+
+        - `life-curve-nightly` (02:00 IST daily; must finish by 04:00 IST): recompute day counts and stages for rows with
+        nextChangeOn ≤ today; apply stage actions; Upcoming → Available on possession date; Expired demand → Dormant
+
+        - `demand-gap-refresh` (02:45 IST daily (+ incremental on events)): recompute open demand vs matching supply per (segment,
+        dealType, micromarket) and source quality per sourceType
+
+        - `rank-refresh` (every 5 min): recompute should_call ranks for items whose inputs changed (dirty flag) or after a
+        weights change
+
+        - `lease-renewal-scan` (05:00 IST daily): emit lease_renewal.due.v1 for renewals with dueOn ≤ today
+
+        - `dormant-revisit` (06:00 IST daily): put Dormant demands with revisitDate ≤ today into dormant_revisits
+
+        - `follow-up-reminders` (08:00 IST daily): notify owners of deals and SRQs overdue today
+
+        - `queue-counts-flush` (every minute): emit queue.counts_changed.v1 for users whose section counters changed since
+        their last emit (debounce ≤ 1/min per user, R-18)
+
+        - `retention-purge` (Sunday 03:30 IST): purge notes/notifications/link opens/snapshots per retention rules (NFR-18,
+        R-15)
+
+
+        Each call processes batches until a 50 s budget is used, records a cursor in job_runs and returns `done=false` if
+        work remains; pg_cron calls again the next minute until `done=true`.'
+      security:
+      - cronSecret: []
+      parameters:
+      - {$ref: ./_common.yaml#/components/parameters/CorrelationId}
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [life-curve-nightly, demand-gap-refresh, rank-refresh, lease-renewal-scan, dormant-revisit, follow-up-reminders,
+            queue-counts-flush, retention-purge]
+      responses:
+        '200':
+          description: Job batch result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobResult'}
+        '401': {$ref: ./_common.yaml#/components/responses/Unauthenticated}
+        '404': {$ref: ./_common.yaml#/components/responses/NotFound}
+        '409': {$ref: ./_common.yaml#/components/responses/Conflict}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '503': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: []
+      x-rate-limit: 1 call/min per job (pg_cron); internal only
+      x-timeout-ms: 55000
+      x-idempotency: 'safe to re-run: work is claimed with FOR UPDATE SKIP LOCKED; events deduped on eventId'
+      x-emits: [queue.counts_changed.v1, deal.updated.v1, lifecycle.stage_changed.v1, demand.exited.v1, offer.commercial_status_changed.v1,
+        lease_renewal.due.v1]
+      x-caller: pg_cron
+      x-schedules: {life-curve-nightly: '02:00 IST daily; must finish by 04:00 IST', demand-gap-refresh: '02:45 IST daily
+          (+ incremental on events)', rank-refresh: every 5 min, lease-renewal-scan: '05:00 IST daily', dormant-revisit: '06:00
+          IST daily', follow-up-reminders: '08:00 IST daily', queue-counts-flush: every minute, retention-purge: 'Sunday 03:30
+          IST'}
+      x-timeout-reason: bounded job batch (50 s budget) with continuation; internal (R-5)
+  /health/live:
+    get:
+      operationId: healthLive
+      summary: 'Liveness: process is up'
+      tags: [Health]
+      security: []
+      parameters: []
+      responses:
+        '200':
+          description: Alive
+          content:
+            application/json:
+              schema: {$ref: ./_common.yaml#/components/schemas/Health}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '503': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: []
+      x-rate-limit: unlimited (platform probe)
+      x-timeout-ms: 500
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-caller: platform / uptime monitor
+  /health/ready:
+    get:
+      operationId: healthReady
+      summary: 'Readiness: DB reachable and migrations at the expected version'
+      tags: [Health]
+      security: []
+      parameters: []
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema: {$ref: ./_common.yaml#/components/schemas/Health}
+        '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '503': {$ref: ./_common.yaml#/components/responses/ServerError}
+      x-roles: []
+      x-rate-limit: unlimited (platform probe)
+      x-timeout-ms: 1000
+      x-idempotency: safe (read-only)
+      x-emits: []
+      x-caller: platform / uptime monitor
+components:
+  securitySchemes:
+    staffViaWeb: {$ref: ./_common.yaml#/components/securitySchemes/staffViaWeb}
+    serviceToken: {$ref: ./_common.yaml#/components/securitySchemes/serviceToken}
+    cronSecret: {$ref: ./_common.yaml#/components/securitySchemes/cronSecret}
+  responses:
+    Gone:
+      description: Link expired or revoked
+      content:
+        application/problem+json:
+          schema: {$ref: ./_common.yaml#/components/schemas/Problem}
+    Accepted:
+      description: Accepted for asynchronous processing
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Accepted'}
+  schemas:
+    Accepted:
+      type: object
+      additionalProperties: false
+      properties:
+        jobId: {type: string, format: uuid}
+        status:
+          type: string
+          enum: [queued, running, done, failed]
+        statusUrl: {type: string, maxLength: 300}
+      required: [jobId, status]
+    Thresholds:
+      type: object
+      additionalProperties: false
+      properties:
+        freshMaxDays: {type: integer, minimum: 1}
+        ageingMaxDays: {type: integer, minimum: 1}
+        staleMaxDays: {type: integer, minimum: 1}
+      required: [freshMaxDays, ageingMaxDays, staleMaxDays]
+    LifeCurve:
+      type: object
+      additionalProperties: false
+      properties:
+        subjectType:
+          type: string
+          enum: [offer, demand]
+        subjectId: {type: string, format: uuid}
+        code: {type: string, description: Display code}
+        categoryKey:
+          type: string
+          enum: [offer.lease_residential, offer.lease_commercial, offer.sale_secondary, offer.sale_primary, offer.industrial,
+            offer.land_jv, demand.lease_residential, demand.lease_commercial, demand.sale_secondary_any, demand.sale_primary,
+            demand.industrial, demand.land_jv]
+          description: Pagdi uses the sale_secondary / sale_secondary_any key (D-12).
+        stage: {$ref: ./_common.yaml#/components/schemas/LifeStage}
+        dayCount: {type: integer, minimum: 0}
+        lastConfirmedAt:
+          type: [string, 'null']
+          format: date-time
+        lastConfirmedHow:
+          type: [string, 'null']
+          enum: [call, meeting, visit, price_sheet, deal_follow_up, created, null]
+        clockStartsOn:
+          type: [string, 'null']
+          format: date
+        lastSeenAt:
+          type: [string, 'null']
+          format: date-time
+        pausedUntil:
+          type: [string, 'null']
+          format: date
+        nextChangeOn:
+          type: [string, 'null']
+          format: date
+        thresholds: {$ref: '#/components/schemas/Thresholds'}
+        availabilityUnknown: {type: boolean, description: 'Expired offer: ''Availability unknown'''}
+      required: [subjectType, subjectId, categoryKey, stage, dayCount, thresholds]
+      description: Life curve of one offer or demand (BRD §4.5, PRD §4.1, D-12).
+    QueueRef:
+      type: object
+      additionalProperties: false
+      properties:
+        section:
+          type: string
+          enum: [must_call, should_call, sourcing_requests, watchlist_tasks, to_contact, to_qualify, reconfirm_due, needs_sourcing,
+            in_sourcing, sourcing_requests_open, open_matches, proposals_out, site_visits_this_week, deals_follow_up, dormant_revisits]
+        queueItemId: {type: string, format: uuid}
+        rank:
+          type: [number, 'null']
+        reason: {type: string, maxLength: 40}
+        dueAt:
+          type: [string, 'null']
+          format: date-time
+        attempts: {type: integer, minimum: 0}
+        nextCallDate:
+          type: [string, 'null']
+          format: date
+      required: [section]
+    OfferJourney:
+      type: object
+      additionalProperties: false
+      properties:
+        offerId: {type: string, format: uuid}
+        code: {type: string, description: Display code}
+        commercialStatus:
+          type: string
+          enum: [Upcoming, Available, Matched, In proposal, Site visit, In process, Closed, Inactive]
+        commercialChangedAt: {type: string, format: date-time}
+        inactiveReason:
+          type: [string, 'null']
+          enum: [already_gone, unwilling, other, null]
+        lifeCurve: {$ref: '#/components/schemas/LifeCurve'}
+        queue:
+          oneOf:
+          - {$ref: '#/components/schemas/QueueRef'}
+          - {type: 'null'}
+        signals:
+          type: object
+          additionalProperties: false
+          properties:
+            enquiries: {type: integer, minimum: 0}
+            openMatches: {type: integer, minimum: 0}
+            confirmedMatches: {type: integer, minimum: 0}
+          required: [enquiries, openMatches]
+        sourcedForDemandId:
+          type: [string, 'null']
+          format: uuid
+        openDealIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 50
+        openProposalIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 50
+        version: {type: integer, minimum: 0}
+      required: [offerId, code, commercialStatus, lifeCurve, version]
+    Qualification:
+      type: object
+      additionalProperties: false
+      properties:
+        decisionMakerReached: {type: boolean}
+        budgetConfirmed: {type: boolean}
+        timingConfirmed: {type: boolean}
+        agreesToWork: {type: boolean}
+        decisionMakerNote:
+          type: [string, 'null']
+          maxLength: 200
+          description: PII possible (name/title of the decision maker)
+      required: [decisionMakerReached, budgetConfirmed, timingConfirmed, agreesToWork]
+    DemandExit:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [Lost, Dormant, Invalid]
+        reasonCode: {type: string, maxLength: 40}
+        reason:
+          type: [string, 'null']
+          maxLength: 500
+        competingTerms:
+          type: [string, 'null']
+          maxLength: 500
+          description: Lost only; business terms, no PII, e.g. 'Powai, 2 months rent free'
+        competingPriceInr:
+          oneOf:
+          - {$ref: ./_common.yaml#/components/schemas/Money}
+          - {type: 'null'}
+        flagPerson: {type: boolean}
+        personId:
+          type: [string, 'null']
+          format: uuid
+        revisitDate:
+          type: [string, 'null']
+          format: date
+        exitedAt: {type: string, format: date-time}
+        exitedBy: {type: string, format: uuid}
+      required: [type, exitedAt]
+    DemandJourney:
+      type: object
+      additionalProperties: false
+      properties:
+        demandId: {type: string, format: uuid}
+        code: {type: string, description: Display code}
+        commercialStatus:
+          type: string
+          enum: [New, Contacted, Active, Sourcing, Matched, Proposal shared, Site visit, In process, Closed]
+        commercialChangedAt: {type: string, format: date-time}
+        exit:
+          oneOf:
+          - {$ref: '#/components/schemas/DemandExit'}
+          - {type: 'null'}
+        qualifiedAt:
+          type: [string, 'null']
+          format: date-time
+        qualification:
+          oneOf:
+          - {$ref: '#/components/schemas/Qualification'}
+          - {type: 'null'}
+        lifeCurve: {$ref: '#/components/schemas/LifeCurve'}
+        queue:
+          oneOf:
+          - {$ref: '#/components/schemas/QueueRef'}
+          - {type: 'null'}
+        ownerUserId:
+          type: [string, 'null']
+          format: uuid
+        liveMatches: {type: integer, minimum: 0}
+        openSourcingRequestIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 20
+        openDealId:
+          type: [string, 'null']
+          format: uuid
+        unreachable: {type: boolean}
+        version: {type: integer, minimum: 0}
+      required: [demandId, code, commercialStatus, lifeCurve, version]
+    QueueSectionSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        section:
+          type: string
+          enum: [must_call, should_call, sourcing_requests, watchlist_tasks, to_contact, to_qualify, reconfirm_due, needs_sourcing,
+            in_sourcing, sourcing_requests_open, open_matches, proposals_out, site_visits_this_week, deals_follow_up, dormant_revisits]
+        team:
+          type: string
+          enum: [supply, demand]
+        count: {type: integer, minimum: 0}
+        overdue: {type: integer, minimum: 0}
+        plannedToday:
+          type: [integer, 'null']
+          minimum: 0
+      required: [section, team, count]
+    QueueSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        userId: {type: string, format: uuid}
+        capacity: {type: integer, minimum: 0}
+        callsLoggedToday: {type: integer, minimum: 0}
+        plannedToday: {type: integer, minimum: 0}
+        unreadNotifications: {type: integer, minimum: 0}
+        sections:
+          type: array
+          items: {$ref: '#/components/schemas/QueueSectionSummary'}
+          maxItems: 20
+        generatedAt: {type: string, format: date-time}
+      required: [userId, capacity, callsLoggedToday, plannedToday, sections]
+      description: My queue header (P-01). plannedToday = all Must call + Should call up to max(0, capacity − mustOpen − callsLoggedToday).
+    QueueItem:
+      type: object
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        section:
+          type: string
+          enum: [must_call, should_call, sourcing_requests, watchlist_tasks, to_contact, to_qualify, reconfirm_due, needs_sourcing,
+            in_sourcing, sourcing_requests_open, open_matches, proposals_out, site_visits_this_week, deals_follow_up, dormant_revisits]
+        subjectType:
+          type: string
+          enum: [offer, demand, sourcing_request, proposal, site_visit, deal, watchlist_task]
+        subjectId: {type: string, format: uuid}
+        subjectCode: {type: string, description: Display code}
+        offerId:
+          type: [string, 'null']
+          format: uuid
+        demandId:
+          type: [string, 'null']
+          format: uuid
+        reason:
+          type: string
+          enum: [enquiry, match, sourced_for, new_capture, reconfirm, stale_public, request_price_sheet, srq, watchlist, first_contact,
+            qualify, open_matches, no_matches, proposal_feedback, visit, follow_up, revisit, unreachable]
+        reasonRef:
+          type: [string, 'null']
+          description: e.g. ENQ-0311, MAT-0045, SRQ-014
+        summary: {type: string, maxLength: 200, description: 'Generated from stored fields (label, micromarket, area, price);
+            never contact PII'}
+        dueAt:
+          type: [string, 'null']
+          format: date-time
+        overdue: {type: boolean}
+        rank:
+          type: [number, 'null']
+        rankFactors:
+          type: [object, 'null']
+          additionalProperties: false
+          properties:
+            freshness: {type: number, minimum: 0}
+            demandGap: {type: number, minimum: 0}
+            sourceQuality: {type: number, minimum: 0}
+            priceBand: {type: number, minimum: 0}
+            boost: {type: number, minimum: 0}
+        lifeStage:
+          oneOf:
+          - {$ref: ./_common.yaml#/components/schemas/LifeStage}
+          - {type: 'null'}
+        dayCount:
+          type: [integer, 'null']
+          minimum: 0
+        attempts: {type: integer, minimum: 0}
+        nextCallDate:
+          type: [string, 'null']
+          format: date
+        assigneeUserId:
+          type: [string, 'null']
+          format: uuid
+        plannedToday: {type: boolean}
+        status:
+          type: string
+          enum: [open, done, cancelled]
+      required: [id, section, subjectType, subjectId, subjectCode, reason, status]
+    QueueItemPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/QueueItem'}
+        nextCursor:
+          type: [string, 'null']
+    ReassignRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        queueItemIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 100
+          minItems: 1
+        assigneeUserId: {type: string, format: uuid}
+      required: [queueItemIds, assigneeUserId]
+    ReassignResult:
+      type: object
+      additionalProperties: false
+      properties:
+        reassigned: {type: integer, minimum: 0}
+        skipped:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 100
+      required: [reassigned]
+    Capacity:
+      type: object
+      additionalProperties: false
+      properties:
+        userId: {type: string, format: uuid}
+        team:
+          type: string
+          enum: [supply, demand]
+        dailyCalls: {type: integer, minimum: 0, maximum: 200}
+        updatedBy:
+          type: [string, 'null']
+          format: uuid
+        updatedAt:
+          type: [string, 'null']
+          format: date-time
+        version: {type: integer, minimum: 0}
+      required: [userId, team, dailyCalls, version]
+    CapacityPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Capacity'}
+        nextCursor:
+          type: [string, 'null']
+    CapacityPut:
+      type: object
+      additionalProperties: false
+      properties:
+        team:
+          type: string
+          enum: [supply, demand]
+        dailyCalls: {type: integer, minimum: 0, maximum: 200, default: 40}
+      required: [team, dailyCalls]
+    CallCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        subjectType:
+          type: string
+          enum: [offer, demand]
+        subjectId: {type: string, format: uuid}
+        queueItemId:
+          type: [string, 'null']
+          format: uuid
+        personId:
+          type: [string, 'null']
+          format: uuid
+          description: records Person called (for the 3-attempt rule)
+        channel:
+          type: string
+          enum: [call, meeting]
+          default: call
+        outcome:
+          type: string
+          enum: [confirmed, no_answer, already_gone, unwilling]
+        availableNow:
+          type: [boolean, 'null']
+          description: Upcoming offer confirmed as available now → Available
+        knownPriceInr:
+          oneOf:
+          - {$ref: ./_common.yaml#/components/schemas/Money}
+          - {type: 'null'}
+        nextCallDate:
+          type: [string, 'null']
+          format: date
+        notes:
+          type: [string, 'null']
+          maxLength: 2000
+          description: Free text. PII possible; never logged or put in events.
+      required: [subjectType, subjectId, outcome]
+      description: 'Call (or meeting) outcome (C-08). Offer outcomes: confirmed | no_answer | already_gone | unwilling. Demand
+        outcomes: confirmed | no_answer. Fact edits (price, availability, areas, extra offer) are sent by web to records in
+        parallel (HLD §5.2).'
+    Call:
+      type: object
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string, description: Display code}
+        subjectType:
+          type: string
+          enum: [offer, demand]
+        subjectId: {type: string, format: uuid}
+        personId:
+          type: [string, 'null']
+          format: uuid
+        queueItemId:
+          type: [string, 'null']
+          format: uuid
+        channel:
+          type: string
+          enum: [call, meeting]
+        outcome:
+          type: string
+          enum: [confirmed, no_answer, already_gone, unwilling]
+        attemptNo: {type: integer, minimum: 0}
+        knownPriceInr:
+          oneOf:
+          - {$ref: ./_common.yaml#/components/schemas/Money}
+          - {type: 'null'}
+        nextCallDate:
+          type: [string, 'null']
+          format: date
+        notes:
+          type: [string, 'null']
+          maxLength: 2000
+        loggedAt: {type: string, format: date-time}
+        loggedBy: {type: string, format: uuid}
+      required: [id, code, subjectType, subjectId, outcome, attemptNo, loggedAt, loggedBy]
+    CallResult:
+      type: object
+      additionalProperties: false
+      properties:
+        call: {$ref: '#/components/schemas/Call'}
+        lifeCurve:
+          oneOf:
+          - {$ref: '#/components/schemas/LifeCurve'}
+          - {type: 'null'}
+        commercialStatus:
+          type: [string, 'null']
+        personUnreachable: {type: boolean}
+        nextQueueItem:
+          oneOf:
+          - {$ref: '#/components/schemas/QueueRef'}
+          - {type: 'null'}
+      required: [call]
+    CallPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Call'}
+        nextCursor:
+          type: [string, 'null']
+    QualifyRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        checklist: {$ref: '#/components/schemas/Qualification'}
+        notes:
+          type: [string, 'null']
+          maxLength: 2000
+      required: [checklist]
+    ExitRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [Lost, Dormant, Invalid]
+        reasonCode:
+          type: string
+          enum: [closed_elsewhere, withdrew, postponed, life_curve_expired, fake_details, unreachable, broker_posing, is_broker,
+            other]
+        reason:
+          type: [string, 'null']
+          maxLength: 500
+        competingTerms:
+          type: [string, 'null']
+          maxLength: 500
+          description: Business terms only, no names or phones
+        competingPriceInr:
+          oneOf:
+          - {$ref: ./_common.yaml#/components/schemas/Money}
+          - {type: 'null'}
+        revisitDate:
+          type: [string, 'null']
+          format: date
+        flagPerson: {type: boolean, default: false}
+        personId:
+          type: [string, 'null']
+          format: uuid
+      required: [type]
+      description: 'C-16. Lost: reasonCode required, competingTerms optional. Dormant: revisitDate (default today + 60, A-41).
+        Invalid: reasonCode required; flagPerson=true + personId asks records to flag the person (records consumes demand.exited.v1;
+        the flag type follows reasonCode).'
+    ReactivateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: [string, 'null']
+          maxLength: 500
+    RetireRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+          enum: [already_gone, unwilling, other]
+        knownPriceInr:
+          oneOf:
+          - {$ref: ./_common.yaml#/components/schemas/Money}
+          - {type: 'null'}
+        note:
+          type: [string, 'null']
+          maxLength: 1000
+      required: [reason]
+    SourcingRequestCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        demandId: {type: string, format: uuid}
+        assigneeUserId: {type: string, format: uuid}
+        dueDate: {type: string, format: date}
+        priority:
+          type: string
+          enum: [High, Normal, Low]
+        postAnonymously: {type: boolean, default: false}
+        notes:
+          type: [string, 'null']
+          maxLength: 2000
+      required: [demandId, assigneeUserId, dueDate, priority]
+    SourcingRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string, description: Display code}
+        demandId: {type: string, format: uuid}
+        demandCode: {type: string, description: Display code}
+        requestedBy: {type: string, format: uuid}
+        assigneeUserId: {type: string, format: uuid}
+        dueDate: {type: string, format: date}
+        priority:
+          type: string
+          enum: [High, Normal, Low]
+        status:
+          type: string
+          enum: [Open, In progress, Fulfilled, Cancelled]
+        postAnonymously: {type: boolean}
+        offerIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 100
+        notes:
+          type: [string, 'null']
+          maxLength: 2000
+        createdAt: {type: string, format: date-time}
+        closedAt:
+          type: [string, 'null']
+          format: date-time
+        version: {type: integer, minimum: 0}
+      required: [id, code, demandId, status, assigneeUserId, dueDate, priority, version]
+    SourcingRequestPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/SourcingRequest'}
+        nextCursor:
+          type: [string, 'null']
+    SourcingRequestPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        assigneeUserId: {type: string, format: uuid}
+        dueDate: {type: string, format: date}
+        priority:
+          type: string
+          enum: [High, Normal, Low]
+        status:
+          type: string
+          enum: [In progress, Fulfilled, Cancelled]
+        notes:
+          type: [string, 'null']
+          maxLength: 2000
+      description: JSON Merge Patch.
+    ProposalOption:
+      type: object
+      additionalProperties: false
+      properties:
+        position: {type: integer, minimum: 1, maximum: 20}
+        matchId: {type: string, format: uuid}
+        offerIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 3
+          minItems: 1
+        feedback:
+          type: [string, 'null']
+          enum: [liked, rejected, visit_requested, null]
+        feedbackNote:
+          type: [string, 'null']
+          maxLength: 500
+      required: [position, matchId, offerIds]
+    ProposalCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        demandId: {type: string, format: uuid}
+        options:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              matchId: {type: string, format: uuid}
+              position: {type: integer, minimum: 1}
+            required: [matchId]
+          maxItems: 20
+          minItems: 1
+        coverNote:
+          type: [string, 'null']
+          maxLength: 2000
+      required: [demandId, options]
+    ProposalPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        options:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              matchId: {type: string, format: uuid}
+              position: {type: integer, minimum: 1}
+            required: [matchId]
+          maxItems: 20
+          minItems: 1
+        coverNote:
+          type: [string, 'null']
+          maxLength: 2000
+      description: JSON Merge Patch; Draft or Ready only (not Sent). Changing options rebuilds the snapshot.
+    Proposal:
+      type: object
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string, description: Display code}
+        demandId: {type: string, format: uuid}
+        demandCode: {type: string, description: Display code}
+        status:
+          type: string
+          enum: [Preparing, Ready, Sent, Failed]
+          description: Preparing = content snapshot being built from records; Ready = PDF/link allowed
+        options:
+          type: array
+          items: {$ref: '#/components/schemas/ProposalOption'}
+          maxItems: 20
+        coverNote:
+          type: [string, 'null']
+          maxLength: 2000
+        pdf:
+          type: object
+          additionalProperties: false
+          properties:
+            status:
+              type: string
+              enum: [none, queued, ready, failed]
+            generatedAt:
+              type: [string, 'null']
+              format: date-time
+          required: [status]
+        activeLink:
+          type: [object, 'null']
+          additionalProperties: false
+          properties:
+            expiresAt: {type: string, format: date-time}
+            opens: {type: integer, minimum: 0}
+            lastOpenedAt:
+              type: [string, 'null']
+              format: date-time
+            urlHint: {type: string, maxLength: 40}
+          required: [expiresAt]
+        sentAt:
+          type: [string, 'null']
+          format: date-time
+        sentChannel:
+          type: [string, 'null']
+          enum: [WhatsApp, Email, In person, Other, null]
+        createdBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        version: {type: integer, minimum: 0}
+      required: [id, code, demandId, status, options, version]
+    ProposalPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Proposal'}
+        nextCursor:
+          type: [string, 'null']
+    ProposalPdf:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [none, queued, ready, failed]
+        url:
+          type: [string, 'null']
+          maxLength: 1000
+          description: Signed Storage URL, valid 5 min
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+      required: [status]
+    ShareLinkCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        expiresInDays: {type: integer, minimum: 1, maximum: 14, default: 14}
+    ShareLink:
+      type: object
+      additionalProperties: false
+      properties:
+        url: {type: string, maxLength: 300, description: 'https://<web>/p/{token}; token shown once'}
+        expiresAt: {type: string, format: date-time}
+      required: [url, expiresAt]
+    MarkSentRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        channel:
+          type: string
+          enum: [WhatsApp, Email, In person, Other]
+        sentAt:
+          type: [string, 'null']
+          format: date-time
+      required: [channel]
+    ProposalFeedback:
+      type: object
+      additionalProperties: false
+      properties:
+        options:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              position: {type: integer, minimum: 1}
+              feedback:
+                type: string
+                enum: [liked, rejected, visit_requested]
+              note:
+                type: [string, 'null']
+                maxLength: 500
+            required: [position, feedback]
+          maxItems: 20
+          minItems: 1
+      required: [options]
+    PublicProposal:
+      type: object
+      additionalProperties: false
+      properties:
+        code: {type: string, description: Display code}
+        preparedFor:
+          type: [string, 'null']
+          maxLength: 80
+          description: Generated label only, e.g. 'Office, Andheri East'
+        agentRera: {type: string, maxLength: 40}
+        expiresAt: {type: string, format: date-time}
+        coverNote:
+          type: [string, 'null']
+          maxLength: 2000
+        options:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              position: {type: integer, minimum: 0}
+              title: {type: string, maxLength: 200}
+              buildingName:
+                type: [string, 'null']
+                maxLength: 200
+              micromarket:
+                type: [string, 'null']
+                maxLength: 100
+              locality:
+                type: [string, 'null']
+                maxLength: 100
+              dealType: {type: string, x-vocabulary: deal_type}
+              segment: {type: string, x-vocabulary: segment}
+              propertyTypes:
+                type: array
+                items: {type: string, x-vocabulary: property_type}
+                x-vocabulary: property_type
+              builtupAreaSqft:
+                type: [number, 'null']
+                minimum: 0
+              carpetAreaSqft:
+                type: [number, 'null']
+                minimum: 0
+              areaSqftMin:
+                type: [number, 'null']
+                minimum: 0
+              areaSqftMax:
+                type: [number, 'null']
+                minimum: 0
+              areaBasis: {$ref: ./_common.yaml#/components/schemas/AreaBasis}
+              salePriceInrMin:
+                oneOf:
+                - {$ref: ./_common.yaml#/components/schemas/Money}
+                - {type: 'null'}
+              salePriceInrMax:
+                oneOf:
+                - {$ref: ./_common.yaml#/components/schemas/Money}
+                - {type: 'null'}
+              rentMonthlyInrMin:
+                oneOf:
+                - {$ref: ./_common.yaml#/components/schemas/Money}
+                - {type: 'null'}
+              rentMonthlyInrMax:
+                oneOf:
+                - {$ref: ./_common.yaml#/components/schemas/Money}
+                - {type: 'null'}
+              depositInr:
+                oneOf:
+                - {$ref: ./_common.yaml#/components/schemas/Money}
+                - {type: 'null'}
+              availableFrom:
+                type: [string, 'null']
+                maxLength: 10
+              furnishing:
+                type: [string, 'null']
+                x-vocabulary: furnishing
+              projectRera:
+                type: [string, 'null']
+                maxLength: 40
+              photos:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    url: {type: string, maxLength: 1000, description: 'Signed URL, 10 min'}
+                    caption:
+                      type: [string, 'null']
+                      maxLength: 100
+                  required: [url]
+                maxItems: 30
+              bundleOf:
+                type: [integer, 'null']
+                minimum: 0
+            required: [position, title]
+          maxItems: 20
+      required: [code, expiresAt, options, agentRera]
+      description: Token-scoped snapshot (US-23). Includes building names, photos, built-up and carpet area, price, availability
+        and the MahaRERA number. Never owner/broker contacts, unit or wing.
+    SiteVisitCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        demandId: {type: string, format: uuid}
+        offerIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 10
+          minItems: 1
+        scheduledAt: {type: string, format: date-time}
+        attendeeUserIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 10
+        notes:
+          type: [string, 'null']
+          maxLength: 2000
+      required: [demandId, offerIds, scheduledAt]
+    SiteVisitPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        scheduledAt: {type: string, format: date-time}
+        offerIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 10
+          minItems: 1
+        attendeeUserIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 10
+        status:
+          type: string
+          enum: [Cancelled]
+        notes:
+          type: [string, 'null']
+          maxLength: 2000
+      description: JSON Merge Patch; Scheduled only.
+    SiteVisitComplete:
+      type: object
+      additionalProperties: false
+      properties:
+        outcome:
+          type: string
+          enum: [Interested, Shortlisted, Not interested, Client no-show, Owner no-show]
+        visitedOfferIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 10
+        preferredOfferId:
+          type: [string, 'null']
+          format: uuid
+        completedAt:
+          type: [string, 'null']
+          format: date-time
+        notes:
+          type: [string, 'null']
+          maxLength: 2000
+      required: [outcome]
+    SiteVisit:
+      type: object
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string, description: Display code}
+        demandId: {type: string, format: uuid}
+        offerIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 10
+        scheduledAt: {type: string, format: date-time}
+        attendeeUserIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 10
+        status:
+          type: string
+          enum: [Scheduled, Completed, Cancelled]
+        outcome:
+          type: [string, 'null']
+          enum: [Interested, Shortlisted, Not interested, Client no-show, Owner no-show, null]
+        visitedOfferIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 10
+        preferredOfferId:
+          type: [string, 'null']
+          format: uuid
+        completedAt:
+          type: [string, 'null']
+          format: date-time
+        notes:
+          type: [string, 'null']
+          maxLength: 2000
+        createdBy: {type: string, format: uuid}
+        version: {type: integer, minimum: 0}
+      required: [id, code, demandId, offerIds, scheduledAt, status, version]
+    SiteVisitPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/SiteVisit'}
+        nextCursor:
+          type: [string, 'null']
+    AgreedTerms:
+      type: object
+      additionalProperties: false
+      properties:
+        priceInr:
+          oneOf:
+          - {$ref: ./_common.yaml#/components/schemas/Money}
+          - {type: 'null'}
+        rentMonthlyInr:
+          oneOf:
+          - {$ref: ./_common.yaml#/components/schemas/Money}
+          - {type: 'null'}
+        depositInr:
+          oneOf:
+          - {$ref: ./_common.yaml#/components/schemas/Money}
+          - {type: 'null'}
+        leaseMonths:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 240
+        leaseStartDate:
+          type: [string, 'null']
+          format: date
+        lockInMonths:
+          type: [integer, 'null']
+          minimum: 0
+        fitoutMonths:
+          type: [number, 'null']
+          minimum: 0
+        rentFreeMonths:
+          type: [number, 'null']
+          minimum: 0
+        escalationPct:
+          type: [number, 'null']
+          minimum: 0
+        unitsBooked:
+          type: [integer, 'null']
+          minimum: 1
+        partnerSharePct:
+          type: [number, 'null']
+          minimum: 0
+        otherTerms:
+          type: [string, 'null']
+          maxLength: 1000
+      description: Business terms (no contacts).
+    DealCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        demandId: {type: string, format: uuid}
+        offerId: {type: string, format: uuid}
+        matchId:
+          type: [string, 'null']
+          format: uuid
+        agreedTerms: {$ref: '#/components/schemas/AgreedTerms'}
+        nextAction: {type: string, maxLength: 300}
+        followUpDate: {type: string, format: date}
+      required: [demandId, offerId, nextAction, followUpDate]
+    DealPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        stage:
+          type: string
+          enum: [Negotiation, Documentation, Stamp duty & registration, Closed]
+        agreedTerms: {$ref: '#/components/schemas/AgreedTerms'}
+        nextAction: {type: string, maxLength: 300}
+        followUpDate: {type: string, format: date}
+        closingPriceInr: {$ref: ./_common.yaml#/components/schemas/Money}
+        closedAt: {type: string, format: date-time}
+      description: JSON Merge Patch. Stage moves forward only (Negotiation → Documentation → Stamp duty & registration → Closed).
+        nextAction + followUpDate are required on every change while the deal is open. stage=Closed requires closingPriceInr
+        (and agreedTerms.leaseMonths for Lease). Cancel uses POST .../cancel.
+    DealCancel:
+      type: object
+      additionalProperties: false
+      properties:
+        reasonCode:
+          type: string
+          enum: [token_refunded, loan_rejected, landlord_withdrew, client_withdrew, documentation_failed, other]
+        reason:
+          type: [string, 'null']
+          maxLength: 500
+      required: [reasonCode]
+    DealFollowUp:
+      type: object
+      additionalProperties: false
+      properties:
+        channel:
+          type: string
+          enum: [call, meeting]
+          default: call
+        note:
+          type: [string, 'null']
+          maxLength: 2000
+        nextAction: {type: string, maxLength: 300}
+        followUpDate: {type: string, format: date}
+      required: [nextAction, followUpDate]
+    Deal:
+      type: object
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string, description: Display code}
+        demandId: {type: string, format: uuid}
+        offerId: {type: string, format: uuid}
+        matchId:
+          type: [string, 'null']
+          format: uuid
+        stage:
+          type: string
+          enum: [Negotiation, Documentation, Stamp duty & registration, Closed, Cancelled]
+        agreedTerms: {$ref: '#/components/schemas/AgreedTerms'}
+        nextAction:
+          type: [string, 'null']
+          maxLength: 300
+        followUpDate:
+          type: [string, 'null']
+          format: date
+        overdue: {type: boolean}
+        closingPriceInr:
+          oneOf:
+          - {$ref: ./_common.yaml#/components/schemas/Money}
+          - {type: 'null'}
+        closedAt:
+          type: [string, 'null']
+          format: date-time
+        cancelledAt:
+          type: [string, 'null']
+          format: date-time
+        cancelReasonCode:
+          type: [string, 'null']
+          maxLength: 40
+        cancelReason:
+          type: [string, 'null']
+          maxLength: 500
+        leaseRenewalDueOn:
+          type: [string, 'null']
+          format: date
+        stageHistory:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              from:
+                type: [string, 'null']
+                maxLength: 40
+              to: {type: string, maxLength: 40}
+              at: {type: string, format: date-time}
+              by: {type: string, format: uuid}
+            required: [to, at]
+          maxItems: 20
+        createdBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        version: {type: integer, minimum: 0}
+      required: [id, code, demandId, offerId, stage, nextAction, followUpDate, version]
+    DealPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Deal'}
+        nextCursor:
+          type: [string, 'null']
+    Notification:
+      type: object
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        kind:
+          type: string
+          enum: [match_suggested, match_confirmed, match_closed, match_flagged, srq_assigned, srq_fulfilled, enquiry, offer_closed,
+            demand_exited, deal_follow_up_overdue, proposal_opened, visit_scheduled, dormant_revisit, watchlist_task]
+        title: {type: string, maxLength: 200, description: 'Codes and labels only, never contact PII'}
+        body:
+          type: [string, 'null']
+          maxLength: 500
+        subjectType:
+          type: [string, 'null']
+          maxLength: 40
+        subjectId:
+          type: [string, 'null']
+          format: uuid
+        subjectCode:
+          type: [string, 'null']
+          description: Display code
+        createdAt: {type: string, format: date-time}
+        readAt:
+          type: [string, 'null']
+          format: date-time
+      required: [id, kind, title, createdAt]
+    NotificationPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Notification'}
+        nextCursor:
+          type: [string, 'null']
+    MarkReadRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        ids:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 100
+        upTo:
+          type: [string, 'null']
+          format: date-time
+      description: Either ids or upTo (mark all up to a timestamp).
+    MarkReadResult:
+      type: object
+      additionalProperties: false
+      properties:
+        marked: {type: integer, minimum: 0}
+      required: [marked]
+    UnreadCount:
+      type: object
+      additionalProperties: false
+      properties:
+        unread: {type: integer, minimum: 0}
+      required: [unread]
+    WatchlistTask:
+      type: object
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        watchlistItemId: {type: string, format: uuid}
+        watchlistCode: {type: string, description: Display code}
+        signalType: {type: string, x-vocabulary: signal_type}
+        deadlineDate:
+          type: [string, 'null']
+          format: date
+        assigneeUserId:
+          type: [string, 'null']
+          format: uuid
+        dueDate:
+          type: [string, 'null']
+          format: date
+        status:
+          type: string
+          enum: [Open, Done, Cancelled]
+        outcome:
+          type: [string, 'null']
+          maxLength: 500
+        completedAt:
+          type: [string, 'null']
+          format: date-time
+        completedBy:
+          type: [string, 'null']
+          format: uuid
+        version: {type: integer, minimum: 0}
+      required: [id, watchlistItemId, status, version]
+    WatchlistTaskPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/WatchlistTask'}
+        nextCursor:
+          type: [string, 'null']
+    WatchlistTaskPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        assigneeUserId: {type: string, format: uuid}
+        dueDate: {type: string, format: date}
+        status:
+          type: string
+          enum: [Cancelled]
+      description: JSON Merge Patch.
+    WatchlistTaskComplete:
+      type: object
+      additionalProperties: false
+      properties:
+        outcome: {type: string, maxLength: 500}
+        createdOfferIds:
+          type: array
+          items: {type: string, format: uuid}
+          maxItems: 20
+      required: [outcome]
+    LeaseRenewal:
+      type: object
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        dealId: {type: string, format: uuid}
+        offerId: {type: string, format: uuid}
+        propertyId: {type: string, format: uuid}
+        leaseStartDate: {type: string, format: date}
+        leaseMonths: {type: integer, minimum: 0}
+        dueOn: {type: string, format: date}
+        availableFrom: {type: string, format: date}
+        status:
+          type: string
+          enum: [scheduled, emitted, cancelled]
+        emittedAt:
+          type: [string, 'null']
+          format: date-time
+      required: [id, dealId, offerId, propertyId, dueOn, availableFrom, status]
+    LeaseRenewalPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/LeaseRenewal'}
+        nextCursor:
+          type: [string, 'null']
+    LifeCurveThresholds:
+      type: object
+      additionalProperties: false
+      properties:
+        version: {type: integer, minimum: 0}
+        offer:
+          type: object
+          additionalProperties: false
+          properties:
+            lease_residential: {$ref: '#/components/schemas/Thresholds'}
+            lease_commercial: {$ref: '#/components/schemas/Thresholds'}
+            sale_secondary: {$ref: '#/components/schemas/Thresholds'}
+            sale_primary: {$ref: '#/components/schemas/Thresholds'}
+            industrial: {$ref: '#/components/schemas/Thresholds'}
+            land_jv: {$ref: '#/components/schemas/Thresholds'}
+          required: [lease_residential, lease_commercial, sale_secondary, sale_primary, industrial, land_jv]
+        demand:
+          type: object
+          additionalProperties: false
+          properties:
+            lease_residential: {$ref: '#/components/schemas/Thresholds'}
+            lease_commercial: {$ref: '#/components/schemas/Thresholds'}
+            sale_secondary_any: {$ref: '#/components/schemas/Thresholds'}
+            sale_primary: {$ref: '#/components/schemas/Thresholds'}
+            industrial: {$ref: '#/components/schemas/Thresholds'}
+            land_jv: {$ref: '#/components/schemas/Thresholds'}
+          required: [lease_residential, lease_commercial, sale_secondary_any, sale_primary, industrial, land_jv]
+        upcomingLeadDays: {type: integer, minimum: 0, maximum: 365, default: 60}
+        dormantRevisitDays: {type: integer, minimum: 1, maximum: 365, default: 60}
+        updatedBy:
+          type: [string, 'null']
+          format: uuid
+        updatedAt:
+          type: [string, 'null']
+          format: date-time
+      required: [version, offer, demand]
+      description: Admin-editable thresholds per category (BRD §4.5 + D-12). Each value is the last day of the stage.
+    QueueWeights:
+      type: object
+      additionalProperties: false
+      properties:
+        version: {type: integer, minimum: 0}
+        freshness: {type: number, minimum: 0, maximum: 1, default: 0.25}
+        demandGap: {type: number, minimum: 0, maximum: 1, default: 0.35}
+        sourceQuality: {type: number, minimum: 0, maximum: 1, default: 0.2}
+        priceBand: {type: number, minimum: 0, maximum: 1, default: 0.2}
+        stalePublicBoost: {type: number, minimum: 0, maximum: 50, default: 15}
+        ageingReconfirmBoost: {type: number, minimum: 0, maximum: 50, default: 5}
+        freshnessHorizonDays: {type: integer, minimum: 1, maximum: 365, default: 60}
+        demandGapCap: {type: integer, minimum: 1, maximum: 1000, default: 20}
+        mustCallDueHours: {type: integer, minimum: 1, maximum: 168, default: 24}
+        maxAttempts: {type: integer, minimum: 1, maximum: 10, default: 3}
+        updatedBy:
+          type: [string, 'null']
+          format: uuid
+        updatedAt:
+          type: [string, 'null']
+          format: date-time
+      required: [version, freshness, demandGap, sourceQuality, priceBand]
+      description: Should call ranking weights (PRD §4.2). Weights are normalised by their sum.
+    SubjectState:
+      type: object
+      additionalProperties: false
+      properties:
+        subjectType:
+          type: string
+          enum: [offer, demand]
+        subjectId: {type: string, format: uuid}
+        commercialStatus: {type: string, maxLength: 40}
+        exit:
+          type: [string, 'null']
+          maxLength: 20
+        lifeStage: {$ref: ./_common.yaml#/components/schemas/LifeStage}
+        dayCount: {type: integer, minimum: 0}
+        version: {type: integer, minimum: 0}
+        updatedAt: {type: string, format: date-time}
+      required: [subjectType, subjectId, commercialStatus, lifeStage, version]
+    SubjectStatePage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/SubjectState'}
+        nextCursor:
+          type: [string, 'null']
+    RelayResult:
+      type: object
+      additionalProperties: false
+      properties:
+        claimed: {type: integer, minimum: 0}
+        published: {type: integer, minimum: 0}
+        lagSeconds: {type: integer, minimum: 0}
+      required: [claimed, published]
+    DrainResult:
+      type: object
+      additionalProperties: false
+      properties:
+        queue: {type: string, maxLength: 64}
+        read: {type: integer, minimum: 0}
+        applied: {type: integer, minimum: 0}
+        duplicates: {type: integer, minimum: 0}
+        failed: {type: integer, minimum: 0}
+        movedToDlq: {type: integer, minimum: 0}
+      required: [queue, read, applied, duplicates, failed]
+    JobResult:
+      type: object
+      additionalProperties: false
+      properties:
+        job: {type: string, maxLength: 64}
+        runId: {type: string, format: uuid}
+        processed: {type: integer, minimum: 0}
+        done: {type: boolean}
+        cursor:
+          type: [string, 'null']
+          maxLength: 200
+        startedAt: {type: string, format: date-time}
+      required: [job, runId, processed, done]

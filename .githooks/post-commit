@@ -1,0 +1,25 @@
+#!/bin/sh
+# momentum post-commit hook (Phase 31a — Ecosystem Lifecycle Spine, ADR-0016).
+#
+# Records the commit as an attributed ecosystem event when this repo is a
+# registered member of a momentum ecosystem. Silent no-op otherwise.
+#
+# This replaces the pre-31a agent-tool-hook write path, which was invisible to
+# lane worktrees, to forge merges, and to any commit the agent did not make
+# itself — and which was outright unreachable on the default adapter (BUG-028).
+#
+# NEVER blocks: post-commit runs after the commit already succeeded, and every
+# path here exits 0. If node is missing, if there is no ecosystem, if this repo
+# is not a member — all silent.
+#
+# Bypass:  MOMENTUM_SKIP_HOOKS=1 git commit ...
+[ -n "${MOMENTUM_SKIP_HOOKS:-}" ] && exit 0
+dir=$(dirname "$0")
+if command -v node >/dev/null 2>&1; then
+  # stderr is deliberately NOT redirected: the cross-repo routing banner
+  # (Phase 31b) is written there. run-check.js wraps this branch in a
+  # try/catch, so failures stay silent without suppressing the message the
+  # hook exists to surface.
+  node "$dir/run-check.js" post-commit || true
+fi
+exit 0

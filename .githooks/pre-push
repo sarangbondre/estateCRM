@@ -1,0 +1,15 @@
+#!/bin/sh
+# momentum pre-push hook (Phase 19 — Lifecycle Hardening).
+# Blocks (a) direct pushes to protected branches without the single-use
+# .momentum/merge-approved sentinel, and (b) release-tag pushes lacking
+# verification evidence (Rule 12). Logic lives in run-check.js (unit-tested).
+# Vendor-neutral: pure git, runs under any agent on any forge.
+#
+# git passes <remote> <url> as args and the pushed refs on stdin; we forward
+# both. Bypass for emergencies:  MOMENTUM_SKIP_HOOKS=1 git push ...
+dir=$(dirname "$0")
+if command -v node >/dev/null 2>&1; then
+  exec node "$dir/run-check.js" pre-push "$@"
+fi
+echo "momentum: node not found on PATH — skipping pre-push checks." >&2
+exit 0

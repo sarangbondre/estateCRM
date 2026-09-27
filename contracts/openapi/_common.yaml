@@ -1,0 +1,155 @@
+# Shared OpenAPI components. Service specs reference these with
+#   $ref: './_common.yaml#/components/...'
+# Rules: docs/04-lld/conventions.md
+openapi: 3.1.0
+info:
+  title: 11 Estates CRM — shared components
+  version: 0.1.0
+paths: {}
+components:
+  securitySchemes:
+    staffViaWeb:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Service token minted by web for a signed-in staff user (aud=<service>, sub=web, tid, 5 min),
+        plus headers X-User-Id, X-User-Role, X-Tenant-Id. Services re-check role and tenant.
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Service-to-service JWT (aud=<service>, sub=<caller>, tid, 5 min). Issued by web at POST /internal/v1/service-tokens; verify with web GET /.well-known/jwks.json (conventions R-2). Internal routes only.
+    clientSecret:
+      type: apiKey
+      in: header
+      name: X-Client-Secret
+      description: Per-service client secret (Vercel env) used only to call web POST /internal/v1/service-tokens (R-2).
+    cronSecret:
+      type: apiKey
+      in: header
+      name: X-Cron-Secret
+      description: Per-service secret used by Supabase pg_cron/pg_net for /internal/v1/relay, /internal/v1/drain/*, /internal/v1/jobs/*.
+    websiteApiKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: Listings public API only. Stored hashed; rotatable.
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema: { type: string, maxLength: 64 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: UUID; 24 h replay window per user+route. Same key with a different body → 409 idempotency-key-reused.
+      schema: { type: string, format: uuid }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: Row version for optimistic concurrency; mismatch → 412 version-mismatch.
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string }
+    IdOrCode:
+      name: idOrCode
+      in: path
+      required: true
+      description: UUID or display code (e.g. INV-00452).
+      schema: { type: string }
+  headers:
+    RetryAfter:
+      schema: { type: integer }
+      description: Seconds to wait before retrying.
+  schemas:
+    Problem:
+      type: object
+      description: RFC 7807 problem details.
+      required: [type, title, status, code, correlationId]
+      properties:
+        type: { type: string, format: uri, example: "https://errors.11estates.in/validation-failed" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string, description: Stable kebab-case error code }
+        correlationId: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, code]
+            properties:
+              field: { type: string }
+              code: { type: string }
+              message: { type: string }
+    PageMeta:
+      type: object
+      required: [nextCursor]
+      properties:
+        nextCursor: { type: [string, "null"] }
+    Money:
+      type: integer
+      minimum: 0
+      description: INR, whole rupees
+    AreaBasis:
+      type: [string, "null"]
+      enum: [Carpet, Builtup, Saleable, null]
+    Side:
+      type: [string, "null"]
+      enum: [Supply, Demand, None, null]
+    RecordScope:
+      type: string
+      enum: [Property, Business, Capital, Equipment, Market Participant, Market Signal]
+    PublicationLevel:
+      type: string
+      enum: [Private, Anonymous, Public]
+    LifeStage:
+      type: string
+      enum: [Fresh, Ageing, Stale, Expired, Paused]
+    VocabValue:
+      type: string
+      description: Controlled value validated at runtime against the active vocabulary release (x-vocabulary names the field).
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ok, degraded, down] }
+        checks: { type: object, additionalProperties: { type: string } }
+  responses:
+    BadRequest:
+      description: Validation failed
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    Unauthenticated:
+      description: Missing or invalid credentials
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    Forbidden:
+      description: Role or tenant not allowed
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    NotFound:
+      description: Not found
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    Conflict:
+      description: Conflict (state or idempotency-key-reused)
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    PreconditionFailed:
+      description: version-mismatch
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    TooMany:
+      description: rate-limited
+      headers: { Retry-After: { $ref: '#/components/headers/RetryAfter' } }
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    ServerError:
+      description: internal or dependency-unavailable
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }

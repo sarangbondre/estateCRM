@@ -1,0 +1,678 @@
+<title>11 Estates CRM Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F4F5F3; --surface:#FFFFFF; --surface-2:#F7F8F6; --line:#DDE2DE; --line-strong:#C4CCC7;
+  --ink:#17211F; --muted:#5E6B67; --faint:#8A9692;
+  --accent:#0F6E6A; --accent-ink:#FFFFFF; --accent-soft:#E1F0EE;
+  --supply:#0F6E6A; --supply-soft:#DDEFEC; --demand:#4B4FA8; --demand-soft:#E6E7F6;
+  --warn:#A8650B; --warn-soft:#FBEFD9; --bad:#B42318; --bad-soft:#FCE6E4; --good:#1E7A3C; --good-soft:#E2F3E7;
+  --side:#ECEFEC; --side-hover:#E1E6E2; --user:#E4ECEA;
+  --shadow:0 1px 2px rgba(20,35,32,.05),0 6px 20px rgba(20,35,32,.07);
+  --sans:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --serif:"IBM Plex Serif",Georgia,serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#121817; --surface:#1A2120; --surface-2:#1F2826; --line:#2C3735; --line-strong:#3B4845;
+    --ink:#E6EDEA; --muted:#9AA8A4; --faint:#6E7C78;
+    --accent:#3FB5AC; --accent-ink:#06201E; --accent-soft:#16312F;
+    --supply:#3FB5AC; --supply-soft:#16312F; --demand:#A3A6F2; --demand-soft:#24264A;
+    --warn:#E8A94A; --warn-soft:#352812; --bad:#F2877D; --bad-soft:#3A1C19; --good:#6CCB8A; --good-soft:#15301F;
+    --side:#0E1312; --side-hover:#1A2120; --user:#20302D;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#121817; --surface:#1A2120; --surface-2:#1F2826; --line:#2C3735; --line-strong:#3B4845;
+  --ink:#E6EDEA; --muted:#9AA8A4; --faint:#6E7C78;
+  --accent:#3FB5AC; --accent-ink:#06201E; --accent-soft:#16312F;
+  --supply:#3FB5AC; --supply-soft:#16312F; --demand:#A3A6F2; --demand-soft:#24264A;
+  --warn:#E8A94A; --warn-soft:#352812; --bad:#F2877D; --bad-soft:#3A1C19; --good:#6CCB8A; --good-soft:#15301F;
+  --side:#0E1312; --side-hover:#1A2120; --user:#20302D;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.5}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--mono);font-size:12.5px}
+.muted{color:var(--muted)} .faint{color:var(--faint)} .small{font-size:12.5px}
+.num,td.n{font-variant-numeric:tabular-nums}
+
+/* shell */
+.app{display:grid;grid-template-columns:264px minmax(0,1fr) auto;height:100%}
+.side{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;padding:12px 10px}
+.brand{display:flex;align-items:baseline;gap:6px;padding:6px 10px 12px}
+.brand b{font-size:18px;letter-spacing:-.02em}
+.brand span{font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted)}
+.sbtn{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;font-size:13.5px;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbtn:hover{background:var(--side-hover)}
+.sbtn.on{background:var(--side-hover);font-weight:600}
+.sbtn:focus-visible{outline:2px solid var(--accent)}
+.sbtn .cnt{margin-left:auto;font-size:11px;font-weight:600;color:var(--warn)}
+.sbtn svg{flex:none;width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.newchat{border:1px solid var(--line-strong);background:var(--surface);font-weight:600;margin-bottom:10px}
+.newchat:hover{background:var(--surface)}
+.slabel{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);padding:12px 10px 4px}
+.recents{overflow-y:auto;flex:1;min-height:0}
+.me{border-top:1px solid var(--line);padding:10px 4px 0;display:flex;flex-direction:column;gap:6px}
+.me-row{display:flex;align-items:center;gap:9px;padding:0 6px}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:600;font-size:12px;flex:none}
+.me select{width:100%;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);font-size:12.5px}
+
+.main{display:flex;flex-direction:column;min-width:0;min-height:0;height:100%}
+.topbar{display:flex;align-items:center;gap:10px;padding:10px 20px;min-height:50px}
+.topbar h1{font-size:14.5px;font-weight:500;margin:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu-btn{display:none}
+.proto{margin-left:auto;font-size:11.5px;color:var(--warn);background:var(--warn-soft);padding:3px 9px;border-radius:4px;white-space:nowrap}
+.scroll{flex:1;overflow-y:auto;min-height:0}
+.thread{max-width:820px;margin:0 auto;padding:8px 24px 24px;display:flex;flex-direction:column;gap:20px}
+.u-msg{align-self:flex-end;background:var(--user);padding:9px 14px;border-radius:14px;max-width:80%;white-space:pre-wrap}
+.u-file{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:4px}
+.u-file .ext{background:var(--good);color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:3px 5px}
+.a-msg{display:flex;gap:12px;align-items:flex-start}
+.a-ico{width:26px;height:26px;border-radius:7px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:12px;flex:none;margin-top:1px;font-family:var(--serif)}
+.a-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.a-body p{margin:0}
+
+/* composer */
+.composer-wrap{padding:0 24px 18px;max-width:868px;margin:0 auto;width:100%;position:relative}
+.composer{background:var(--surface);border:1px solid var(--line-strong);border-radius:16px;box-shadow:var(--shadow);padding:10px 10px 8px 14px;display:flex;flex-direction:column;gap:6px}
+.composer input[type=text]{border:none;outline:none;background:transparent;padding:6px 0;font-size:15px;width:100%}
+.composer .tools{display:flex;align-items:center;gap:6px}
+.ibtn{all:unset;cursor:pointer;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--muted)}
+.ibtn:hover{background:var(--surface-2);color:var(--ink)}
+.ibtn:focus-visible{outline:2px solid var(--accent)}
+.ibtn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.send{margin-left:auto;background:var(--accent);color:var(--accent-ink)}
+.send:hover{background:var(--accent);color:var(--accent-ink);filter:brightness(1.08)}
+.hint{font-size:11.5px;color:var(--faint);text-align:center;margin-top:6px}
+.slash{position:absolute;bottom:calc(100% - 8px);left:24px;right:24px;background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;z-index:10}
+.slash button{all:unset;cursor:pointer;padding:7px 10px;border-radius:6px;display:flex;gap:10px;font-size:13.5px}
+.slash button:hover,.slash button:focus-visible{background:var(--surface-2)}
+.slash b{font-family:var(--mono);font-weight:500;min-width:96px}
+
+/* home */
+.home{max-width:760px;margin:0 auto;padding:7vh 24px 12px;display:flex;flex-direction:column;gap:18px}
+.home h2{font-family:var(--serif);font-weight:500;font-size:32px;letter-spacing:-.01em;margin:0;text-wrap:balance}
+.attn{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.attn button{all:unset;cursor:pointer;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:2px}
+.attn button:hover{border-color:var(--accent)}
+.attn button:focus-visible{outline:2px solid var(--accent)}
+.attn b{font-size:21px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.attn span{font-size:12.5px;color:var(--muted)}
+.sugg{display:flex;gap:7px;flex-wrap:wrap}
+.sugg button{cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:16px;padding:6px 12px;font-size:13px;text-align:left}
+.sugg button:hover{border-color:var(--accent);color:var(--accent)}
+
+/* cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.card-h{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px;font-weight:600;flex-wrap:wrap}
+.card-h .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
+.card-b{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.card-f{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-top:1px solid var(--line);background:var(--surface-2)}
+.btn{cursor:pointer;border:1px solid var(--line-strong);background:var(--surface);padding:6px 12px;border-radius:8px;font-weight:500;font-size:13px;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.btn.sm{padding:4px 9px;font-size:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.chip.supply{background:var(--supply-soft);color:var(--supply)} .chip.demand{background:var(--demand-soft);color:var(--demand)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)} .chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.good{background:var(--good-soft);color:var(--good)} .chip.plain{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.done-note{font-size:12.5px;color:var(--good);font-weight:500}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface-2)}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th.n,td.n{text-align:right}
+tbody tr:last-child td{border-bottom:none}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
+.how{font-size:12px}
+.how summary{cursor:pointer;color:var(--muted);font-weight:500}
+.how code{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);padding:1px 6px;border-radius:4px;display:inline-block;margin:4px 4px 0 0}
+.map-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px;font-size:13px}
+.map-grid div{display:flex;align-items:center;gap:6px;min-width:0}
+.map-grid .col{font-family:var(--mono);font-size:12px;color:var(--muted);flex:none}
+.map-grid select{flex:1;min-width:0;padding:3px 6px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);font-size:12.5px}
+.stage{display:grid;grid-template-columns:110px 1fr 44px;gap:10px;align-items:center;font-size:12.5px}
+.track{height:7px;background:var(--surface-2);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.track i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s linear}
+.report{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.report div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface-2);font-size:12px;color:var(--muted)}
+.report b{display:block;font-size:18px;color:var(--ink);font-variant-numeric:tabular-nums}
+.compare{display:grid;grid-template-columns:1fr 1fr 50px;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:13px}
+.compare>div{padding:7px 10px;border-bottom:1px solid var(--line)}
+.compare .h{background:var(--surface-2);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.compare .m{text-align:center;font-weight:700}
+.ok{color:var(--good)} .wn{color:var(--warn)} .bd{color:var(--bad)}
+.score{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;min-width:46px;text-align:center;border-radius:7px;padding:3px 0;flex:none}
+.score.hi{background:var(--good-soft);color:var(--good)} .score.mid{background:var(--warn-soft);color:var(--warn)}
+.match{display:flex;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.match:last-child{border-bottom:none}
+.match.hide{opacity:.4}
+.factors{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.webcard{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.webcard .imgs{display:grid;grid-template-columns:2fr 1fr;gap:3px;height:120px}
+.webcard .imgs div{background:linear-gradient(135deg,var(--accent-soft),var(--demand-soft))}
+.webcard .imgs div+div{background:linear-gradient(135deg,var(--demand-soft),var(--surface-2))}
+.webcard .c{padding:10px 12px;display:flex;flex-direction:column;gap:3px;font-size:13px}
+.pub-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:14px}
+.check{display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px}
+.check .ic{width:16px;flex:none;font-weight:700}
+mark{background:var(--bad-soft);color:var(--bad);padding:0 2px;border-radius:2px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface-2)}
+.kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.kpi .v{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:11.5px;color:var(--good)}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar-row{display:grid;grid-template-columns:118px 1fr 84px;gap:10px;align-items:center;font-size:12.5px}
+.bar-track{display:flex;flex-direction:column;gap:2px}
+.bar{height:7px;border-radius:2px}
+.bar.s{background:var(--supply)} .bar.d{background:var(--demand)}
+.legend{display:flex;gap:12px;font-size:12px;color:var(--muted);font-weight:400}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+.filesel{display:flex;flex-direction:column;gap:6px}
+.filesel button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+.filesel button:hover{border-color:var(--accent);background:var(--accent-soft)}
+.filesel button:focus-visible{outline:2px solid var(--accent)}
+
+/* side panel */
+.panel{width:min(46vw,640px);border-left:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;min-height:0;height:100%}
+.panel-h{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.panel-h h2{font-size:15px;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel-b{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:14px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{all:unset;cursor:pointer;padding:8px 10px;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tabs button.on{color:var(--ink);border-color:var(--accent);font-weight:600}
+.tabs button:focus-visible{outline:2px solid var(--accent)}
+dl.kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;margin:0;font-size:13px}
+dl.kv dt{color:var(--muted)} dl.kv dd{margin:0}
+.private{color:var(--warn);font-size:10.5px;font-weight:700;margin-left:6px;letter-spacing:.04em}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}
+.ph{aspect-ratio:4/3;border-radius:6px;background:linear-gradient(135deg,var(--accent-soft),var(--surface-2));border:1px solid var(--line);display:grid;place-items:center;font-size:11px;color:var(--muted);max-width:100%}
+.timeline div{display:grid;grid-template-columns:70px 1fr;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted)}
+.field select,.field input{padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink);font-size:13px;min-width:0}
+
+/* settings page */
+.settings{max-width:980px;margin:0 auto;padding:8px 24px 40px;display:flex;flex-direction:column;gap:14px;width:100%}
+.settings h2{font-family:var(--serif);font-weight:500;font-size:26px;margin:0}
+.form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+
+/* login */
+.login{min-height:100%;display:grid;place-items:center;padding-inline:16px}
+.login .box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:32px;max-width:390px;width:100%;display:flex;flex-direction:column;gap:16px;box-shadow:var(--shadow)}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);cursor:pointer;font-weight:500}
+.gbtn:hover{border-color:var(--accent)}
+.note{font-size:12.5px;color:var(--muted);background:var(--surface-2);border:1px dashed var(--line-strong);border-radius:8px;padding:8px 12px;margin:0}
+.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:var(--shadow);z-index:50;max-width:calc(100% - 32px)}
+.typing{display:inline-flex;gap:4px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--faint);animation:b 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,100%{opacity:.3}50%{opacity:1}}
+
+@media (max-width:1100px){
+  .panel{position:fixed;inset:0 0 0 auto;width:min(100%,600px);z-index:30;box-shadow:var(--shadow);padding-top:env(safe-area-inset-top,0px)}
+  .attn{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:820px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:fixed;inset:0 auto 0 0;width:280px;z-index:40;box-shadow:var(--shadow);padding-top:calc(12px + env(safe-area-inset-top,0px))}
+  .side[data-closed]{display:none}
+  .menu-btn{display:grid}
+  .thread,.composer-wrap,.home,.settings{padding-left:16px;padding-right:16px}
+  .slash{left:16px;right:16px}
+  .report,.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .map-grid,.pub-grid,.form-grid{grid-template-columns:1fr}
+  .compare{grid-template-columns:1fr 1fr 36px;font-size:12px}
+  .home h2{font-size:26px}
+  dl.kv{grid-template-columns:110px 1fr}
+  .bar-row{grid-template-columns:90px 1fr 64px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.axis{display:grid;grid-template-columns:88px 1fr;gap:8px;align-items:center;margin:2px 0}
+.axis-n{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.steps{display:flex;flex-wrap:wrap;gap:3px}
+.st{font-size:11.5px;padding:2px 7px;border-radius:4px;border:1px solid var(--line);color:var(--faint);background:var(--surface)}
+.st.done{color:var(--muted);background:var(--surface-2)}
+.st.cur{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.st.locked{border-style:dashed;opacity:.55}
+.life{position:relative;display:flex;height:8px;border-radius:4px;overflow:visible;margin:4px 0}
+.lz{height:8px}.lz.f{background:var(--good);border-radius:4px 0 0 4px}.lz.a{background:var(--warn)}.lz.s{background:var(--bad);opacity:.6}.lz.e{background:var(--bad);border-radius:0 4px 4px 0}
+.life i{position:absolute;top:-4px;width:3px;height:16px;background:var(--ink);border-radius:2px}
+.axis .life{grid-column:2}.axis>.small{grid-column:2}
+.qsec{display:flex;flex-direction:column;gap:2px}
+.qh{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;display:flex;gap:6px;align-items:center;margin:6px 0 2px}
+.qitem2{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.panel .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+.webcard .c b{font-size:14px}
+</style>
+
+<div id="root"></div>
+<input type="file" id="realfile" accept=".xlsx,.xls,.csv" hidden>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= reference data ================= */
+const MM={'Andheri East':['Chakala','Marol','MIDC Andheri','Andheri East'],'Andheri West':['Lokhandwala','Four Bungalows','Andheri West'],'Powai':['Powai','Chandivali'],'BKC':['BKC'],'Goregaon East':['Goregaon East'],'Bandra West':['Bandra West'],'Thane West':['Thane West'],'Bhiwandi':['Bhiwandi'],'Taloja':['Taloja MIDC']};
+function mmOf(loc){for(const k in MM)if(MM[k].includes(loc))return k;return loc}
+const TH_S={'Lease, Residential':[14,30,45],'Lease, Commercial':[30,60,90],'Sale, Secondary':[45,90,120],'Sale, Primary':[30,60,90],'Industrial':[45,90,120],'Land':[60,120,180],'JV':[60,120,180],'Pagdi':[45,90,120]};
+const TH_D={'Lease, Residential':[14,21,30],'Lease, Commercial':[30,60,90],'Sale, Secondary or Any':[45,90,150],'Sale, Primary':[30,60,120],'Industrial':[45,90,120],'Land':[60,120,180],'JV':[60,120,180],'Pagdi':[45,90,150]};
+const VOCAB_VER='v0.6 (2026-09-24)';
+const PTYPES={Residential:['Apartment','Penthouse','Studio','Villa','Bungalow','Row House','Farmhouse','Building','Serviced Apartment'],Commercial:['Office','Shop','Showroom','Restaurant Space','Commercial Building','Coworking','Hotel','Resort','Institutional Building','Commercial Space'],Industrial:['Gala','Shed','Warehouse','Factory','Industrial Building','Cold Storage'],Land:['Plot','Land Parcel','Agricultural Land']};
+function catOf(r){if(r.deal==='JV'||r.deal==='Pagdi')return r.deal;if(r.seg==='Industrial'||r.seg==='Land')return r.seg;if(r.deal==='Lease')return 'Lease, '+(r.seg==='Residential'?'Residential':'Commercial');if(r.market==='Primary')return 'Sale, Primary';return r.kind==='D'?'Sale, Secondary or Any':'Sale, Secondary'}
+function label(r){const S=r.kind==='S';if(r.deal==='Sale'){if(r.market==='Primary')return S?'New Project, For Sale':'Wants to Buy, New Project';if(r.market==='Secondary')return S?'Resale, For Sale':'Wants to Buy, Resale';return 'Wants to Buy'}
+  if(r.deal==='Lease')return r.seg==='Residential'?(S?'For Rent':'Wants to Rent'):(S?'For Lease':'Wants to Lease');if(r.deal==='JV')return S?'For JV':'Wants JV';return S?'Pagdi, For Transfer':'Wants Pagdi'}
+function norm(r){if(!r.deal){r.deal=r.txn==='Lease'?'Lease':r.txn==='Pagdi'?'Pagdi':r.txn==='JV'?'JV':'Sale';if(r.deal==='Sale'&&!r.market)r.market=r.txn==='New project'?'Primary':'Secondary'}
+  r.ptype=r.ptype||(r.sub==='Flat'?(r.cfg==='1RK'?'Studio':'Apartment'):r.sub);if(r.cfg){r.bhk=r.cfg==='1RK'?0.5:parseInt(r.cfg)}r.txn=r.deal==='Lease'?'Lease':r.txn;return r}
+function stageOf(r){if(r.day==null)return 'Paused';const t=(r.kind==='D'?TH_D:TH_S)[catOf(r)];return r.day<=t[0]?'Fresh':r.day<=t[1]?'Ageing':r.day<=t[2]?'Stale':'Expired'}
+const SREC=['Captured','Enriched','Contacted','Verified','Qualified'],PUB=['Private','Anonymous','Public'],SCOM=['Upcoming','Available','Matched','In proposal','Site visit','In process','Closed','Inactive'];
+const DREC=['Captured','Enriched','Verified','Qualified'],DCOM=['New','Contacted','Active','Sourcing','Matched','Proposal shared','Site visit','In process','Closed'];
+const RERA='A51800012345';
+
+/* ================= example data (from Vinit's journeys + generated) ================= */
+const offers=[],demands=[];
+function O(o){o.kind='S';norm(o);o.mm=mmOf(o.loc);o.src=o.src||[{who:'—',price:o.price,first:true}];o.photos=o.photos||0;o.enq=o.enq||0;o.owner=o.owner||'Vinit';o.tags=o.tags||[];offers.push(o);return o}
+function D(d){d.kind='D';norm(d);d.touches=d.touches||[];d.owner=d.owner||'Priyanka';d.matches=d.matches||{};demands.push(d);return d}
+O({id:'INV-00452',prp:'PRP-00210',seg:'Commercial',sub:'Office',txn:'Lease',loc:'Chakala',bldg:'Near Chakala tower (internal)',bu:5000,ca:3900,price:800000,avail:0,rec:1,pub:1,com:1,day:3,src:[{who:'Sanjay (broker)',price:800000,first:true},{who:'Rakesh (broker)',price:820000}],enq:1,q:{t:'must',why:'Enquiry from Rohan (I\'m interested)',due:'in 6 h'},furn:'Furnished',note:'5000 sqft furnished office Andheri East. 8L per month. Ready to move. Call Sanjay.'});
+O({id:'INV-00455',prp:'PRP-00214',seg:'Commercial',sub:'Office',txn:'Lease',loc:'Chakala',bldg:'Chakala business park (internal)',bu:5000,ca:3950,price:850000,avail:0,rec:3,pub:2,com:1,day:12,photos:11});
+O({id:'INV-00461',prp:'PRP-00230',seg:'Commercial',sub:'Office',txn:'Lease',loc:'Marol',bldg:'Marol Maroshi Rd tower, 4th floor (internal)',grp:'MMR-T1',bu:3200,ca:2500,price:470000,avail:0,rec:3,pub:2,com:1,day:20,photos:8});
+O({id:'INV-00462',prp:'PRP-00231',seg:'Commercial',sub:'Office',txn:'Lease',loc:'Marol',bldg:'Marol Maroshi Rd tower, 5th floor (internal)',grp:'MMR-T1',bu:3000,ca:2350,price:420000,avail:0,rec:3,pub:2,com:1,day:20,photos:7});
+O({id:'INV-00391',prp:'PRP-00190',seg:'Commercial',sub:'Office',txn:'Lease',loc:'Marol',bldg:'Near Marol Metro (internal)',bu:3500,ca:2700,price:520000,avail:0,rec:3,pub:2,com:1,day:31,photos:10,src:[{who:'Ramesh (broker)',price:520000,first:true}],q:{t:'should',rank:9,why:'Ageing day 31: reconfirm'}});
+O({id:'INV-00701',prp:'PRP-00305',seg:'Commercial',sub:'Office',txn:'Lease',loc:'Marol',bldg:'Near Marol Naka (internal)',bu:6000,ca:4700,price:900000,avail:130,rec:2,pub:1,com:0,day:null,src:[{who:'Mr Desai (owner)',price:900000,first:true}]});
+O({id:'INV-00488',prp:'PRP-00241',seg:'Residential',sub:'Flat',cfg:'2BHK',txn:'Lease',loc:'Lokhandwala',bldg:'Society near Lokhandwala (internal)',bu:1050,ca:850,price:75000,avail:0,rec:1,pub:0,com:1,day:0,src:[{who:'Mrs Kapoor (owner), newspaper',price:75000,first:true}],q:{t:'should',rank:4,why:'New · demand gap: 12 open rent demands'},furn:'Semi furnished'});
+O({id:'INV-00801',prp:'PRJ-0031',seg:'Residential',sub:'Flat',cfg:'2BHK',txn:'New project',loc:'Andheri West',bldg:'PRJ-0031 tower',bu:950,ca:720,price:24000000,units:38,avail:0,rec:3,pub:2,com:2,day:5,photos:12,owner:'Vinit',tags:['Project RERA P51800031'],enq:11});
+O({id:'INV-00802',prp:'PRJ-0031',seg:'Residential',sub:'Flat',cfg:'3BHK',txn:'New project',loc:'Andheri West',bldg:'PRJ-0031 tower',bu:1350,ca:1010,price:34000000,units:22,avail:0,rec:3,pub:2,com:1,day:5,photos:12,tags:['Project RERA P51800031']});
+O({id:'INV-00655',prp:'PRP-00266',seg:'Residential',sub:'Flat',cfg:'2BHK',txn:'Resale',loc:'Four Bungalows',bldg:'Four Bungalows CHS (internal)',bu:900,ca:690,price:23500000,avail:0,rec:3,pub:2,com:1,day:40,photos:9});
+O({id:'INV-00520',prp:'PRP-00250',seg:'Industrial',sub:'Gala',txn:'Lease',loc:'Bhiwandi',bldg:'K Square park (internal)',bu:4000,ca:3800,price:92000,avail:0,rec:3,pub:2,com:1,day:22,photos:6});
+O({id:'INV-00521',prp:'PRP-00251',seg:'Industrial',sub:'Warehouse',txn:'Lease',loc:'Bhiwandi',bldg:'Arihant compound (internal)',bu:4400,ca:4200,price:101000,avail:0,rec:2,pub:1,com:1,day:60,src:[{who:'Industrial Hub WhatsApp',price:101000,first:true}]});
+O({id:'INV-00522',prp:'PRP-00252',seg:'Industrial',sub:'Gala',txn:'Resale',loc:'Taloja MIDC',bldg:'Taloja Phase II (internal)',bu:4200,ca:4000,price:21000000,avail:0,rec:1,pub:1,com:1,day:10});
+O({id:'INV-00530',prp:'PRP-00260',seg:'Residential',sub:'Flat',cfg:'3BHK',txn:'Resale',loc:'Powai',bldg:'Hiranandani Eden (internal)',bu:1450,ca:1150,price:28500000,avail:0,rec:3,pub:2,com:1,day:50,photos:8});
+O({id:'INV-00531',prp:'PRP-00261',seg:'Residential',sub:'Flat',cfg:'2BHK',txn:'Lease',loc:'Four Bungalows',bldg:'Four Bungalows sea view (internal)',bu:1000,ca:780,price:78000,avail:0,rec:3,pub:2,com:1,day:8,photos:7});
+O({id:'INV-00540',prp:'PRP-00270',seg:'Commercial',sub:'Office',txn:'Lease',loc:'MIDC Andheri',bldg:'MIDC Rd 3 (internal)',bu:9000,ca:7000,price:1300000,avail:0,rec:2,pub:1,com:1,day:15,q:{t:'should',rank:17,why:'New · commercial demand gap'}});
+O({id:'INV-00541',prp:'PRP-00271',seg:'Commercial',sub:'Office',txn:'Lease',loc:'BKC',bldg:'BKC G Block (internal)',bu:2200,ca:1700,price:900000,avail:0,rec:0,pub:0,com:1,day:2,q:{t:'should',rank:22,why:'New capture'}});
+
+O({id:'INV-00560',prp:'PRP-00280',seg:'Land',sub:'Plot',ptype:'Plot',landUse:'Industrial',txn:'Resale',loc:'Taloja MIDC',bldg:'MIDC plot C-14 (internal)',bu:21780,ca:21780,price:65000000,avail:0,rec:2,pub:1,com:1,day:25,tenure:'Leasehold',src:[{who:'Industrial Hub WhatsApp',price:65000000,first:true}]});
+O({id:'INV-00570',prp:'PRP-00285',seg:'Residential',sub:'Flat',cfg:'1RK',txn:'Pagdi',deal:'Pagdi',loc:'Four Bungalows',bldg:'Old chawl, Four Bungalows (internal)',bu:320,ca:260,price:3500000,avail:0,rec:1,pub:0,com:1,day:6,q:{t:'should',rank:14,why:'New · Pagdi transfer'}});
+O({id:'INV-00575',prp:'PRP-00288',seg:'Commercial',sub:'Shop',txn:'Resale',loc:'Andheri West',bldg:'SV Road arcade (internal)',bu:650,ca:520,price:32000000,avail:0,rec:3,pub:2,com:1,day:18,photos:5,tenancy:'Tenanted',curRent:180000});
+
+D({id:'DEM-000127',client:'Rohan Mehta',company:'Fintech (via Anil)',seg:'Commercial',sub:'Office',txn:'Lease',mms:['Andheri East','Marol','Chakala'],aMin:5000,aMax:7000,bMin:800000,bMax:1000000,moveBy:60,rec:3,com:2,day:2,touches:[{type:'Channel',via:'Anil, broker WhatsApp group',first:true},{type:'Digi',via:'Meta lead ad, Andheri offices campaign'}],broker:'Anil (shared commission)'});
+D({id:'DEM-000131',client:'IT firm (A. Rao)',seg:'Commercial',sub:'Office',txn:'Lease',mms:['Andheri East'],aMin:4500,aMax:5500,bMin:700000,bMax:900000,moveBy:90,rec:2,com:2,day:18,touches:[{type:'Digi',via:'Website form',first:true}]});
+D({id:'DEM-000144',client:'Logistics firm (S. Iyer)',seg:'Commercial',sub:'Office',txn:'Lease',mms:['Marol','Andheri East'],aMin:5500,aMax:6500,bMin:800000,bMax:950000,moveBy:150,rec:3,com:2,day:6,touches:[{type:'Direct',via:'Walk in',first:true}]});
+D({id:'DEM-000150',client:'Family relocating (K. Nair)',seg:'Residential',sub:'Flat',cfg:'2BHK',txn:'Lease',mms:['Andheri West','Lokhandwala','Four Bungalows'],aMin:800,aMax:1100,bMin:70000,bMax:80000,moveBy:30,rec:1,com:0,day:1,touches:[{type:'Channel',via:'Mid-day classified',first:true}]});
+D({id:'DEM-000190',client:'P. Desai',seg:'Residential',sub:'Flat',cfg:'2BHK',txn:'New project',deal:'Sale',market:'Any',mms:['Andheri West','Four Bungalows'],aMin:850,aMax:1000,bMin:22000000,bMax:25000000,moveBy:365,rec:3,com:4,day:9,touches:[{type:'Digi',via:'Microsite, PRJ-0031',first:true},{type:'Digi',via:'Instagram'}]});
+D({id:'DEM-000201',client:'Warehousing startup (V. Shah)',seg:'Industrial',sub:'Warehouse',txn:'Lease',mms:['Bhiwandi'],aMin:3500,aMax:4500,bMin:80000,bMax:110000,moveBy:45,rec:2,com:2,day:33,touches:[{type:'Channel',via:'Industrial Hub WhatsApp',first:true}]});
+D({id:'DEM-000202',client:'Packaging unit (R. Jain)',seg:'Industrial',sub:'Gala',txn:'Resale',mms:['Taloja','Taloja MIDC','Bhiwandi'],aMin:3600,aMax:4600,bMin:17000000,bMax:23000000,moveBy:120,rec:1,com:1,day:4,touches:[{type:'Direct',via:'Call to Vinit',first:true}]});
+D({id:'DEM-000210',client:'Investor (M. Kapadia)',seg:'Residential',sub:'Flat',cfg:'3BHK',txn:'Resale',mms:['Powai'],aMin:1300,aMax:1600,bMin:25000000,bMax:30000000,moveBy:120,rec:3,com:5,day:12,touches:[{type:'Direct',via:'Reference',first:true}],dealRec:{stage:'Negotiation',next:'Send counter offer',due:'yesterday',overdue:true}});
+D({id:'DEM-000220',client:'Family office (preleased buyer)',seg:'Commercial',sub:'Shop',txn:'Resale',deal:'Sale',market:'Secondary',tags:{tenancy:'Tenanted'},mms:['Andheri West','Four Bungalows'],aMin:500,aMax:900,bMin:25000000,bMax:35000000,moveBy:120,rec:3,com:2,day:10,touches:[{type:'Direct',via:'Reference',first:true}]});
+D({id:'DEM-000221',client:'Logistics developer',seg:'Land',sub:'Plot',ptype:'Plot',txn:'Resale',deal:'Sale',market:'Any',mms:['Taloja','Taloja MIDC'],aMin:15000,aMax:25000,bMin:50000000,bMax:70000000,moveBy:180,rec:2,com:2,day:12,touches:[{type:'Channel',via:'Industrial Hub WhatsApp',first:true}]});
+
+D({id:'DEM-000215',client:'Consulting firm (N. Bose)',seg:'Commercial',sub:'Office',txn:'Lease',mms:['BKC'],aMin:4000,aMax:5000,bMin:1500000,bMax:2000000,moveBy:60,rec:0,com:0,day:0,touches:[{type:'Digi',via:'Meta lead ad',first:true}]});
+
+/* ================= helpers ================= */
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function inr(v){if(v==null)return '—';if(v>=1e7)return '₹'+(+(v/1e7).toFixed(2))+' Cr';if(v>=1e5)return '₹'+(+(v/1e5).toFixed(2))+' L';return '₹'+v.toLocaleString('en-IN')}
+function priceOf(o){return inr(o.price)+(o.deal==='Lease'?'/mo':'')+(o.tenancy==='Tenanted'?' · tenanted, rent '+inr(o.curRent)+'/mo':'')}
+function budgetOf(d){return inr(d.bMin)+'–'+inr(d.bMax)+(d.deal==='Lease'?'/mo':'')}
+function oTitle(o){return label(o)+' · '+(o.bhk?o.bhk+' BHK ':'')+o.ptype+' · '+o.loc}
+function dTitle(d){return label(d)+' · '+(d.bhk?d.bhk+' BHK ':'')+d.ptype+' · '+d.mms[0]}
+function find(id){id=id.toUpperCase();return offers.find(o=>o.id===id)||demands.find(d=>d.id===id)}
+function stChip(st){return `<span class="chip ${st==='Fresh'?'good':st==='Ageing'?'warn':st==='Paused'?'plain':'bad'}">${st}</span>`}
+function sq(n){return n.toLocaleString('en-IN')}
+function ceiling(o){const st=stageOf(o);if(o.com>=6||st==='Expired')return {lvl:0,why:o.com>=6?'Closed or retired offers are Private.':'Availability expired, so the offer is unpublished everywhere.'};
+  if(st==='Stale')return {lvl:1,why:'Stale: Public drops to Anonymous until reconfirmed.'};
+  if(o.rec>=3&&o.photos>0)return {lvl:2,why:`Verified with ${o.photos} real photos and ${st}.`};
+  return {lvl:1,why:o.rec<3?'Public unlocks once the offer is Verified with real photos.':'Add real photos to unlock Public.'}}
+function scan(o){const t=(o.note||'')+' '+(o.pubText||'');return {phone:/\d{5,}|call\s+\w+/i.test(o.pubText||''),bldg:false}}
+
+/* ================= matching (BRD §7) ================= */
+function txnOk(d,o){if(d.deal!==o.deal)return false;if(d.deal==='Sale'&&d.market!=='Any'&&d.market!==o.market)return false;if(d.tags&&d.tags.tenancy&&o.tenancy!==d.tags.tenancy)return false;return true}
+function locOk(d,o){return d.mms.includes(o.loc)||d.mms.includes(o.mm)}
+function matchOne(d,o){
+  if(o.seg!==d.seg||!txnOk(d,o))return null;
+  if(!locOk(d,o))return null;
+  const st=stageOf(o);if(o.com>=6||st==='Expired')return null;
+  if(o.avail>d.moveBy)return {o,excluded:'Available too late'};
+  const f={};let s=0;
+  if(d.mms.includes(o.loc)){s+=30;f.Location='✔'}else{s+=22;f.Location='~'}
+  if(o.price>=d.bMin*0.9&&o.price<=d.bMax){s+=25;f.Budget='✔'}else if(o.price<=d.bMax*1.1){s+=10;f.Budget='~'}else return null;
+  if(o.bu>=d.aMin*0.95&&o.bu<=d.aMax*1.05){s+=20;f.Area='✔'}else if(o.bu>=d.aMin*0.8&&o.bu<=d.aMax*1.2){s+=8;f.Area='~'}else return null;
+  if(o.ptype!==d.ptype)return null;if(!d.bhk||d.bhk===o.bhk){s+=15;f.Type='✔'}else return null;
+  s+=10;f.Timing='✔';
+  const m={o,score:s,f};if(st==='Stale')m.reconfirm=true;return m}
+function matchesFor(d){
+  const out=[],excl=[];offers.forEach(o=>{const m=matchOne(d,o);if(!m)return;if(m.excluded)excl.push(m);else out.push(m)});
+  if(d.seg!=='Residential'){ // bundles
+    const pool=offers.filter(o=>o.seg===d.seg&&txnOk(d,o)&&locOk(d,o)&&o.com<6&&stageOf(o)!=='Expired'&&o.bu<d.aMin&&o.avail<=d.moveBy);
+    for(let i=0;i<pool.length;i++)for(let j=i+1;j<pool.length;j++){const a=pool[i],b=pool[j];if(!a.grp||a.grp!==b.grp)continue;const A=a.bu+b.bu,P=a.price+b.price;
+      if(A>=d.aMin&&A<=d.aMax*1.05&&P<=d.bMax*1.05)out.push({bundle:[a,b],score:84,f:{Location:'✔',Budget:P<=d.bMax?'✔':'~',Area:'✔ together',Type:'✔',Timing:'✔'},area:A,price:P})}}
+  return {m:out.sort((a,b)=>b.score-a.score),excl}}
+function mTitle(m){return m.bundle?`Bundle: ${m.bundle.map(o=>o.id).join(' + ')} · ${m.bundle[0].loc}`:`${m.o.id} · ${oTitle(m.o)}`}
+function mSub(m){return m.bundle?`${sq(m.area)} sq ft built up together · ${inr(m.price)}/mo together`:`${sq(m.o.bu)} sq ft built up · ${priceOf(m.o)} · ${stageOf(m.o)} · ${PUB[m.o.pub]}`}
+function mKey(m){return m.bundle?m.bundle.map(o=>o.id).join('+'):m.o.id}
+
+/* ================= state ================= */
+const USERS={Priyanka:{name:'Priyanka',ini:'PR',role:'Demand agent'},Vinit:{name:'Vinit',ini:'VI',role:'Supply agent'},Owner:{name:'Owner',ini:'OW',role:'Manager'}};
+const S={auth:false,user:'Priyanka',chats:[],cur:null,panel:null,draft:'',sideOpen:false,settings:false,settingsTab:'Life curve',tables:[],runs:{},srq:[{id:'SRQ-014',dem:'DEM-000201',due:'Fri',pri:'High',to:'Vinit'}],mstate:{},dupIdx:0,log:[]};
+const me=()=>USERS[S.user];const isD=()=>S.user==='Priyanka',isS=()=>S.user==='Vinit',isM=()=>S.user==='Owner';
+const chat=()=>S.chats.find(c=>c.id===S.cur);
+function regTable(ids,title){S.tables.push({ids,title});return S.tables.length-1}
+const root=document.getElementById('root');
+let toastT;function toast(t){let el=document.querySelector('.toast');if(!el){el=document.createElement('div');el.className='toast';el.setAttribute('role','status');document.body.appendChild(el)}el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3600)}
+const ICON={plus:'<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',queue:'<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>',dash:'<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',add:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',up:'<svg viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>',review:'<svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"/></svg>',gear:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',clip:'<svg viewBox="0 0 24 24"><path d="M21.4 11.1l-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg>',send:'<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',slash:'<svg viewBox="0 0 24 24"><path d="M16 3L8 21"/></svg>',close:'<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>',menu:'<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>'};
+const SLASH=[['/queue','My queue'],['/desks','Business / Capital desks, Network, Watchlist'],['/add demand','Quick add a requirement (phone first)'],['/add supply','Add supply'],['/matches','Matches to confirm'],['/upload','Upload a sheet'],['/review','Review uncertain merges'],['/dashboard','Dashboards']];
+
+/* ================= queues ================= */
+function supplyQueue(){
+  const must=offers.filter(o=>o.q&&o.q.t==='must'),should=offers.filter(o=>o.q&&o.q.t==='should').sort((a,b)=>a.q.rank-b.q.rank);
+  return {must,should,srq:S.srq.filter(s=>!s.done)}}
+function demandQueue(){
+  const live=demands.filter(d=>!d.exit);
+  return [['To contact',live.filter(d=>d.com===0)],['To qualify',live.filter(d=>d.com===1||(d.com===2&&d.rec<3))],['Reconfirm due',live.filter(d=>['Ageing','Stale'].includes(stageOf(d)))],
+    ['Open matches to confirm',live.filter(d=>d.rec>=3&&d.com===2&&matchesFor(d).m.length)],['In sourcing',live.filter(d=>d.com===3)],['Follow-ups overdue (In process)',live.filter(d=>d.dealRec&&d.dealRec.overdue)]]}
+
+/* ================= shell ================= */
+function render(){
+  const ae=document.activeElement;const hf=ae&&ae.id==='q';
+  if(!S.auth){root.innerHTML=loginView();bind();return}
+  const c=chat();
+  root.innerHTML=`<div class="app">${sideView()}<div class="main">
+    <div class="topbar"><button class="ibtn menu-btn" data-act="side" aria-label="Open menu">${ICON.menu}</button><h1>${S.settings?'Settings':c?esc(c.title):''}</h1><span class="proto">Prototype · example data from Vinit's journeys</span></div>
+    ${S.settings?`<div class="scroll">${settingsView()}</div>`:c&&c.msgs.length?`<div class="scroll" id="scroll"><div class="thread">${c.msgs.map(msgView).join('')}</div></div>${composer(false)}`:`<div class="scroll">${homeView()}</div>`}
+  </div>${S.panel?panelView():''}</div>`;
+  bind();const sc=document.getElementById('scroll');if(sc&&S._scroll){sc.scrollTop=sc.scrollHeight;S._scroll=false}
+  if(hf){const q=document.getElementById('q');if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length)}}}
+function loginView(){return `<div class="login"><div class="box"><div class="brand" style="padding:0"><b>11 Estates</b><span>CRM</span></div>
+  <div><h2 style="margin:0 0 4px;font-size:20px">Sign in</h2><p class="muted small" style="margin:0">Use your 11 Estates Google account. Only invited people can sign in.</p></div>
+  <button class="gbtn" data-act="login"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>Sign in with Google</button>
+  <p class="note">Prototype: you start as Priyanka (demand team). Switch to Vinit (supply team) or a Manager at the bottom of the sidebar.</p></div></div>`}
+function qCount(){if(isS()){const q=supplyQueue();return q.must.length+Math.min(q.should.length,40)+q.srq.length}return demandQueue().reduce((a,x)=>a+x[1].length,0)}
+function sideView(){const rec=S.chats.filter(c=>c.msgs.length).slice().reverse();
+  const seeds=isS()?['Called Sanjay about INV-00452','Publish INV-00488','Add supply for SRQ-014']:isD()?['Qualify DEM-000127','Can you help me match the requirements for an industrial area of 4,000 sq ft?','Send proposal for DEM-000127']:['How are we doing?','Which Public offers turned Stale this week?','Show demands in sourcing'];
+  return `<aside class="side" ${S.sideOpen?'':'data-closed'}><div class="brand"><b>11 Estates</b><span>CRM</span></div>
+   <button class="sbtn newchat" data-act="new">${ICON.plus}New chat</button>
+   <button class="sbtn ${S.panel&&S.panel.k==='queue'?'on':''}" data-act="pqueue">${ICON.queue}My queue<span class="cnt">${qCount()}</span></button>
+   <button class="sbtn" data-act="pdash">${ICON.dash}Dashboards</button>
+   <button class="sbtn" data-ask="/desks">${ICON.review}Desks &amp; Watchlist</button>
+   ${isS()?`<button class="sbtn" data-ask="/add supply">${ICON.add}Add supply</button>`:`<button class="sbtn" data-ask="/add demand">${ICON.add}Quick add requirement</button>`}
+   <button class="sbtn" data-ask="/upload">${ICON.up}Upload a sheet</button>
+   ${isM()?`<button class="sbtn" data-ask="/review">${ICON.review}Review merges<span class="cnt">2</span></button>`:''}
+   <div class="slabel">Recent chats</div><div class="recents">${rec.map(c=>`<button class="sbtn ${c.id===S.cur&&!S.settings?'on':''}" data-chat="${c.id}">${esc(c.title)}</button>`).join('')}
+   ${seeds.filter(t=>!rec.find(c=>c.title===t)).map(t=>`<button class="sbtn" data-seed="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+   <div class="me">${isM()?`<button class="sbtn ${S.settings?'on':''}" data-act="settings">${ICON.gear}Settings</button>`:''}
+    <div class="me-row"><span class="avatar">${me().ini}</span><div style="min-width:0;flex:1"><div style="font-weight:600;font-size:13px">${me().name} · ${me().role}</div>
+    <label class="small muted" for="userSel" style="display:block">Viewing as</label><select id="userSel">${Object.keys(USERS).map(u=>`<option value="${u}" ${u===S.user?'selected':''}>${USERS[u].name} · ${USERS[u].role}</option>`).join('')}</select></div></div>
+    <button class="sbtn small muted" data-act="logout">Sign out</button></div></aside>`}
+function composer(home){const f=SLASH.filter(s=>S.draft.startsWith('/')&&s[0].startsWith(S.draft.trim().split(' ')[0]));
+  return `<div class="composer-wrap">${f.length?`<div class="slash">${f.map(s=>`<button data-ask="${s[0]}"><b>${s[0]}</b><span class="muted">${s[1]}</span></button>`).join('')}</div>`:''}
+  <form class="composer" id="cf"><input type="text" id="q" placeholder="${home?'Ask, log a call, add a requirement… or type / for actions':'Reply, or type / for actions'}" value="${esc(S.draft)}" autocomplete="off" aria-label="Message">
+  <div class="tools"><button type="button" class="ibtn" data-ask="/upload" title="Attach a sheet" aria-label="Attach a sheet">${ICON.clip}</button><button type="button" class="ibtn" data-act="slashbtn" aria-label="Show actions">${ICON.slash}</button><span class="small faint">All 11 Estates data</span><button type="submit" class="ibtn send" aria-label="Send">${ICON.send}</button></div></form>
+  ${home?'':'<div class="hint">The assistant proposes. Nothing changes until you click.</div>'}</div>`}
+function homeView(){const h=new Date().getHours();const g=h<12?'Good morning':h<17?'Good afternoon':'Good evening';let tiles;
+  if(isS()){const q=supplyQueue();tiles=[[q.must.length,'Must call (24 h)','/queue'],[Math.min(q.should.length,40),'Should call today','/queue'],[q.srq.length,'sourcing requests','/queue'],[offers.filter(o=>o.pub===2&&['Ageing','Stale'].includes(stageOf(o))).length,'Public offers ageing','Which Public offers need reconfirming?']]}
+  else if(isD()){const dq=Object.fromEntries(demandQueue());tiles=[[dq['To contact'].length,'to contact','/queue'],[dq['Reconfirm due'].length,'reconfirm due','/queue'],[dq['Open matches to confirm'].length,'demands with matches to confirm','/matches'],[dq['Follow-ups overdue (In process)'].length,'follow-up overdue','/queue']]}
+  else tiles=[[offers.filter(o=>o.q&&o.q.t==='must').length,'supply Must call open','/dashboard'],[demands.filter(d=>['Ageing','Stale'].includes(stageOf(d))&&!d.exit).length,'demands need reconfirming','/dashboard'],[offers.filter(o=>stageOf(o)==='Stale').length,'offers Stale','/dashboard'],[2,'uncertain merges to review','/review']];
+  const sugg=isS()?['Called Sanjay about INV-00452, available at 8.5L, owner will also sell for 11 Cr','Publish INV-00488','Add supply for SRQ-014']:isD()?['Qualify DEM-000127','Can you help me match the requirements for an industrial area of 4,000 sq ft?','Rohan Mehta 98200 11111 needs office 5-7k sqft Andheri E','Send proposal for DEM-000127','Client for DEM-000131 postponed to April']:['How are we doing?','Which Public offers turned Stale this week?','Show demands in sourcing'];
+  return `<div class="home"><h2>${g}, ${me().name}</h2><div><div class="slabel" style="padding:0 0 6px">Today</div><div class="attn">${tiles.map(t=>`<button data-ask="${esc(t[2])}"><b>${t[0]}</b><span>${t[1]}</span></button>`).join('')}</div></div></div>${composer(true)}
+   <div class="home" style="padding-top:0"><div class="sugg">${sugg.map(s=>`<button data-ask="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>`}
+
+/* ================= axes & bits ================= */
+function axis(name,stages,i,opts){opts=opts||{};return `<div class="axis"><span class="axis-n">${name}</span><div class="steps">${stages.map((s,k)=>`<span class="st ${opts.single?(k===i?'cur':''):(k<i?'done':k===i?'cur':'')} ${opts.cap!=null&&k>opts.cap?'locked':''}">${s}</span>`).join('')}</div></div>`}
+function lifeBar(r){const st=stageOf(r);if(st==='Paused')return `<div class="axis"><span class="axis-n">Life curve</span><span class="small muted">${r.exit?'Paused (Dormant)':'Starts 60 days before Available from'}</span></div>`;
+  const t=(r.kind==='D'?TH_D:TH_S)[catOf(r)];const max=t[2]*1.2;return `<div class="axis"><span class="axis-n">Life curve</span><div class="life"><div class="lz f" style="width:${t[0]/max*100}%"></div><div class="lz a" style="width:${(t[1]-t[0])/max*100}%"></div><div class="lz s" style="width:${(t[2]-t[1])/max*100}%"></div><div class="lz e" style="flex:1"></div><i style="left:${Math.min(r.day/max*100,99)}%"></i></div><span class="small">${stChip(st)} day ${r.day} · ${catOf(r)} ${t.join('/')}</span></div>`}
+function offerAxes(o){const c=ceiling(o);return axis('Record',SREC,o.rec)+axis('Publication',PUB,o.pub,{single:true,cap:c.lvl})+`<div class="small muted" style="margin:-4px 0 4px 96px">Ceiling: ${PUB[c.lvl]}. ${c.why}</div>`+axis('Commercial',SCOM,o.com,{single:true})+lifeBar(o)}
+function demAxes(d){return axis('Record',DREC,d.rec)+axis('Commercial',DCOM,d.com,{single:true})+(d.exit?`<div class="axis"><span class="axis-n">Exit</span><span class="chip bad">${d.exit.type}</span> <span class="small">${esc(d.exit.why)}</span></div>`:'')+lifeBar(d)}
+function how(parts,note){return `<details class="how"><summary>How I got this</summary>${parts.map(p=>`<code>${esc(p)}</code>`).join('')}${note?`<div class="faint" style="margin-top:4px">${note}</div>`:''}</details>`}
+function card(k,head,body,foot){return `<div class="card"><div class="card-h"><span class="k">${k}</span>${head}</div><div class="card-b">${body}</div>${foot?`<div class="card-f">${foot}</div>`:''}</div>`}
+function doneOr(d,html){return d.done?`<div class="card-f"><span class="done-note">✓ ${d.done}</span></div>`:html}
+
+/* ================= messages & cards ================= */
+function msgView(m,i){if(m.u!=null)return `<div class="u-msg">${esc(m.u)}</div>`;
+  const body=m.k==='typing'?'<span class="typing" aria-label="Working"><i></i><i></i><i></i></span>':(CARDS[m.k]||CARDS.text)(m.d,i);
+  return `<div class="a-msg"><span class="a-ico" aria-hidden="true">11</span><div class="a-body">${body}</div></div>`}
+const CARDS={
+ text:d=>d.html,
+ queue:()=>`<p>Opened <b>My queue</b> in the side panel. Items are ranked for you, and each one opens with the right action.</p>`,
+ call(d,i){const o=find(d.id);const r=d.r||'Confirmed';return `<p>Logging your call about <b>${o.id}</b> (${oTitle(o)}).</p><div class="card"><div class="card-h"><span class="k">Call outcome</span>${o.id} · ${o.src[0].who}</div><div class="card-b">
+   <div class="row">${['Confirmed','No answer','Already gone','Unwilling'].map(x=>`<label class="row small"><input type="radio" name="co${i}" value="${x}" data-co="${i}" ${x===r?'checked':''} ${d.done?'disabled':''}> ${x}</label>`).join('')}</div>
+   ${r==='Confirmed'?`<div class="form-grid"><div class="field"><label for="cp${i}">${o.deal==='Lease'?'Rent / month':'Price'}</label><input id="cp${i}" value="${inr(d.price||o.price)}" ${d.done?'disabled':''}></div><div class="field"><label for="ca${i}">Available</label><input id="ca${i}" value="Now" ${d.done?'disabled':''}></div><div class="field"><label for="cb${i}">Built up</label><input id="cb${i}" value="${sq(o.bu)} sq ft" ${d.done?'disabled':''}></div></div>
+     ${d.sale?`<label class="row small"><input type="checkbox" checked ${d.done?'disabled':''}> Add sale offer on ${o.prp}: ${inr(d.sale)}</label>`:''}
+     <p class="small muted">Life curve resets to day 0. Record moves to Contacted. The item leaves your Must call.</p>`:r==='No answer'?`<p class="small muted">Attempt ${(o.att||0)+1} of 3. It is rescheduled for tomorrow, and a 3rd no answer marks ${o.src[0].who} unreachable.</p>`:r==='Already gone'?`<p class="small muted">The offer becomes Inactive, is unpublished, and the price is kept as market data. Matched demands are notified.</p>`:`<p class="small muted">Kept for matching intelligence and never published.</p>`}
+   </div>${doneOr(d,`<div class="card-f"><span class="grow"></span><button class="btn" data-cancel="${i}">Cancel</button><button class="btn primary" data-do="call" data-i="${i}">Save outcome</button></div>`)}</div>`},
+ pub(d,i){const o=find(d.id);const c=ceiling(o);const lv=d.lvl!=null?d.lvl:c.lvl;const clean=d.cleaned||!o.dirty;
+   const txt=`${o.bhk?o.bhk+' BHK ':''}${o.ptype.toLowerCase()}, ${label(o).toLowerCase()} in ${o.loc}, ${sq(o.bu)} sq ft built up${o.furn?', '+o.furn.toLowerCase():''}. ${priceOf(o)}.`+(clean?'':' Contact Mrs Kapoor 98xxxxxx21, <mark>Sea Breeze CHS</mark>.');
+   return `<p>Here's what the website can show for <b>${o.id}</b>. The publication ceiling comes from the BRD rules. You choose within it.</p><div class="card"><div class="card-h"><span class="k">Publication</span>${o.id} · ${oTitle(o)}</div><div class="card-b">
+   <div><b>Ceiling: ${PUB[c.lvl]}</b> <span class="small muted">${c.why}</span></div>
+   <div class="row">${PUB.map((p,k)=>`<label class="row small ${k>c.lvl?'faint':''}"><input type="radio" name="pl${i}" data-pl="${i}" value="${k}" ${k===lv?'checked':''} ${k>c.lvl||d.done?'disabled':''}> ${p}${k>c.lvl?' (locked)':''}</label>`).join('')}</div>
+   <div class="webcard"><div class="c"><span class="small muted">${lv===2?'Public':'Anonymous'} listing preview · generated label</span><b>${label(o)} · ${o.bhk?o.bhk+' BHK ':''}${o.ptype} in ${o.loc}</b><span>${priceOf(o)} · ${sq(o.bu)} sq ft built up · Available ${o.avail?'from 1 Feb':'now'}</span>${lv===2?`<span class="small">${o.photos} photos · ${txt}</span>`:'<span class="small muted">Details subject to confirmation. No photos.</span>'}<span class="small faint">MahaRERA agent reg. ${RERA}${o.tags.find(t=>/RERA/.test(t))?' · '+o.tags.find(t=>/RERA/.test(t)):''}</span></div></div>
+   <div class="check"><span class="ic ${clean?'ok':'bd'}">${clean?'✔':'✗'}</span><span>${clean?'No phone numbers, building names or unit numbers in the text':'Phone number and building name found in the description'}</span>${clean||d.done?'':`<button class="btn sm" data-do="clean" data-i="${i}">Remove</button>`}</div>
+   <div class="check"><span class="ic ok">✔</span><span>MahaRERA number present</span></div></div>
+   ${doneOr(d,`<div class="card-f"><span class="grow"></span>${clean?'':'<span class="small bd">Blocked until the red check is fixed</span>'}<button class="btn primary" data-do="pub" data-i="${i}" ${clean?'':'disabled'}>Set to ${PUB[lv]}</button></div>`)}</div>`},
+ qualify(d,i){const x=find(d.id);const items=['Decision maker reached','Budget confirmed','Timing confirmed','Agrees to work with 11 Estates'];d.ck=d.ck||[1,1,1,1];
+   return `<p><b>${x.id}</b>: ${dTitle(x)}, ${sq(x.aMin)}–${sq(x.aMax)} sq ft built up, ${budgetOf(x)}, move in within ${x.moveBy} days.</p><div class="card"><div class="card-h"><span class="k">Qualify</span>${x.id} · ${esc(x.client)}</div><div class="card-b">${items.map((t,k)=>`<label class="row small"><input type="checkbox" data-ck="${i}" data-k="${k}" ${d.ck[k]?'checked':''} ${d.done?'disabled':''}> ${t}</label>`).join('')}<p class="small muted">Qualifying resets the life curve and runs the inventory check.</p></div>
+   ${doneOr(d,`<div class="card-f"><span class="grow"></span><button class="btn primary" data-do="qualify" data-i="${i}" ${d.ck.every(Boolean)?'':'disabled'}>Mark qualified</button></div>`)}</div>`},
+ matches(d,i){const x=find(d.id);const r=matchesFor(x);const st=S.mstate;
+   if(!r.m.length)return `<p>Nothing in inventory clears the criteria for <b>${x.id}</b>${r.excl.length?`. ${r.excl.map(e=>e.o.id+' is excluded: '+e.excluded).join('; ')}`:''}.</p><div class="row"><button class="btn primary" data-ask="Source supply for ${x.id}">Raise sourcing request</button></div>`;
+   return `<p>${r.m.length} suggested for <b>${x.id}</b> (${dTitle(x)}, ${sq(x.aMin)}–${sq(x.aMax)} sq ft, ${budgetOf(x)}).${r.m.some(m=>m.bundle)?' One is a <b>bundle</b> that meets the area only together.':''} Sourcing is skipped because the CRM already has options.</p>`+
+   `<div class="card"><div class="card-b" style="padding-top:4px;padding-bottom:4px">${r.m.slice(0,5).map(m=>{const k=x.id+'|'+mKey(m),s=st[k];return `<div class="match ${s==='rej'?'hide':''}"><div class="score ${m.score>=80?'hi':'mid'}">${m.score}</div><div class="grow"><b>${mTitle(m)}</b>${m.reconfirm?' <span class="chip warn">Stale: reconfirm</span>':''}<div class="small muted">${mSub(m)}</div><div class="factors">${Object.entries(m.f).map(([a,b])=>`<span class="chip ${b.startsWith('✔')?'good':'warn'}">${a} ${b}</span>`).join('')}</div>
+    <div class="row" style="margin-top:6px">${s==='ok'?'<span class="done-note">✓ Confirmed</span>':s==='rej'?'<span class="small muted">Rejected</span>':`<button class="btn sm primary" data-m="ok" data-k="${k}">Confirm</button><button class="btn sm" data-m="rej" data-k="${k}">Reject</button>`}${m.o?`<button class="btn sm ghost" data-open="${m.o.id}">Open</button>`:''}</div></div></div>`}).join('')}</div></div>`+
+   (r.excl.length?`<p class="small muted">Excluded: ${r.excl.map(e=>`${e.o.id} (${e.excluded})`).join(', ')}.</p>`:'')+
+   `<div class="row"><button class="btn sm" data-ask="Send proposal for ${x.id}">Build proposal from confirmed</button></div>`+how(['side = Supply (opposite)','deal_type = '+x.deal,...(x.deal==='Sale'?['market = '+x.market+(x.market==='Any'?' (Primary or Secondary)':'')]:[]),'segment = '+x.seg,'property_type = '+x.ptype,...(x.tags&&x.tags.tenancy?['tenancy_status = '+x.tags.tenancy]:[]),'micromarket ∈ '+x.mms.join(', '),'built up '+x.aMin+'–'+x.aMax+' (bundles: combined)','price ≤ budget','Available from ≤ move-in window','offer not Expired / Closed / Inactive'])},
+ srq(d,i){const x=find(d.id);return `<p>Nothing matches <b>${x.id}</b>, so I'll ask the supply team to source it.</p>`+card('Sourcing request',x.id+' · '+dTitle(x),`<div class="form-grid"><div class="field"><label for="sa${i}">Assign to</label><select id="sa${i}" ${d.done?'disabled':''}><option>Vinit</option></select></div><div class="field"><label for="sd${i}">Due</label><input id="sd${i}" value="Friday" ${d.done?'disabled':''}></div><div class="field"><label for="sp${i}">Priority</label><select id="sp${i}" ${d.done?'disabled':''}><option>High</option><option>Normal</option></select></div></div>
+   <label class="row small"><input type="checkbox" checked ${d.done?'disabled':''}> Post the demand anonymously (${label(x)} · ${x.ptype} · ${x.mms[0]} · ${sq(x.aMin)}–${sq(x.aMax)} sq ft · ${budgetOf(x)} band)</label><p class="small muted">The demand moves to Sourcing and gets an <b>Add supply</b> action. The post comes down once a match is confirmed.</p>`,d.done?`<span class="done-note">✓ ${d.done}</span>`:`<span class="grow"></span><button class="btn" data-cancel="${i}">Cancel</button><button class="btn primary" data-do="srq" data-i="${i}">Send to supply team</button>`)},
+ addsup(d,i){const x=find(d.id);return `<p>Add supply found for <b>${x.id}</b>. The form is prefilled from the demand. I'll check for a duplicate property first.</p>`+card('Add supply',`Sourced for ${x.id}`,`<div class="form-grid"><div class="field"><label>Segment / type</label><input value="${label({...x,kind:'S'})} · ${x.seg} · ${x.ptype}" disabled></div><div class="field"><label for="al${i}">Locality</label><input id="al${i}" value="${x.mms[0]}" ${d.done?'disabled':''}></div><div class="field"><label for="ab${i}">Built up (sq ft)</label><input id="ab${i}" value="${sq(Math.round((x.aMin+x.aMax)/2))}" ${d.done?'disabled':''}></div><div class="field"><label for="ap${i}">${x.deal==='Lease'?'Rent / month':'Price'}</label><input id="ap${i}" value="${inr(Math.round(x.bMax*0.95))}" ${d.done?'disabled':''}></div><div class="field"><label for="as${i}">Source</label><input id="as${i}" value="Sanjay (broker)" ${d.done?'disabled':''}></div><div class="field"><label>Starts at</label><input value="Contacted · Private" disabled></div></div>
+   <div class="check"><span class="ic ok">✔</span><span>Duplicate check (building, floor, area, locality): no existing property</span></div>`,d.done?`<span class="done-note">✓ ${d.done}</span>`:`<span class="grow"></span><button class="btn primary" data-do="addsup" data-i="${i}">Create offer and match</button>`)},
+ proposal(d,i){const x=find(d.id);const conf=matchesFor(x).m.filter(m=>S.mstate[x.id+'|'+mKey(m)]==='ok');const opts=conf.length?conf:matchesFor(x).m.slice(0,3);
+   return `<p>${conf.length?conf.length+' confirmed':'No confirmed matches yet, so I used the top 3 suggestions'} for <b>${x.id}</b>. Proposals include <b>building names</b> for qualified clients, but never owner or broker contacts.</p>`+card('Proposal',`${x.id} · ${esc(x.client)}`,`<div class="tw"><table><thead><tr><th>Option</th><th>Building</th><th class="n">Built up / carpet</th><th class="n">Price</th><th>Available</th></tr></thead><tbody>${opts.map(m=>{const os=m.bundle||[m.o];return `<tr><td>${m.bundle?'Bundle':''} ${os.map(o=>o.id).join(' + ')}</td><td>${os.map(o=>esc(o.bldg.replace(' (internal)',''))).join('; ')}</td><td class="n">${os.map(o=>sq(o.bu)+' / '+sq(o.ca)).join(' + ')}</td><td class="n">${m.bundle?inr(m.price)+'/mo':priceOf(m.o)}</td><td>${os.some(o=>o.avail)?'1 Feb':'Now'}</td></tr>`}).join('')}</tbody></table></div><p class="small faint">Footer: 11 Estates · MahaRERA ${RERA}</p>`,
+   d.done?`<span class="done-note">✓ ${d.done}</span>`:`<button class="btn" data-do="pdf" data-i="${i}">Generate PDF</button><button class="btn" data-do="link" data-i="${i}">Create share link (14 days)</button><span class="grow"></span><button class="btn primary" data-do="sent" data-i="${i}">Mark sent</button>`)},
+ deal(d,i){const x=find(d.id);d.next=d.next||'';d.fu=d.fu||'';return `<p>Tracking the deal for <b>${x.id}</b>. Every In process deal needs a next action and a follow-up date.</p>`+card('Deal',`${x.id} with ${d.offer}`,`<div class="form-grid"><div class="field"><label for="ds${i}">Stage</label><select id="ds${i}" ${d.done?'disabled':''}><option>Negotiation</option><option>Documentation</option><option>Stamp duty &amp; registration</option></select></div><div class="field"><label for="dn${i}">Next action</label><input id="dn${i}" data-f="next" data-i="${i}" value="${esc(d.next)}" placeholder="e.g. Send revised term sheet" ${d.done?'disabled':''}></div><div class="field"><label for="df${i}">Follow-up date</label><input id="df${i}" data-f="fu" data-i="${i}" value="${esc(d.fu)}" placeholder="e.g. 26 Sep" ${d.done?'disabled':''}></div></div><p class="small muted">Cancelling later returns the offer to Available and the demand to Active, and keeps this deal on record.</p>`,
+   d.done?`<span class="done-note">✓ ${d.done}</span>`:`<span class="grow"></span><button class="btn primary" data-do="deal" data-i="${i}" ${d.next&&d.fu?'':'disabled'}>Start In process</button>`)},
+ exit(d,i){const x=find(d.id);const t=d.type||'Dormant';return `<p>Closing out <b>${x.id}</b> (${esc(x.client)}).</p>`+card('Exit',x.id,`<div class="row">${['Lost','Dormant','Invalid'].map(e=>`<label class="row small"><input type="radio" name="ex${i}" data-ex="${i}" value="${e}" ${e===t?'checked':''} ${d.done?'disabled':''}> ${e}</label>`).join('')}</div>
+   ${t==='Dormant'?`<div class="form-grid"><div class="field"><label for="er${i}">Revisit on</label><input id="er${i}" value="1 March" ${d.done?'disabled':''}></div><div class="field" style="grid-column:span 2"><label for="ew${i}">Reason</label><input id="ew${i}" value="${esc(d.why||'Expansion moved to April')}" ${d.done?'disabled':''}></div></div><p class="small muted">The life curve pauses and matches are released to other clients. On the revisit date the demand returns to your queue.</p>`
+   :t==='Lost'?`<div class="form-grid"><div class="field" style="grid-column:span 2"><label for="ew${i}">Reason</label><input id="ew${i}" value="Signed elsewhere" ${d.done?'disabled':''}></div><div class="field"><label for="ec${i}">Competing terms</label><input id="ec${i}" value="Powai, 2 months rent free" ${d.done?'disabled':''}></div></div><p class="small muted">The competing terms are kept as market data. All matches are released and the offer owners notified.</p>`
+   :`<div class="field"><label for="ew${i}">Reason</label><select id="ew${i}" ${d.done?'disabled':''}><option>Unreachable after 3 attempts</option><option>Broker posing as a client</option><option>Fake details</option></select></div><p class="small muted">The person is flagged so future records from them are marked. The demand drops out of every queue.</p>`}`,
+   d.done?`<span class="done-note">✓ ${d.done}</span>`:`<span class="grow"></span><button class="btn" data-cancel="${i}">Cancel</button><button class="btn primary" data-do="exit" data-i="${i}">Confirm ${t}</button>`)},
+ quick(d,i){const found=d.phone&&/11111/.test(d.phone);return `<p>Quick add asks for the phone number first, so an existing client or demand is found instead of recreated.</p>`+card('Quick add requirement',d.looked?(found?'Existing client found':'New client'):'Step 1 · phone',
+   `<div class="row"><div class="field grow"><label for="qp${i}">Phone</label><input id="qp${i}" value="${esc(d.phone||'')}" ${d.looked?'disabled':''}></div>${d.looked?'':`<button class="btn primary" data-do="lookup" data-i="${i}" style="align-self:flex-end">Look up</button>`}</div>
+   ${d.looked?(found?`<div class="check"><span class="ic wn">!</span><span><b>Rohan Mehta</b> already has <b>DEM-000127</b> (office, Andheri East) from Channel via Anil. Adding this as a <b>touch</b> keeps the first-touch credit with Anil.</span></div>`
+     :`${qaForm(d,i)}<div class="form-grid"><div class="field"><label>Client</label><input value="${esc(d.name||'New client')}"></div><div class="field"><label>Locations</label><input value="${esc(d.loc||'Andheri East')}"></div><div class="field"><label>Area</label><input value="${esc(d.area||'5,000–7,000 sq ft built up')}"></div><div class="field"><label>Budget</label><input value="${esc(d.bud||'₹8–10 L / month')}"></div><div class="field"><label>Referred by</label><input value="${esc(d.ref||'')}" placeholder="optional"></div></div><p class="small muted">Source: Direct, typed in. It goes to your To contact queue.</p>`):''}`,
+   d.done?`<span class="done-note">✓ ${d.done}</span>`:d.looked?(found?`<span class="grow"></span><button class="btn" data-do="qnew" data-i="${i}">Create new anyway</button><button class="btn primary" data-do="qtouch" data-i="${i}">Add touch to DEM-000127</button>`:`<span class="grow"></span><button class="btn primary" data-do="qnew" data-i="${i}">Create demand</button>`):'')},
+ upload(d,i){if(!d.started)return `<p>Attach an Excel/CSV file, or pick an example. Lead-form and enquiry exports should be uploaded at least daily so Must call can meet its 24 h target.</p><div class="filesel">${[['TOI_Classifieds_24Sep.xlsx','98,402 rows · Channel · template "TOI classifieds v2"'],['Meta_leads_Andheri_24Sep.csv','412 rows · Digi · campaign ID column mapped']].map((f,k)=>`<button data-do="upstart" data-i="${i}" data-f="${k}"><span class="chip good">XLSX</span><span><b>${f[0]}</b><br><span class="small muted">${f[1]}</span></span></button>`).join('')}</div>`;
+   const r=S.runs[d.run];const big=d.f===0;if(!r.done)return card('Processing',big?'TOI_Classifieds_24Sep.xlsx':'Meta_leads_Andheri_24Sep.csv',`<div data-run="${d.run}">${['Parsing','Normalising','Classifying','Deduplicating','Matching'].map((s,k)=>`<div class="stage"><span>${s}</span><div class="track"><i style="width:${r.p[k]}%"></i></div><span class="num small muted" style="text-align:right">${Math.round(r.p[k])}%</span></div>`).join('')}</div>`);
+   return `<p>Finished.</p>`+card('Report',big?'TOI_Classifieds_24Sep.xlsx':'Meta_leads_Andheri_24Sep.csv',`<div class="report">${(big?[['Rows read','98,402'],['New offers','9,140'],['New demands','3,040'],['Reposts / sightings','71,944'],['Second sources','2,318'],['To review','1,902'],['Unclassified','8,650'],['Rejected','1,408']]:[['Rows read','412'],['Enquiries','412'],['New demands','236'],['Touches on existing','131'],['Offers moved to Must call','38'],['To review','12'],['Unclassified','9'],['Rejected','24']]).map(x=>`<div>${x[0]}<b>${x[1]}</b></div>`).join('')}</div>`,`<button class="btn" data-ask="/queue">Open my queue</button><button class="btn" data-ask="/review">Review merges</button>`)},
+ review(d,i){const pairs=[{h:'Supply · same property?',a:'INV-00452 · Office, Chakala · 5,000 sq ft · ₹8 L · Sanjay',b:'New post · Office Andheri E · 5,000 sq ft · ₹8.2 L · Rakesh',why:'Building, floor and area match. Different broker and price.',act:'Link as second source (price gap flagged)'},{h:'Demand · same client?',a:'DEM-000127 · Office Andheri E 5–7k · ₹8–10 L · Channel via Anil',b:'Meta lead ad · Rohan Mehta · "Offices in Andheri East"',why:'Company name and requirement match. Different phone.',act:'Merge as second touch (first touch stays Channel)'}];const p=pairs[S.dupIdx%2];
+   if(d.done)return `<p class="done-note">✓ ${d.done}</p>`;
+   const groups=[['side unclear (no side_evidence)',214],['value not in list: property_type "Duplex" (moved to property_detail?)',38],['record_scope unclear',12],['uncertain merge',2],['price gap between sources',3]];
+   return `<p>Review queue, grouped by review_reason. Review never blocks routing (BRD §4.7).</p><div class="card"><div class="card-b">${groups.map(g=>`<div class="row small"><span class="chip warn">${g[1]}</span>${esc(g[0])}</div>`).join('')}<p class="small muted">Rows rejected at upload (values outside the controlled lists, strict mode): 1,408. See the Data quality dashboard.</p></div></div>`+card('Uncertain merge',p.h,`<div class="compare"><div class="h">Existing</div><div class="h">Incoming</div><div class="h m"></div><div>${p.a}</div><div>${p.b}</div><div></div></div><p class="small muted">${p.why} A phone number alone never merges records.</p>`,`<button class="btn primary" data-do="merge" data-i="${i}">${p.act}</button><button class="btn" data-do="diff" data-i="${i}">Different</button><span class="grow"></span><button class="btn ghost sm" data-do="stoprev" data-i="${i}">Stop</button>`)},
+ dash:()=>`<p>Opened the dashboards. Every tile opens its list.</p>`
+};
+
+/* ================= assistant routing (prototype) ================= */
+const T=html=>({k:'text',d:{html}});
+function idIn(t){const m=t.match(/\b((?:inv|dem|srq|prj)-\d+)\b/i);return m?m[1].toUpperCase():null}
+function reply(q){const t=q.toLowerCase().trim();const id=idIn(t);
+  if(/^\/queue|my queue|^queue/.test(t)){S.panel={k:'queue'};return {k:'queue',d:{}}}
+  if(/^\/dashboard|dashboard|how are we doing/.test(t)){S.panel={k:'dash',tab:isS()?'Supply':isD()?'Demand':'Demand'};return {k:'dash',d:{}}}
+  if(/^\/upload|upload/.test(t))return {k:'upload',d:{}};
+  if(/^\/review|review merge/.test(t))return {k:'review',d:{}};
+  if(/^\/add demand|quick add/.test(t))return {k:'quick',d:{}};
+  if(/^\/desks|desk|watchlist/.test(t)){S.panel={k:'desks',tab:/watch/.test(t)?'Watchlist':'Business Desk'};return T('<p>Opened the <b>Desks</b> in the side panel. Business, Capital, Equipment, Market Participant and Market Signal records are stored and viewable. They have no journeys in Phase 1.</p>')}
+  const ph=t.match(/(\d[\d\s]{8,}\d)/);if(ph&&/needs|need|requirement|looking/.test(t)){const bud=(q.match(/(\d+\s*-\s*\d+\s*l)/i)||[])[1];return {k:'quick',d:{phone:ph[1].replace(/\s/g,' '),name:(q.match(/^([A-Z][a-z]+ [A-Z][a-z]+)/)||[])[1]}}}
+  if(/^\/add supply|add supply/.test(t)){const s=id&&id.startsWith('SRQ')?S.srq.find(x=>x.id===id):null;const dem=s?s.dem:id&&id.startsWith('DEM')?id:'DEM-000201';return {k:'addsup',d:{id:dem}}}
+  if(/called|spoke|call with/.test(t)&&id){const o=find(id);if(!o||o.kind!=='S')return T('<p>I can\'t find that offer.</p>');const pr=t.match(/(\d+(?:\.\d+)?)\s*l\b/);const sale=t.match(/sell for\s*(\d+(?:\.\d+)?)\s*cr/);
+    return {k:'call',d:{id,r:/no answer|didn.t pick/.test(t)?'No answer':/gone|leased|sold/.test(t)?'Already gone':'Confirmed',price:pr?Math.round(parseFloat(pr[1])*1e5):null,sale:sale?Math.round(parseFloat(sale[1])*1e7):null}}}
+  if(/publish|publication/.test(t)&&id){const o=find(id);if(!o||o.kind!=='S')return T('<p>Only offers can be published.</p>');if(isD())return T('<p>The supply team sets publication levels. I can ask Vinit to review it.</p>');return {k:'pub',d:{id}}}
+  if(/qualify/.test(t)&&id)return isS()?T('<p>Qualifying demand is done by the demand team.</p>'):{k:'qualify',d:{id}};
+  if(/source supply|sourcing request/.test(t)&&id)return {k:'srq',d:{id}};
+  if(/proposal/.test(t)&&id)return {k:'proposal',d:{id}};
+  if(/start deal|deal /.test(t)&&id)return {k:'deal',d:{id,offer:'INV-00455'}};
+  if(/postponed|dormant/.test(t)){const x=id?find(id):demands.find(d=>d.id==='DEM-000131');return {k:'exit',d:{id:x.id,type:'Dormant'}}}
+  if(/lost|signed elsewhere/.test(t)&&id)return {k:'exit',d:{id,type:'Lost'}};
+  if(/invalid|fake|unreachable/.test(t)&&id)return {k:'exit',d:{id,type:'Invalid'}};
+  if(/^\/matches|matches|^match/.test(t)&&!/\d{3,}\s*(sq|sqft)|thousand/.test(t)){const x=id?find(id):demands.find(d=>d.rec>=3&&d.com===2&&matchesFor(d).m.length&&!d.exit);return x?{k:'matches',d:{id:x.id}}:T('<p>No demands are waiting for match confirmation.</p>')}
+  if(/^open /.test(t)&&id){const x=find(id);S.panel={k:x.kind==='S'?'offer':'demand',id:x.id};return T(`<p>Opened <b>${x.id}</b> in the side panel.</p>`)}
+  // data questions
+  const sqm=t.match(/([\d,]+)\s*(?:sq\.?\s*ft|sqft|square feet)/)||t.match(/(four|five|three)\s+thousand/);
+  if(sqm&&/match/.test(t)){const n=/thousand/.test(sqm[0])?{three:3000,four:4000,five:5000}[sqm[1]]:parseInt(sqm[1].replace(/,/g,''));const seg=/industrial|gala|warehouse/.test(t)?'Industrial':/office|commercial/.test(t)?'Commercial':null;
+    const ds=demands.filter(d=>!d.exit&&(!seg||d.seg===seg)&&d.aMax>=n*0.75&&d.aMin<=n*1.25);
+    return T(`<p>I found <b>${ds.length} ${seg?seg.toLowerCase()+' ':''}demands</b> around ${sq(n)} sq ft (±25%). Best match for each, using micromarket, built-up area, budget and availability date:</p><div class="card"><div class="tw"><table><thead><tr><th>Demand</th><th class="n">Wants</th><th class="n">Budget</th><th>Best offer</th><th class="n">Score</th></tr></thead><tbody>${ds.map(d=>{const m=matchesFor(d).m[0];return `<tr class="click" data-open="${d.id}"><td><b>${d.id}</b><div class="small muted">${dTitle(d)}</div></td><td class="n">${sq(d.aMin)}–${sq(d.aMax)}</td><td class="n">${budgetOf(d)}</td><td>${m?mTitle(m)+`<div class="small muted">${mSub(m)}</div>`:'<span class="faint">none, consider a sourcing request</span>'}</td><td class="n">${m?`<span class="chip ${m.score>=80?'good':'warn'}">${m.score}</span>`:'—'}</td></tr>`}).join('')}</tbody></table></div></div><div class="row"><button class="btn sm" data-act="dl">Download Excel</button></div>`+how(['category = Demand',`segment = ${seg||'any'}`,`area overlaps ${n*0.75}–${n*1.25} sq ft`,'not exited','then matching rules (BRD §7)']))}
+  if(/stale|ageing|reconfirm/.test(t)){const rows=offers.filter(o=>['Ageing','Stale','Expired'].includes(stageOf(o)));return T(`<p>${rows.length} offers need reconfirming:</p><div class="card"><div class="tw"><table><thead><tr><th>Offer</th><th>Life curve</th><th>Publication</th><th>Queue</th></tr></thead><tbody>${rows.map(o=>`<tr class="click" data-open="${o.id}"><td><b>${o.id}</b> ${oTitle(o)}</td><td>${stChip(stageOf(o))} day ${o.day}</td><td>${PUB[o.pub]}${stageOf(o)==='Stale'&&o.pub===1?' (auto-downgraded)':''}</td><td>${o.q?o.q.t==='must'?'Must call':'Should call #'+o.q.rank:'—'}</td></tr>`).join('')}</tbody></table></div></div>`+how(['life-curve stage ∈ Ageing, Stale, Expired','thresholds per category (BRD §4.5)']))}
+  if(/sourcing/.test(t)){const rows=demands.filter(d=>d.com===3);return T(rows.length?`<p>${rows.length} demands are in Sourcing: ${rows.map(d=>`<a href="#" data-open="${d.id}">${d.id}</a>`).join(', ')}.</p>`:'<p>No demands are in Sourcing right now. Sourcing requests open: '+S.srq.filter(s=>!s.done).map(s=>s.id+' for '+s.dem).join(', ')+'.</p>')}
+  return T(`<p>I can help with your queue, calls, qualifying, matches, sourcing, proposals, deals and exits, or answer questions about the data. Try:</p><div class="sugg">${['/queue','Qualify DEM-000127','Matches for DEM-000127','Called Sanjay about INV-00452, available at 8.5L','Which offers need reconfirming?'].map(s=>`<button data-ask="${esc(s)}">${esc(s)}</button>`).join('')}</div>`)}
+function qaForm(d,i){d.side=d.side||'Demand';d.deal=d.deal||'Lease';d.seg=d.seg||'Commercial';d.market=d.market||'Any';if(!PTYPES[d.seg].includes(d.pt))d.pt=PTYPES[d.seg][0];
+  const sel=(k,lab,opts,v)=>`<div class="field"><label for="qa${k}${i}">${lab}</label><select id="qa${k}${i}" data-qa="${k}" data-i="${i}" ${d.done?'disabled':''}>${opts.map(o=>`<option ${o===v?'selected':''}>${o}</option>`).join('')}</select></div>`;
+  const lr={kind:d.side==='Supply'?'S':'D',deal:d.deal,market:d.side==='Supply'&&d.market==='Any'?'Secondary':d.market,seg:d.seg};
+  return `<p class="small muted">Classification order (BRD §4.2): side first for usability, then deal_type → market (Sale only) → segment → property_type. Controlled values only.</p><div class="form-grid">${sel('side','Side',['Demand','Supply'],d.side)}${sel('deal','deal_type',['Sale','Lease','JV','Pagdi'],d.deal)}${d.deal==='Sale'?sel('market','market',d.side==='Demand'?['Any','Primary','Secondary']:['Primary','Secondary'],d.market):''}${sel('seg','segment',Object.keys(PTYPES),d.seg)}${sel('pt','property_type',PTYPES[d.seg],d.pt)}<div class="field"><label>Label (generated)</label><input value="${label(lr)}" disabled></div></div>`}
+function titleFor(q){return q.replace(/^\//,'').slice(0,46)}
+function ask(q){q=(q||'').trim();if(!q)return;S.draft='';S.sideOpen=false;let c=chat();if(!c||S.settings){c={id:'c'+Date.now()+Math.random(),title:titleFor(q),msgs:[]};S.chats.push(c);S.cur=c.id}S.settings=false;
+  c.msgs.push({u:q});c.msgs.push({k:'typing'});S._scroll=true;render();setTimeout(()=>{c.msgs.pop();c.msgs.push(reply(q));S._scroll=true;render()},550)}
+function say(k,d){const c=chat();c.msgs.push({k,d});S._scroll=true}
+
+/* ================= panels ================= */
+function panelView(){const p=S.panel;let h='',b='';
+  if(p.k==='queue'){h='My queue · '+me().name;b=queueBody()}
+  if(p.k==='offer'){const o=find(p.id);h=`${o.id} · ${oTitle(o)}`;b=offerBody(o)}
+  if(p.k==='demand'){const d=find(p.id);h=`${d.id} · ${dTitle(d)}`;b=demandBody(d)}
+  if(p.k==='dash'){h='Dashboards';b=dashBody()}
+  if(p.k==='desks'){h='Desks';b=desksBody()}
+  return `<aside class="panel" aria-label="Side panel"><div class="panel-h">${p.back?`<button class="btn sm ghost" data-act="pback">‹ Back</button>`:''}<h2>${h}</h2><button class="ibtn" data-act="pclose" aria-label="Close panel">${ICON.close}</button></div><div class="panel-b">${b}</div></aside>`}
+function qItem(id,title,why,due,act){return `<div class="qitem2"><div class="grow"><b data-open="${id}" style="cursor:pointer">${id}</b> <span>${title}</span><div class="small muted">${why}</div></div><span class="small ${/overdue|in \d+ h|today/.test(due)?'bd':'muted'}">${due||''}</span><button class="btn sm" data-ask="${esc(act)}">${act.split(' ')[0]}</button></div>`}
+function queueBody(){
+  if(isS()||isM()&&S.qside==='Supply'){const q=supplyQueue();const cap=40;
+    return `${isM()?qToggle():''}<p class="small muted">Capacity ${cap} calls today (set by your manager). Must call first, then Should call by rank.</p>
+    <div class="qsec"><div class="qh">Must call <span class="chip bad">${q.must.length}</span></div>${q.must.map(o=>qItem(o.id,oTitle(o),o.q.why,o.q.due,`Called Sanjay about ${o.id}, available at 8.5L, owner will also sell for 11 Cr`)).join('')||'<p class="small muted">Nothing due.</p>'}</div>
+    <div class="qsec"><div class="qh">Should call <span class="chip warn">${q.should.length}</span></div>${q.should.map(o=>qItem(o.id,oTitle(o),`#${o.q.rank} · ${o.q.why}`,'',`Called about ${o.id}, confirmed`)).join('')}</div>
+    <div class="qsec"><div class="qh">Sourcing requests <span class="chip plain">${q.srq.length}</span></div>${q.srq.map(s=>{const d=find(s.dem);return qItem(s.id,`for ${s.dem} · ${dTitle(d)}`,`${sq(d.aMin)}–${sq(d.aMax)} sq ft · ${budgetOf(d)} · priority ${s.pri}`,'due '+s.due,`Add supply for ${s.id}`)}).join('')||'<p class="small muted">None open.</p>'}</div>
+    <div class="qsec"><div class="qh">Ready to publish</div>${offers.filter(o=>ceiling(o).lvl>o.pub&&o.com<6).map(o=>qItem(o.id,oTitle(o),`Now ${PUB[o.pub]} · ceiling ${PUB[ceiling(o).lvl]}`,'',`Publish ${o.id}`)).join('')||'<p class="small muted">All at their ceiling.</p>'}</div>`}
+  return `${isM()?qToggle():''}`+demandQueue().map(([n,ds])=>`<div class="qsec"><div class="qh">${n} <span class="chip ${/overdue/i.test(n)?'bad':ds.length?'warn':'plain'}">${ds.length}</span></div>${ds.map(d=>qItem(d.id,`${dTitle(d)} · ${esc(d.client)}`,n==='Reconfirm due'?`${stageOf(d)} day ${d.day} · ${catOf(d)}`:n.startsWith('Follow')?`${d.dealRec.stage}: ${d.dealRec.next}`:`${sq(d.aMin)}–${sq(d.aMax)} sq ft · ${budgetOf(d)} · ${d.touches[0].type}`,n.startsWith('Follow')?'overdue '+d.dealRec.due:'',n==='Open matches to confirm'?`Matches for ${d.id}`:n==='To qualify'?`Qualify ${d.id}`:n==='Reconfirm due'?`Client for ${d.id} postponed to April`:`Qualify ${d.id}`)).join('')}</div>`).join('')}
+function qToggle(){return `<div class="row">${['Demand','Supply'].map(x=>`<button class="btn sm ${(S.qside||'Demand')===x?'primary':''}" data-qside="${x}">${x} team</button>`).join('')}</div>`}
+function offerBody(o){const ms=demands.map(d=>{const m=matchOne(d,o);return m&&!m.excluded&&!d.exit?{d,score:m.score}:null}).filter(Boolean);
+  return `<div class="row"><span class="chip supply">Supply offer</span><b style="font-size:16px">${priceOf(o)}</b><span class="small muted">${o.prp} · ${label(o)} · ${o.seg} · ${o.ptype}${o.units?` · ${o.units} units`:''}</span></div>${offerAxes(o)}
+  <dl class="kv"><dt>Stored fields</dt><dd class="mono small">deal_type=${o.deal}${o.market?' · market='+o.market:''} · segment=${o.seg} · property_type=${o.ptype}${o.bhk?' · bhk='+o.bhk:''}${o.tenancy?' · tenancy_status='+o.tenancy:''}${o.tenure?' · tenure='+o.tenure:''}${o.landUse?' · land_use='+o.landUse:''}</dd><dt>Location</dt><dd>${o.loc} <span class="faint">(${o.mm})</span></dd><dt>Building<span class="private">PROPOSALS ONLY</span></dt><dd>${esc(o.bldg)}</dd><dt>Area</dt><dd>${sq(o.bu)} built up · ${sq(o.ca)} carpet</dd><dt>Available</dt><dd>${o.avail?'from 1 Feb (Upcoming)':'now'}</dd>
+  <dt>Sources</dt><dd>${o.src.map(s=>`${esc(s.who)} · ${inr(s.price)}${s.first?' (first)':''}`).join('<br>')}${o.src.length>1&&Math.abs(o.src[1].price-o.src[0].price)/o.src[0].price>0.02?' <span class="chip warn">price gap</span>':''}</dd>
+  <dt>Signals</dt><dd>${o.enq} enquiries · ${ms.length} matches</dd><dt>Queue</dt><dd>${o.q?(o.q.t==='must'?'Must call · '+o.q.due:'Should call #'+o.q.rank):'—'}</dd><dt>Owner</dt><dd>${o.owner}</dd>${o.tags.length?`<dt>Tags</dt><dd>${o.tags.join(', ')}</dd>`:''}</dl>
+  <div><div class="qh">Matched demands</div>${ms.map(m=>`<div class="small"><b data-open="${m.d.id}" style="cursor:pointer">${m.d.id}</b> ${dTitle(m.d)} · ${esc(m.d.client)} · score ${m.score}</div>`).join('')||'<span class="small muted">None</span>'}</div>
+  <div class="row">${isD()?'':`<button class="btn sm" data-ask="Called about ${o.id}, confirmed">Log call</button><button class="btn sm" data-ask="Publish ${o.id}">Publication…</button>`}</div>`}
+function demandBody(d){const r=matchesFor(d);return `<div class="row"><span class="chip demand">Demand</span><b>${esc(d.client)}</b><span class="small muted">${label(d)} · ${d.seg} · ${d.ptype} · owner ${d.owner}</span></div><div class="mono small muted">side=Demand · deal_type=${d.deal}${d.market?' · market='+d.market:''} · segment=${d.seg} · property_type=${d.ptype}${d.bhk?' · bhk='+d.bhk:''}${d.tags&&d.tags.tenancy?' · tenancy_status='+d.tags.tenancy:''}</div>${demAxes(d)}
+  <dl class="kv"><dt>Wants</dt><dd>${sq(d.aMin)}–${sq(d.aMax)} sq ft built up${d.cfg?' · '+d.cfg:''}</dd><dt>Where</dt><dd>${d.mms.join(', ')}</dd><dt>Budget</dt><dd>${budgetOf(d)}</dd><dt>Move in</dt><dd>within ${d.moveBy} days</dd>
+  <dt>Touches</dt><dd>${d.touches.map(t=>`${t.type} via ${esc(t.via)}${t.first?' <span class="chip good">first touch</span>':''}`).join('<br>')}</dd>${d.broker?`<dt>Broker</dt><dd>${esc(d.broker)}</dd>`:''}${d.dealRec?`<dt>Deal</dt><dd>${d.dealRec.stage} · next: ${esc(d.dealRec.next)} · ${d.dealRec.overdue?'<span class="bd">overdue</span>':'due '+d.dealRec.due}</dd>`:''}</dl>
+  <div><div class="qh">Matches (${r.m.length})</div>${r.m.slice(0,5).map(m=>`<div class="small">${mTitle(m)} · score ${m.score}</div>`).join('')||'<span class="small muted">None</span>'}${r.excl.map(e=>`<div class="small faint">${e.o.id} excluded: ${e.excluded}</div>`).join('')}</div>
+  ${isS()?'':`<div class="row"><button class="btn sm" data-ask="Qualify ${d.id}">Qualify</button><button class="btn sm" data-ask="Matches for ${d.id}">Matches</button><button class="btn sm" data-ask="Send proposal for ${d.id}">Proposal</button><button class="btn sm" data-ask="Start deal ${d.id}">Deal</button><button class="btn sm" data-ask="Client for ${d.id} postponed to April">Exit…</button></div>`}`}
+function grid(rs,side){const cols=[['Sale, Secondary',r=>r.deal==='Sale'&&r.market==='Secondary'],['Sale, Primary',r=>r.deal==='Sale'&&r.market==='Primary']].concat(side==='D'?[['Sale, Any',r=>r.deal==='Sale'&&r.market==='Any']]:[]).concat([['Lease',r=>r.deal==='Lease'],['JV',r=>r.deal==='JV'],['Pagdi',r=>r.deal==='Pagdi']]);
+  return `<div class="tw"><table><thead><tr><th>segment</th>${cols.map(c=>`<th class="n">${c[0]}</th>`).join('')}</tr></thead><tbody>${Object.keys(PTYPES).map(sg=>`<tr><td>${sg}</td>${cols.map(c=>`<td class="n">${rs.filter(r=>r.seg===sg&&c[1](r)).length||'·'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
+function desksBody(){const tab=S.panel.tab||'Business Desk';const D={
+ 'Business Desk':[['BIZ-0012','For Sale · Hospitality','Running café, Bandra West, includes_property = Yes → PRP-00301 created','Supply'],['BIZ-0013','Wants Partnership · Food and Beverage','Cloud kitchen brand seeks partner','Demand'],['BIZ-0014','For Lease · Education','Coaching centre business, Thane','Supply']],
+ 'Capital Desk':[['CAP-0004','Debt · Real Estate','Developer seeks ₹25 Cr project funding, Chembur','Demand'],['CAP-0005','Asset Sale · Real Estate','NBFC selling a small loan book','Supply']],
+ 'Archive':[['EQP-0021','For Sale','Used CNC machines, Bhiwandi','Supply'],['EQP-0022','Wants to Lease','Forklifts for 6 months','Demand']],
+ 'Network':[['Person','Broker','R. Kulkarni, commercial broker, Andheri E','None'],['Person','Architect','S. Rao, redevelopment architect','None'],['Person','Auctioneer','Bank auction agency, Fort','None']],
+ 'Watchlist':[['WCH-0031','Redevelopment Upcoming','Society in Vile Parle East hiring a PMC · deadline in 9 days · follow-up: Vinit','None'],['WCH-0032','Government Tender','MIDC plot allotment tender · deadline in 21 days','None'],['WCH-0033','Title Notice','Public notice on a Juhu bungalow · follow-up: Vinit','None']]};
+  return `<div class="tabs">${Object.keys(D).map(x=>`<button class="${tab===x?'on':''}" data-ktab="${x}">${x}</button>`).join('')}</div><p class="small muted">${tab==='Watchlist'?'Market Signals. Each has a follow-up task for the supply team; deadlines in the next 14 days show first.':tab==='Network'?'Market Participants: People with a participant_role.':'Stored and viewable only in Phase 1; no journey. Managers can assign or archive.'}</p>
+  ${D[tab].map(r=>`<div class="qitem2"><div class="grow"><b>${r[0]}</b> <span>${r[1]}</span><div class="small muted">${esc(r[2])}</div></div><span class="chip plain">side ${r[3]}</span>${isM()&&/Desk/.test(tab)?'<button class="btn sm" data-act="dl">Assign</button>':tab==='Watchlist'&&!isD()?'<button class="btn sm" data-act="dl">Task done</button>':''}</div>`).join('')}`}
+function lcCounts(rs){const c={Fresh:0,Ageing:0,Stale:0,Expired:0};rs.forEach(r=>{const s=stageOf(r);if(c[s]!=null)c[s]++});return c}
+function tiles(arr){return `<div class="kpis">${arr.map(a=>`<div class="kpi"><div class="l">${a[0]}</div><div class="v">${a[1]}</div>${a[2]?`<div class="d faint">${a[2]}</div>`:''}</div>`).join('')}</div>`}
+function dashBody(){const tab=S.panel.tab||'Demand';const live=demands.filter(d=>!d.exit);let b='';
+  if(tab==='Demand'){const src={Channel:0,Digi:0,Direct:0};live.forEach(d=>src[d.touches.find(t=>t.first).type]++);const lc=lcCounts(live);const dq=demandQueue();
+    b=`<div class="qh">Demand by source (first touch)</div>${tiles(Object.entries(src).map(([k,v])=>[k,v]))}<div class="qh">Demand life curve</div>${tiles(Object.entries(lc))}<div class="qh">Demand team queues</div>${tiles(dq.map(([n,ds])=>[n,ds.length]))}<div class="qh">Demand by classification (Wants labels)</div>${grid(live,'D')}<div class="qh">Exits this month</div>${tiles([['Lost',demands.filter(d=>d.exit&&d.exit.type==='Lost').length],['Dormant',demands.filter(d=>d.exit&&d.exit.type==='Dormant').length],['Invalid',demands.filter(d=>d.exit&&d.exit.type==='Invalid').length]])}`}
+  if(tab==='Supply'){const lc=lcCounts(offers.filter(o=>o.com<6));const q=supplyQueue();
+    b=`<div class="qh">Stock</div>${tiles([['Properties',new Set(offers.map(o=>o.prp)).size],['Projects',1],['Offers',offers.length],['Second sources linked',offers.filter(o=>o.src.length>1).length]])}<div class="qh">Supply life curve</div>${tiles(Object.entries(lc))}<div class="qh">Supply by classification (For labels)</div>${grid(offers,'S')}<p class="small muted">Deal-tag filters: Auction ${offers.filter(o=>o.saleMode==='Auction').length} · Tenanted ${offers.filter(o=>o.tenancy==='Tenanted').length}</p><div class="qh">Queues and listings</div>${tiles([['Must call',q.must.length],['Should call',q.should.length],['Upcoming',offers.filter(o=>o.com===0).length],['Verified',Math.round(offers.filter(o=>o.rec>=3).length/offers.length*100)+'%'],['Public',offers.filter(o=>o.pub===2).length],['Anonymous',offers.filter(o=>o.pub===1).length]])}`}
+  if(tab==='Other scopes')b=`<div class="qh">Desks</div>${tiles([['Business Desk',3],['Capital Desk',2],['Archive (Equipment)',2],['Network',3],['Watchlist',3,'2 deadlines in 14 days']])}<div class="row"><button class="btn sm" data-ask="/desks">Open desks</button></div>`;
+  if(tab==='Data quality')b=`<div class="qh">Uploads</div>${tiles([['Files today',3],['Rows accepted','98,810'],['Rejected','1,432'],['Oldest source','Meta leads · 26 h','upload due']])}<div class="qh">Review queues</div>${tiles([['Unclassified','8,659'],['Uncertain merges',2],['Price gaps',offers.filter(o=>o.src.length>1).length]])}<div class="qh">Side checks</div>${tiles([['Side defaulted to Supply (last run)','41','up from 18: extractor phrase list needs entries'],['needs_review loaded',269],['Rejected: value not in list','1,408']])}<div class="qh">Source quality (verify rate)</div>${tiles([['Newspaper','34%'],['WhatsApp','21%'],['Meta leads','48%'],['Direct','71%']])}`;
+  return `<div class="tabs">${['Demand','Supply','Other scopes','Data quality'].map(x=>`<button class="${tab===x?'on':''}" data-dtab="${x}">${x}</button>`).join('')}</div>${b}<p class="small faint">Every tile opens its list in the product.</p>`}
+
+/* ================= settings ================= */
+function settingsView(){const tabs=['Life curve','Vocabulary','Call capacity','Users','Micromarkets','Website & RERA','Audit log'];const t=S.settingsTab;let b='';
+  if(t==='Life curve')b=`<div class="tw"><table><thead><tr><th>Category</th><th>Side</th><th class="n">Fresh ≤</th><th class="n">Ageing ≤</th><th class="n">Stale ≤</th></tr></thead><tbody>${[['Supply',TH_S],['Demand',TH_D]].map(([sd,T])=>Object.keys(T).map(k=>`<tr><td>${k}</td><td>${sd}</td>${T[k].map(v=>`<td class="n">${v}</td>`).join('')}</tr>`).join('')).join('')}</tbody></table></div><p class="small muted" style="padding:0 14px 12px">Industrial 45/90/120, Land and JV 60/120/180, Pagdi as Sale, Secondary (PRD D-12). After the last value the record is Expired.</p>`;
+  if(t==='Vocabulary')b=`<p class="small muted" style="padding:12px 14px 0">Controlled vocabulary <b>${VOCAB_VER}</b>, shared with the newspaper and WhatsApp extractors. Read-only: changes are owned by Vinit and Priyanka and ship to all three together.</p><div class="tw"><table><thead><tr><th>Field</th><th>Values</th></tr></thead><tbody><tr><td>record_scope</td><td>Property, Business, Capital, Equipment, Market Participant, Market Signal</td></tr><tr><td>deal_type (Property)</td><td>Sale, Lease, JV, Pagdi</td></tr><tr><td>market (Sale)</td><td>Primary, Secondary, Any (demand)</td></tr>${Object.entries(PTYPES).map(([k,v])=>`<tr><td>property_type · ${k}</td><td>${v.join(', ')}</td></tr>`).join('')}<tr><td>side</td><td>Supply, Demand, None</td></tr><tr><td>tenancy_status</td><td>Vacant, Tenanted</td></tr><tr><td>sale_mode</td><td>Private, Auction</td></tr></tbody></table></div>`;
+  if(t==='Call capacity')b=`<div class="tw"><table><thead><tr><th>Person</th><th>Team</th><th class="n">Calls / day</th></tr></thead><tbody><tr><td>Vinit</td><td>Supply</td><td class="n"><input aria-label="Vinit capacity" value="40" style="width:60px;text-align:right"></td></tr><tr><td>Priyanka</td><td>Demand</td><td class="n"><input aria-label="Priyanka capacity" value="35" style="width:60px;text-align:right"></td></tr></tbody></table></div>`;
+  if(t==='Users')b=`<div class="tw"><table><thead><tr><th>Name</th><th>Google account</th><th>Role</th></tr></thead><tbody><tr><td>Priyanka</td><td class="mono">priyanka@11estates.in</td><td>Demand agent</td></tr><tr><td>Vinit</td><td class="mono">vinit@11estates.in</td><td>Supply agent</td></tr><tr><td>Owner</td><td class="mono">owner@11estates.in</td><td>Manager</td></tr></tbody></table></div>`;
+  if(t==='Micromarkets')b=`<div class="tw"><table><thead><tr><th>Micromarket</th><th>Contains</th></tr></thead><tbody>${Object.entries(MM).map(([k,v])=>`<tr><td>${k}</td><td>${v.join(', ')}</td></tr>`).join('')}</tbody></table></div>`;
+  if(t==='Website & RERA')b=`<div class="form-grid" style="padding:14px"><div class="field"><label for="rr">11 Estates MahaRERA agent number</label><input id="rr" value="${RERA}"></div><div class="field"><label for="k1">Website API key</label><input id="k1" value="live_••••3f9a"></div><div class="field"><label for="k2">Microsite API key (PRJ-0031)</label><input id="k2" value="live_••••77b2"></div></div>`;
+  if(t==='Audit log')b=`<div class="tw"><table><thead><tr><th>When</th><th>Who</th><th>Action</th></tr></thead><tbody>${(S.log.length?S.log:[['09:12','Vinit','Viewed contact · INV-00452'],['09:02','Priyanka','Export · 12 rows']]).slice().reverse().map(l=>`<tr><td>${l[0]}</td><td>${l[1]}</td><td>${esc(l[2])}</td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="settings"><h2>Settings</h2><div class="card"><div class="tabs" style="padding:0 8px">${tabs.map(x=>`<button class="${t===x?'on':''}" data-stab="${x}">${x}</button>`).join('')}</div>${b}</div><button class="btn" data-act="new" style="align-self:flex-start">‹ Back to chat</button></div>`}
+
+/* ================= actions ================= */
+function logA(s){const d=new Date();S.log.push([d.toTimeString().slice(0,5),me().name,s])}
+function doAct(kind,i,el){const c=chat();const m=c.msgs[i];const d=m.d;
+  switch(kind){
+  case 'call':{const o=find(d.id);const r=d.r||'Confirmed';
+    if(r==='Confirmed'){o.day=0;o.rec=Math.max(o.rec,2);if(d.price)o.price=d.price;delete o.q;
+      if(d.sale&&!find('INV-00453'))O({id:'INV-00453',prp:o.prp,seg:o.seg,sub:o.sub,ptype:o.ptype,txn:'Resale',deal:'Sale',market:'Secondary',loc:o.loc,bldg:o.bldg,bu:o.bu,ca:o.ca,price:d.sale,avail:0,rec:2,pub:0,com:1,day:0,src:[{who:o.src[0].who,price:d.sale,first:true}]});
+      d.done=`Saved. ${o.id} is Contacted, life curve reset to day 0${d.sale?', sale offer INV-00453 added on '+o.prp:''}.`;
+      say('text',{html:`<p>Next step for ${o.id}: collect real photos to verify it. Public unlocks once it's Verified.</p><div class="row"><button class="btn sm" data-do2="verify" data-id="${o.id}">Mark verified (14 photos)</button><button class="btn sm" data-ask="Publish ${o.id}">Publication…</button></div>`})}
+    else if(r==='No answer'){o.att=(o.att||0)+1;o.q={t:'should',rank:o.q?o.q.rank:5,why:'Retry · attempt '+o.att};d.done=`Attempt ${o.att} of 3 logged. Rescheduled for tomorrow.`}
+    else if(r==='Already gone'){o.com=7;o.pub=0;delete o.q;d.done=`${o.id} is Inactive and unpublished. The price is kept as market data.`}
+    else{o.com=7;o.pub=0;delete o.q;d.done=`${o.id} is kept for intelligence only and will never be published.`}
+    logA('Call outcome '+r+' · '+o.id);break}
+  case 'clean':d.cleaned=true;break;
+  case 'pub':{const o=find(d.id);const lv=d.lvl!=null?d.lvl:ceiling(o).lvl;o.pub=lv;d.done=`${o.id} is now ${PUB[lv]}. The website gets it within 1 minute.`;logA('Publication '+PUB[lv]+' · '+o.id);break}
+  case 'qualify':{const x=find(d.id);x.rec=3;x.com=Math.max(x.com,2);x.day=0;d.done=`${x.id} qualified. Life curve reset. Inventory check ran.`;say('matches',{id:x.id});break}
+  case 'srq':{const x=find(d.id);x.com=3;const id='SRQ-0'+(15+S.srq.length);S.srq.push({id,dem:x.id,due:'Fri',pri:'High',to:'Vinit'});d.done=`${id} sent to Vinit. ${x.id} is in Sourcing and posted anonymously.`;break}
+  case 'addsup':{const x=find(d.id);const n='INV-00'+(612+offers.length);const o=O({id:n,prp:'PRP-00'+(262+offers.length),seg:x.seg,sub:x.sub,ptype:x.ptype,bhk:x.bhk,txn:x.txn,deal:x.deal,market:x.deal==='Sale'?(x.market==='Any'?'Secondary':x.market):undefined,loc:x.mms[0],bldg:'Found via Sanjay (internal)',bu:Math.round((x.aMin+x.aMax)/2),ca:Math.round((x.aMin+x.aMax)/2*0.8),price:Math.round(x.bMax*0.95),avail:0,rec:2,pub:0,com:2,day:0,src:[{who:'Sanjay (broker)',price:Math.round(x.bMax*0.95),first:true}],tags:['Sourced for '+x.id],q:{t:'must',why:'Sourced for '+x.id+': verify at top priority',due:'today'}});
+    const s=S.srq.find(s=>s.dem===x.id);if(s)s.done=true;x.com=4;d.done=`${n} created at Contacted, tagged Sourced for ${x.id}, and matched on creation. It is Private while the client decides.`;break}
+  case 'pdf':toast('In the product this generates a branded PDF with building names and the MahaRERA number.');return;
+  case 'link':toast('Share link created. It expires in 14 days and records opens.');return;
+  case 'sent':{const x=find(d.id);x.com=Math.max(x.com,5);d.done=`Marked sent. ${x.id} is at Proposal shared.`;logA('Proposal sent · '+x.id);break}
+  case 'deal':{const x=find(d.id);x.com=7;x.dealRec={stage:'Negotiation',next:d.next,due:d.fu};d.done=`${x.id} is In process. Next: ${d.next} on ${d.fu}.`;break}
+  case 'exit':{const x=find(d.id);const t=d.type||'Dormant';x.exit={type:t,why:t==='Dormant'?'Revisit 1 March':t==='Lost'?'Signed elsewhere: Powai, 2 months rent free':'Unreachable after 3 attempts'};if(t==='Dormant')x.day=null;
+    d.done=t==='Dormant'?`${x.id} is Dormant until 1 March. Matches released, life curve paused.`:t==='Lost'?`${x.id} is Lost. Competing terms saved as market data, and the offer owners notified.`:`${x.id} is Invalid and the person is flagged.`;logA('Exit '+t+' · '+x.id);break}
+  case 'lookup':{d.phone=document.getElementById('qp'+i).value;d.looked=true;break}
+  case 'qtouch':{const x=find('DEM-000127');x.touches.push({type:'Direct',via:'Quick add by '+me().name});d.done='Added as a touch on DEM-000127. First touch stays Channel via Anil.';break}
+  case 'qnew':{const n='DEM-000'+(216+demands.length);D({id:n,client:d.name||'New client',seg:d.seg||'Commercial',sub:d.pt||'Office',ptype:d.pt||'Office',deal:d.deal||'Lease',market:(d.deal||'Lease')==='Sale'?d.market:undefined,txn:d.deal||'Lease',mms:['Andheri East'],aMin:5000,aMax:7000,bMin:800000,bMax:1000000,moveBy:60,rec:0,com:0,day:0,touches:[{type:'Direct',via:'Typed in by '+me().name,first:true}]});d.done=`${n} created (Direct, typed in). It's in your To contact queue.`;break}
+  case 'upstart':{d.started=true;d.f=+el.dataset.f;const run='r'+Date.now();d.run=run;S.runs[run]={p:[0,0,0,0,0],done:false};render();const r=S.runs[run];let j=0;const red=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const tick=()=>{r.p[j]=Math.min(100,r.p[j]+(red?100:12+Math.random()*16));if(r.p[j]>=100)j++;if(j>=5){r.done=true;render();toast('Upload finished');return}const e=root.querySelector(`[data-run="${run}"]`);if(e){e.querySelectorAll('.track i').forEach((t,k)=>t.style.width=r.p[k]+'%');e.querySelectorAll('.num').forEach((t,k)=>t.textContent=Math.round(r.p[k])+'%')}setTimeout(tick,red?40:150)};tick();return}
+  case 'merge':S.dupIdx++;toast('Merged. A Manager can undo it from the record\'s Activity.');break;
+  case 'diff':S.dupIdx++;toast('Kept separate');break;
+  case 'stoprev':d.done='Stopped reviewing. 1 uncertain merge still waiting.';break;
+  }
+  render()}
+
+/* ================= events ================= */
+function bind(){const on=(sel,fn)=>root.querySelectorAll(sel).forEach(el=>el.onclick=e=>{e.preventDefault();e.stopPropagation();fn(el,e)});
+  on('[data-ask]',el=>ask(el.dataset.ask));on('[data-seed]',el=>{S.cur=null;ask(el.dataset.seed)});
+  on('[data-chat]',el=>{S.cur=el.dataset.chat;S.settings=false;S.sideOpen=false;S._scroll=true;render()});
+  on('[data-open]',el=>{const x=find(el.dataset.open);if(!x)return;const back=S.panel&&S.panel.k==='queue'?S.panel:null;S.panel={k:x.kind==='S'?'offer':'demand',id:x.id,back};if(x.kind==='S'&&x.src)logA('Viewed contact · '+x.id);render()});
+  on('[data-do]',el=>doAct(el.dataset.do,+el.dataset.i,el));
+  on('[data-do2]',el=>{const o=find(el.dataset.id);o.rec=Math.max(o.rec,3);o.photos=14;el.closest('.row').outerHTML='<span class="done-note">✓ '+o.id+' Verified with 14 photos. Ceiling is now Public.</span>';toast('Verified. Public unlocked.')});
+  on('[data-cancel]',el=>{chat().msgs[+el.dataset.cancel].d.done='Cancelled. Nothing changed.';render()});
+  on('[data-m]',el=>{S.mstate[el.dataset.k]=el.dataset.m;if(el.dataset.m==='ok'){const [dem]=el.dataset.k.split('|');const x=find(dem);x.com=Math.max(x.com,4)}toast(el.dataset.m==='ok'?'Match confirmed':'Match rejected');render()});
+  on('[data-stab]',el=>{S.settingsTab=el.dataset.stab;render()});on('[data-ktab]',el=>{S.panel.tab=el.dataset.ktab;render()});on('[data-dtab]',el=>{S.panel.tab=el.dataset.dtab;render()});on('[data-qside]',el=>{S.qside=el.dataset.qside;render()});
+  on('[data-act]',el=>act(el.dataset.act));
+  root.querySelectorAll('[data-co]').forEach(el=>el.onchange=()=>{chat().msgs[+el.dataset.co].d.r=el.value;render()});
+  root.querySelectorAll('[data-pl]').forEach(el=>el.onchange=()=>{chat().msgs[+el.dataset.pl].d.lvl=+el.value;render()});
+  root.querySelectorAll('[data-ex]').forEach(el=>el.onchange=()=>{chat().msgs[+el.dataset.ex].d.type=el.value;render()});
+  root.querySelectorAll('[data-qa]').forEach(el=>el.onchange=()=>{const d=chat().msgs[+el.dataset.i].d;d[el.dataset.qa]=el.value;if(el.dataset.qa==='side'&&el.value==='Supply'&&d.market==='Any')d.market='Secondary';render()});
+  root.querySelectorAll('[data-ck]').forEach(el=>el.onchange=()=>{chat().msgs[+el.dataset.ck].d.ck[+el.dataset.k]=el.checked?1:0;render()});
+  root.querySelectorAll('[data-f]').forEach(el=>el.oninput=()=>{const d=chat().msgs[+el.dataset.i].d;d[el.dataset.f]=el.value;const b=root.querySelector(`[data-do="deal"][data-i="${el.dataset.i}"]`);if(b)b.disabled=!(d.next&&d.fu)});
+  const us=document.getElementById('userSel');if(us)us.onchange=()=>{S.user=us.value;S.cur=null;S.panel=null;S.settings=false;render();toast('Now viewing as '+me().name+' · '+me().role)};
+  const cf=document.getElementById('cf');if(cf){cf.onsubmit=e=>{e.preventDefault();ask(document.getElementById('q').value)};const q=document.getElementById('q');q.oninput=()=>{const was=S.draft.startsWith('/'),now=q.value.startsWith('/');S.draft=q.value;if(was||now)render()}}}
+function act(a){switch(a){
+  case 'login':S.auth=true;break;case 'logout':Object.assign(S,{auth:false,chats:[],cur:null,panel:null,settings:false});break;
+  case 'new':S.cur=null;S.settings=false;S.sideOpen=false;break;case 'side':S.sideOpen=!S.sideOpen;break;
+  case 'settings':S.settings=true;S.panel=null;break;case 'slashbtn':S.draft='/';break;
+  case 'pqueue':S.panel={k:'queue'};break;case 'pdash':S.panel={k:'dash',tab:isS()?'Supply':'Demand'};break;
+  case 'pclose':S.panel=null;break;case 'pback':S.panel=S.panel.back;break;
+  case 'dl':toast('In the product this downloads an .xlsx and records the export in the audit log.');return;}
+  render();if(a==='slashbtn'){const q=document.getElementById('q');if(q)q.focus()}}
+// mark one offer as having a dirty description to demo the blocking scan
+find('INV-00488').dirty=true;
+render();
+})();
+</script>
