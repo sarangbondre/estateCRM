@@ -16,7 +16,9 @@ Inputs: docs/inputs/extractor-master-profile.md (PII-free profile of crm_master.
 Environments:
 - Supabase pilot project ref: `xzizchbnejzxkhemmpie` (Mumbai, Free). Linking, bootstrap and deploy happen in the provisioning session (docs/runbooks/provisioning.md).
 
-Stage 7 task progress: none done yet (next: F-01).
+Stage 7 task progress:
+- [x] F-01 Monorepo scaffold (2026-09-27)
+- next: F-02 code quality baseline
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)
