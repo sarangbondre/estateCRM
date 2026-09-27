@@ -47,7 +47,7 @@ describe('My queue', () => {
 
   it('builds should_call items for captures and a must_call item per enquiry (due +24 h)', async () => {
     for (const o of offers) await h.deliver('offer.created.v1', o, { aggregateId: o.offerId });
-    await h.deliver('enquiry.received.v1', { enquiryId: ids(), code: 'ENQ-0311', offerId: offers[0]?.offerId, receivedAt: h.clock.now().toISOString() }, { aggregateId: ids() });
+    await h.deliver('enquiry.received.v1', { enquiryId: ids(), code: 'ENQ-0311', offerId: offers[0]?.offerId as string, receivedAt: h.clock.now().toISOString() }, { aggregateId: ids() });
     const me = await h.as(agent, 'Supply agent');
     const r = await me.get('/v1/queues/me');
     expect(r.status).toBe(200);
