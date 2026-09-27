@@ -1,0 +1,21 @@
+{
+  "eventId": "49868756-12d0-4df5-8366-8a95a10c5003",
+  "eventType": "records.merged.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-records.merged.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "records",
+  "aggregateId": "7004dd78-845a-4e42-803a-916a8db8052b",
+  "aggregateVersion": 1,
+  "data": {
+    "mergeId": "b6de8f8a-d41b-4b22-8aa2-0a2ddf6c1793",
+    "aggregateType": "offer",
+    "survivorId": "271d0d14-8885-4c77-9e04-b646e1f33dee",
+    "mergedIds": [
+      "0a7065c0-bd33-463b-8fda-6c140445c675",
+      "48d381b1-3199-4820-8823-d5a1f28c4e52"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "eventId": "63c240b6-535e-4b6d-809e-93d76dd0da5a",
+  "eventType": "sourcing_request.updated.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-sourcing_request.updated.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "sourcing_request",
+  "aggregateId": "9a8487dc-ebf4-45fe-88d9-083f51c72780",
+  "aggregateVersion": 1,
+  "data": {
+    "sourcingRequestId": "63faec6f-9984-4eeb-bb9f-1b79a5be8117",
+    "status": "fulfilled"
+  }
+}

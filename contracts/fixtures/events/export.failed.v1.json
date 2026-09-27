@@ -1,0 +1,18 @@
+{
+  "eventId": "80f2bc16-2804-45b2-86f8-a117391fc0f9",
+  "eventType": "export.failed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-export.failed.v1",
+  "producer": "insight",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "export",
+  "aggregateId": "695933b1-7090-4f7c-8d48-0b8e4f065f20",
+  "aggregateVersion": 1,
+  "data": {
+    "exportId": "690b5ff4-e100-4219-ab88-fbf8326d5947",
+    "code": "gGjnOG5O8",
+    "requestedBy": "ac3d2ea6-c0e1-4f05-bcf6-5117b0c89b80",
+    "reason": "MfE"
+  }
+}

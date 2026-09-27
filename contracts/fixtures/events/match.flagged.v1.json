@@ -1,0 +1,17 @@
+{
+  "eventId": "86244e51-da97-44c8-879e-ef5843100d53",
+  "eventType": "match.flagged.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-match.flagged.v1",
+  "producer": "crm-engine",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "match",
+  "aggregateId": "12604f54-91b2-442c-81be-f138b0cb10f0",
+  "aggregateVersion": 1,
+  "data": {
+    "matchId": "d76e5933-e228-4680-b8be-8d63c1df0bec",
+    "flag": "price_above_budget",
+    "cleared": true
+  }
+}

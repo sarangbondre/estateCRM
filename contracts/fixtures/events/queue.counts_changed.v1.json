@@ -1,0 +1,16 @@
+{
+  "eventId": "00843f43-d52d-4bbd-8f05-cf53e24685dc",
+  "eventType": "queue.counts_changed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-queue.counts_changed.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "queue",
+  "aggregateId": "3ea303c1-9ea5-492a-84f0-c58ba93e4b91",
+  "aggregateVersion": 1,
+  "data": {
+    "userId": "b0e3b7d1-b744-4902-a239-c3b37e8603ca",
+    "counts": {}
+  }
+}

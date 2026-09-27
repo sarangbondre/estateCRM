@@ -1,0 +1,16 @@
+{
+  "eventId": "6dd088d0-01b0-425e-82a7-a770e95534fb",
+  "eventType": "demand.voided.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-demand.voided.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "demand",
+  "aggregateId": "64d2ac10-464c-47d4-8c03-58b32cc9fbab",
+  "aggregateVersion": 1,
+  "data": {
+    "demandId": "ec0151d5-54a7-4a66-aa68-564563069d37",
+    "reason": "duplicate_discarded"
+  }
+}

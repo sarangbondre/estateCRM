@@ -1,0 +1,20 @@
+{
+  "eventId": "bb323f16-4644-4235-86a6-fc9bd207f1b4",
+  "eventType": "records.merge_undone.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-records.merge_undone.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "records",
+  "aggregateId": "d028225f-ec2d-4e2b-85dd-9d4d2274ff2d",
+  "aggregateVersion": 1,
+  "data": {
+    "mergeId": "d115df37-999a-44a6-b02b-87dda1471e4f",
+    "aggregateType": "4",
+    "restoredIds": [
+      "92d4ab8c-7ba6-41d6-a59e-183498441630",
+      "af600f64-67e8-4320-b8c1-dcbbe35bd5fb"
+    ]
+  }
+}

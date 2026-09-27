@@ -52,3 +52,5 @@ jobs:
       - name: generated artifacts match sources (no drift)
         run: pnpm contracts:check
       - run: pnpm --filter @11e/contracts run typecheck
+      - name: contract mocks start and enforce auth
+        run: pnpm mock:smoke

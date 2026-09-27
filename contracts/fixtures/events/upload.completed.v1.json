@@ -1,0 +1,27 @@
+{
+  "eventId": "9dd25164-ce82-40db-81b3-404bd2e45ec5",
+  "eventType": "upload.completed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-upload.completed.v1",
+  "producer": "intake",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "upload",
+  "aggregateId": "5ddaa11a-0d25-4805-8f94-37ff525da353",
+  "aggregateVersion": 1,
+  "data": {
+    "uploadId": "15ef713f-f2b2-4321-ba85-e2f454b19bb3",
+    "code": "VYHRrL",
+    "counts": {
+      "read": -493,
+      "accepted": 60,
+      "rejected": -976,
+      "needsReview": 407,
+      "unchanged": -838
+    },
+    "rejectionReasons": {},
+    "sourceType": "GltWcPn0N",
+    "sourceDetail": "k",
+    "uploadedBy": "6b1bb13b-d759-43d1-8243-a1224d32219b"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "eventId": "e78ab72d-6860-4c86-8074-cdf49afd5686",
+  "eventType": "offer.commercial_status_changed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-offer.commercial_status_changed.v1",
+  "producer": "journeys",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "offer",
+  "aggregateId": "4061671f-48b6-4332-808c-2f9ae8c45880",
+  "aggregateVersion": 1,
+  "data": {
+    "offerId": "75032507-ca1b-4aa8-b79f-60dcff005743",
+    "from": "mkOFFq",
+    "to": "Matched",
+    "reason": "uACYgUETb"
+  }
+}

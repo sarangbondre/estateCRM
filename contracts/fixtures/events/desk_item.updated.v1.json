@@ -1,0 +1,17 @@
+{
+  "eventId": "9b5d4320-a0a5-427b-8939-a9c5508de392",
+  "eventType": "desk_item.updated.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-desk_item.updated.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "desk_item",
+  "aggregateId": "a3c9bec8-a38d-4ef1-88c2-4da0357c021c",
+  "aggregateVersion": 1,
+  "data": {
+    "deskItemId": "b750ead7-47f6-4738-8bb3-cad6144d58bb",
+    "status": "open",
+    "assigneeUserId": "181d930f-5f60-40bf-97d6-7922c83aec35"
+  }
+}

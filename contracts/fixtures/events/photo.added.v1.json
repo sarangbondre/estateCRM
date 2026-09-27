@@ -1,0 +1,20 @@
+{
+  "eventId": "06cdfc03-eeda-440d-8928-fae1f7a8d2fd",
+  "eventType": "photo.added.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-photo.added.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "photo",
+  "aggregateId": "ea3ecbbb-29aa-4ed2-8c6a-cc2d62ae7c07",
+  "aggregateVersion": 1,
+  "data": {
+    "photoId": "ac6202f8-9399-433c-a19e-77f94061effa",
+    "propertyId": "8be9eacd-5569-4ea1-86f7-8a284720d7a5",
+    "origin": "call",
+    "isReal": false,
+    "storagePath": "3TQ",
+    "hasTextDetected": true
+  }
+}

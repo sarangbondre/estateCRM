@@ -1,0 +1,21 @@
+{
+  "eventId": "91bf6236-0934-4baa-806b-d08396faa27a",
+  "eventType": "price_sheet.applied.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-price_sheet.applied.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "price_sheet",
+  "aggregateId": "e13a9599-9522-4a49-8fe3-2da6886c2f49",
+  "aggregateVersion": 1,
+  "data": {
+    "projectId": "7fb4b99d-de9a-4d58-9540-8f25b7e8b462",
+    "priceSheetId": "d09bc685-2a46-437a-9835-5c085123c795",
+    "sheetDate": "2018-07-14",
+    "changedOfferIds": [
+      "99168704-e25d-436c-8fc0-016311a78e0e",
+      "898697f2-a90b-4512-b631-9559c88821cf"
+    ]
+  }
+}

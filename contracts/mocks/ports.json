@@ -1,0 +1,9 @@
+{
+  "web": 4010,
+  "intake": 4011,
+  "records": 4012,
+  "journeys": 4013,
+  "crm-engine": 4014,
+  "listings": 4015,
+  "insight": 4016
+}

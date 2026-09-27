@@ -1,0 +1,32 @@
+{
+  "eventId": "639916fd-afaf-4617-8964-b6e12a74e4a4",
+  "eventType": "project.updated.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-project.updated.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "project",
+  "aggregateId": "345bf96e-7a43-4b9b-883e-d3262a492f08",
+  "aggregateVersion": 1,
+  "data": {
+    "projectId": "28d18b99-b5de-45eb-8ee2-edbe1cc9a88c",
+    "code": "g9D",
+    "name": "z",
+    "developerPersonId": "b1fff3e8-e9c1-4fc6-8992-e50d381fb9db",
+    "developerName": "",
+    "reraNumber": "dA8eIkjYNm",
+    "locality": "sPtkCI",
+    "micromarket": "kFK",
+    "city": "3d5q",
+    "possessionDate": "0q9P",
+    "amenities": [
+      "GJ",
+      "h7"
+    ],
+    "offerIds": [
+      "17248069-6eaa-4ef9-b4fe-2ef33ed57cd3",
+      "5176439f-6acd-458b-aa6c-9bf57f7b5c51"
+    ]
+  }
+}

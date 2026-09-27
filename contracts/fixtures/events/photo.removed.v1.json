@@ -1,0 +1,16 @@
+{
+  "eventId": "279ea53d-4dc7-4985-8b49-c062d469f61f",
+  "eventType": "photo.removed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-photo.removed.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "photo",
+  "aggregateId": "f5b41d65-eebe-44b3-8e09-ddc4deb5eba9",
+  "aggregateVersion": 1,
+  "data": {
+    "photoId": "b7f89519-1fbd-43b2-8b2a-9e874005cf4e",
+    "propertyId": "edc5c437-f0c9-4ba4-8b7a-9ff51a141305"
+  }
+}

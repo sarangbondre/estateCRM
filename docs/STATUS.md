@@ -21,7 +21,8 @@ Stage 7 task progress:
 - [x] F-02 Code quality baseline: TS 6 strict, ESLint (no-console), dependency-cruiser layer rules (proven with a probe), gitleaks clean (2026-09-27)
 - [x] F-03 CI: reusable per-service workflow (lint, layers, typecheck, tests, build) × 7 with path filters + repo workflow (gitleaks, libs) (2026-09-27)
 - [x] F-04 Contract tooling: Redocly lint (baseline ignore file), AsyncAPI parser validation, TS types in `@11e/contracts` (7 services + 68 events), drift check, CI `contracts` job (2026-09-27)
-- next: F-05 contract mocks
+- [x] F-05 Contract mocks: Prism per OpenAPI spec (`pnpm mock`, ports 4010–4016), 68 schema-valid event fixtures, `pnpm mock:event` pgmq publisher, CI smoke test (2026-09-27)
+- next: F-06 local database stack
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)

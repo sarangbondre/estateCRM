@@ -1,0 +1,25 @@
+{
+  "eventId": "7d3775e7-04d6-4ec7-84c9-36370f7848cc",
+  "eventType": "desk_item.created.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-desk_item.created.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "desk_item",
+  "aggregateId": "7bb4edbd-d827-4f80-84e7-34c31c8c1e44",
+  "aggregateVersion": 1,
+  "data": {
+    "deskItemId": "ad7ed236-d0ec-434b-89f0-3c97ef1efe82",
+    "code": "HXn",
+    "recordScope": "",
+    "dealTypes": [
+      "iPdqkeXqs",
+      "bZ"
+    ],
+    "side": "R",
+    "sector": "Z",
+    "participantRole": "hjpaliO9",
+    "linkedPropertyId": "dded6690-4bc0-471a-ac6f-f1a75c143838"
+  }
+}

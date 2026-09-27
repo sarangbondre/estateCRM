@@ -1,0 +1,18 @@
+{
+  "eventId": "2fe70f7d-613f-489c-8cd9-71949d62a903",
+  "eventType": "watchlist_item.created.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-watchlist_item.created.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "watchlist_item",
+  "aggregateId": "753d31ab-7336-4b9f-883d-7b0a76500c07",
+  "aggregateVersion": 1,
+  "data": {
+    "watchlistItemId": "428e21de-969e-435e-ac4d-c192ae285476",
+    "code": "hGHykBX",
+    "signalType": "mIy5Y",
+    "deadlineDate": "2014-11-27"
+  }
+}

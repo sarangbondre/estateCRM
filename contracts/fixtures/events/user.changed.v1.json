@@ -1,0 +1,18 @@
+{
+  "eventId": "74e7534f-1bce-4134-81ef-d48a4845c76b",
+  "eventType": "user.changed.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-user.changed.v1",
+  "producer": "web",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "user",
+  "aggregateId": "238f9c7e-44b7-477a-846e-f55f55ac4990",
+  "aggregateVersion": 1,
+  "data": {
+    "userId": "d6de79a1-b337-48b5-ad15-b9115efa5a74",
+    "role": "Supply agent",
+    "active": true,
+    "displayName": ""
+  }
+}
