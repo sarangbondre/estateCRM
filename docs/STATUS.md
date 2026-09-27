@@ -34,7 +34,10 @@ Stage 7 task progress:
 - [x] F-14 libs/redaction: redact/restore/detect with PHONE/EMAIL/URL/NAME/UNIT/ID, placeholder maps kept in memory only, residual-risk post-check; 0 leaks on 171 annotated synthetic ads, 50 hard negatives untouched (2026-09-27, PR #12)
 - [x] F-15 Schedules and alarms: `infra/schedules.yaml` catalogue (checked against every contract jobs enum) → generated pg_cron jobs (60 scheduler calls + alarms + prune), `platform.invoke` via pg_net with Vault cron secrets, in-DB alarms (DLQ depth, relay/queue lag, failed jobs/calls) + optional webhook (CR-008 auto-approved technical); `configure-environment.mjs` for the provisioning session; verifier 73/73 incl. a real pg_cron→HTTP call (2026-09-27)
 - [x] F-16 Backups and runbooks: nightly encrypted per-schema pg_dump + queue export to the private Mumbai `backups` bucket (14 days) and a monthly restore check (workflows dormant until BACKUPS_ENABLED at provisioning); backup/restore round trip tested locally (owners, grants, queue messages); `dlq.mjs` and `rotate-db-password.mjs`; runbooks deploy, rollback, rotate-secrets, dlq-replay, restore (2026-09-27)
-- next: service tracks (records first), after F-12/F-17 land
+- [x] F-12 libs/observability: pino logger with a PII allow-list (33 PII tests), OpenTelemetry traces across HTTP and events, RED metrics, alarm rules, `observe()` one-call wiring; 51 tests (2026-09-27, PR #16)
+- [x] Foundation addendum (part of each *-01 task): service runtime scaffold for the 6 backend services via `tools/scaffold-service.mjs` (composition root, env config, local server, Vercel entry, platform relay/drain/jobs endpoints in the contract's response style, job leases, 0001 technical tables, platform tests); libs gain app-level middleware, principal ids in request metrics, relay lag, client correlation IDs; service CI builds deps via turbo with local Postgres (2026-09-27)
+- in progress (parallel agent): F-17 synthetic data
+- next: service tracks in parallel (records, journeys, crm-engine), then intake, listings, insight, then web
 
 Change requests:
 - CR-001: WITHDRAWN 2026-09-24 (superseded by CR-002)

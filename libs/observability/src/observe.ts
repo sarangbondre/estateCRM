@@ -110,7 +110,8 @@ export function observe(service: string, options: ObserveOptions = {}): Observab
         else logger.debug(fields, 'drain run');
       },
     },
-    onRelay: (result, lagSeconds) => {
+    onRelay: (result, lagArg) => {
+      const lagSeconds = lagArg ?? result.oldestPendingAgeSec ?? undefined;
       red.recordRelay(result, lagSeconds);
       const fields = {
         ...result,

@@ -18,6 +18,9 @@ export type ServiceEnv = { Variables: ServiceVariables };
 export type ServiceContext = Context<ServiceEnv>;
 
 export interface RequestEndInfo {
+  /** From the authenticated principal, when there is one. */
+  tenantId?: string;
+  userId?: string;
   method: string;
   route: string;
   operationId: string | undefined;
@@ -41,6 +44,8 @@ export interface ServiceOptions {
   /** Validate every JSON response against the contract (contract tests). Default: NODE_ENV === 'test'. */
   validateResponses?: boolean;
   onRequestEnd?: (info: RequestEndInfo) => void;
+  /** App-level middleware, before every route including health and 404 (e.g. tracing/logging from libs/observability). */
+  middleware?: MiddlewareHandler<ServiceEnv>[];
   /** Runs for every contract operation after the operation is resolved and before its own middleware (e.g. libs/auth). */
   operationMiddleware?: MiddlewareHandler<ServiceEnv>[];
   /** Unexpected errors (500). The lib never logs. */
@@ -88,6 +93,13 @@ export interface Service<Ops> {
     handler: OperationHandler<Ops[K]>,
     ...middleware: MiddlewareHandler<ServiceEnv>[]
   ): void;
+  /** Like `op`, addressed by method + path template (for platform endpoints whose operationId varies per service). */
+  opAt(
+    method: string,
+    path: string,
+    handler: OperationHandler<unknown>,
+    ...middleware: MiddlewareHandler<ServiceEnv>[]
+  ): void;
   /** Operations in the contract that have no handler yet. */
   unimplemented(): string[];
 }
@@ -100,10 +112,14 @@ export function createService<Ops>(options: ServiceOptions): Service<Ops> {
   const validateResponses = options.validateResponses ?? process.env['NODE_ENV'] === 'test';
 
   app.use('*', correlationId());
+  for (const m of options.middleware ?? []) app.use('*', m);
   app.use('*', async (c, next) => {
     const started = performance.now();
     await next();
+    const principal = c.get('principal') as { tenantId?: unknown; userId?: unknown } | undefined;
     options.onRequestEnd?.({
+      ...(typeof principal?.tenantId === 'string' ? { tenantId: principal.tenantId } : {}),
+      ...(typeof principal?.userId === 'string' ? { userId: principal.userId } : {}),
       method: c.req.method,
       route: c.get('operation')?.path ?? c.req.routePath,
       operationId: c.get('operation')?.operationId,
@@ -207,10 +223,23 @@ export function createService<Ops>(options: ServiceOptions): Service<Ops> {
     );
   };
 
+  const opAt: Service<Ops>['opAt'] = (method, path, handler, ...middleware) => {
+    const found = [...contract.operations.values()].find(
+      (o) => o.method === method.toUpperCase() && o.path === path,
+    );
+    if (!found) throw new Error(`${method} ${path} is not in the contract`);
+    op(
+      found.operationId as keyof Ops & string,
+      handler as OperationHandler<Ops[keyof Ops & string]>,
+      ...middleware,
+    );
+  };
+
   return {
     app,
     contract,
     op,
+    opAt,
     unimplemented: () => [...contract.operations.keys()].filter((id) => !implemented.has(id)),
   };
 }

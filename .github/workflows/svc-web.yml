@@ -19,3 +19,4 @@ jobs:
     with:
       service: web
       path: services/web
+      database: false

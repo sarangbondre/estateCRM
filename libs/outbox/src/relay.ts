@@ -26,6 +26,8 @@ export interface RelayResult {
   unroutable: number;
   /** Unpublished rows still waiting (capped at 10,000). */
   remaining: number;
+  /** Age of the oldest routable unpublished row after this run (relay-lag alarm); null when none. */
+  oldestPendingAgeSec: number | null;
   durationMs: number;
 }
 
@@ -93,9 +95,18 @@ export async function relayOutbox<DB>(ctx: QueueContext<DB>, options: RelayOptio
     .select((eb) => eb.fn.countAll<string>().as('n'))
     .executeTakeFirst();
 
+  const oldest = await db
+    .selectFrom('outbox')
+    .select((eb) => eb.fn.min('occurred_at').as('oldest'))
+    .where('published_at', 'is', null)
+    .where('event_type', 'in', Object.keys(options.routes).length ? Object.keys(options.routes) : ['-'])
+    .executeTakeFirst();
+  const oldestAt = oldest?.oldest ? new Date(oldest.oldest as unknown as string) : null;
+
   return {
     processed,
     unroutable,
+    oldestPendingAgeSec: oldestAt ? Math.max(0, Math.round((Date.now() - oldestAt.getTime()) / 1000)) : null,
     remaining: Math.max(0, Number(remaining?.n ?? 0) - unroutable),
     durationMs: Date.now() - started,
   };
