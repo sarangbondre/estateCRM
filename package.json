@@ -9,9 +9,21 @@
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "lint:all": "eslint . && depcruise services libs --config .dependency-cruiser.cjs",
+    "layers": "depcruise services libs --config .dependency-cruiser.cjs",
+    "secrets": "gitleaks detect --no-banner --redact",
+    "format": "prettier --check ."
   },
   "devDependencies": {
-    "turbo": "2.11.4"
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.0",
+    "dependency-cruiser": "18.4.0",
+    "eslint": "10.11.0",
+    "prettier": "^3.9.9",
+    "turbo": "2.11.4",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1"
   }
 }

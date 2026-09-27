@@ -1,0 +1,7 @@
+# Secret scanning (CLAUDE.md §3.8). Default rules + project allow-list for documented example values only.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documentation placeholders and generated contracts"
+paths = ['''docs/.*\.pdf''']
