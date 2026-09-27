@@ -1,7 +1,8 @@
 // Test harness on the local stack: a fresh tenant per test file, a controllable clock, fake integrations, staff
 // tokens signed with a test key, direct event delivery through the application handlers, and outbox inspection.
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Ajv } from 'ajv';
 import addFormatsModule from 'ajv-formats';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
@@ -103,6 +104,21 @@ export function fakeIntegrations(content = new FakeContent(), storage = new Memo
   };
 }
 
+/** Records (operationId, status) of every request so global-setup's teardown can check contract coverage. */
+function recordingObs() {
+  const obs = observe(SERVICE, { level: 'fatal' });
+  const dir = process.env['JOURNEYS_HITS_DIR'];
+  if (!dir) return obs;
+  const file = join(dir, `hits-${process.pid}-${randomUUID()}.jsonl`);
+  return {
+    ...obs,
+    onRequestEnd: (info: Parameters<typeof obs.onRequestEnd>[0]) => {
+      obs.onRequestEnd(info);
+      if (info.operationId) appendFileSync(file, `${JSON.stringify([info.operationId, info.status])}\n`);
+    },
+  };
+}
+
 const keys = await generateKeyPair('ES256');
 const jwks = { keys: [{ ...(await exportJWK(keys.publicKey)), kid: 'k1', alg: 'ES256' }] };
 
@@ -136,7 +152,8 @@ export async function serviceHeaders(tenantId: string, caller: string): Promise<
 }
 
 export function harness(opts: { clock?: TestClock; content?: FakeContent; storage?: MemoryStorage } = {}) {
-  const handle = createDb<JourneysDb>({ connectionString: config.databaseUrl, schema: SCHEMA, maxConnections: 4 });
+  // journeys_svc has a pilot connection cap of 4: one connection per test file, waiting for a free one if needed.
+  const handle = createDb<JourneysDb>({ connectionString: config.databaseUrl, schema: SCHEMA, maxConnections: 1, acquireTimeoutMs: 60_000, idleTimeoutMs: 1_000 });
   const clock = opts.clock ?? new TestClock();
   const content = opts.content ?? new FakeContent();
   const storage = opts.storage ?? new MemoryStorage();
@@ -145,7 +162,7 @@ export function harness(opts: { clock?: TestClock; content?: FakeContent; storag
   const svc = buildApp({
     config,
     db: handle.db,
-    obs: observe(SERVICE, { level: 'fatal' }),
+    obs: recordingObs(),
     auth,
     clock,
     integrations,

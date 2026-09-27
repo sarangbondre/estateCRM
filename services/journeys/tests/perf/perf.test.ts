@@ -8,11 +8,13 @@ import { ensureMigrated, env, harness, ids } from '../helpers.js';
 
 const SUBJECTS = Number(process.env['PERF_SUBJECTS'] ?? 0);
 const DUE_SHARE = Number(process.env['PERF_DUE_SHARE'] ?? 0.03);
+/** PERF_LEAN=1: queue items only for the measured agent (keeps a 5M run small enough for a laptop). */
+const LEAN = process.env['PERF_LEAN'] === '1';
 const run = SUBJECTS > 0 ? describe : describe.skip;
 
 const h = harness();
 const agent = ids();
-const report: Record<string, unknown> = { subjects: SUBJECTS, dueShare: DUE_SHARE };
+const report: Record<string, unknown> = { subjects: SUBJECTS, dueShare: DUE_SHARE, lean: LEAN };
 
 const p = (xs: number[], q: number) => [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.ceil(q * xs.length) - 1)] ?? 0;
 
@@ -49,7 +51,7 @@ async function seed() {
         case when g % 50 = 0 then now() + ((g % 48) || ' hours')::interval else null end,
         case when g % 50 = 0 then null else (g % 9000) / 100.0 end,
         '{"freshness":1,"demandGap":0.2,"sourceQuality":0.5,"priceBand":0.5,"boost":0}'::jsonb
-      from generate_series(${from}::int, ${to}::int) g`.execute(h.db);
+      from generate_series(${from}::int, ${to}::int) g where ${LEAN ? sql`g % 25 = 0` : sql`true`}`.execute(h.db);
   }
   await sql`insert into queue_counters (id, tenant_id, user_id, section, open_count, changed_at)
     select gen_random_uuid(), ${t}, assignee_user_id, section, count(*), now() from queue_items where tenant_id = ${t}
