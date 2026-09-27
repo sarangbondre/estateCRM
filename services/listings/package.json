@@ -7,9 +7,29 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "echo \"build: not implemented yet (see docs/05-tasks.md)\"",
-    "test": "echo \"no tests yet\"",
+    "dev": "tsx watch --env-file-if-exists=../../.env.local src/server.ts",
+    "start": "node --env-file-if-exists=../../.env.local dist/src/server.js",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint . --no-error-on-unmatched-pattern",
-    "typecheck": "echo \"no sources yet\""
+    "migrate": "node --env-file-if-exists=../../.env.local ../../libs/db/dist/cli/migrate.js --schema listings --dir migrations",
+    "migrate:check": "node ../../libs/db/dist/cli/migrate.js --check --dir migrations"
+  },
+  "dependencies": {
+    "@11e/auth": "workspace:*",
+    "@11e/contracts": "workspace:*",
+    "@11e/db": "workspace:*",
+    "@11e/http": "workspace:*",
+    "@11e/observability": "workspace:*",
+    "@11e/outbox": "workspace:*",
+    "@hono/node-server": "^2.1.1",
+    "hono": "~4.13.9",
+    "kysely": "~0.29.6"
+  },
+  "devDependencies": {
+    "jose": "~6.2.12",
+    "pg": "~8.23.0",
+    "@types/pg": "^8.23.1"
   }
 }
