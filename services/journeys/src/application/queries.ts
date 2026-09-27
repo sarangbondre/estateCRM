@@ -89,6 +89,8 @@ export interface ListFilter {
 }
 
 export interface Queries {
+  /** Next display code of a per-tenant sequence, e.g. CALL-000042 (LLD §3.1). */
+  nextCode(prefix: 'SRQ' | 'PROP' | 'VIS' | 'DEAL' | 'CALL'): Promise<string>;
   settingsByKind(kind: SettingsRow['kind']): Promise<SettingsRow | undefined>;
 
   // queue

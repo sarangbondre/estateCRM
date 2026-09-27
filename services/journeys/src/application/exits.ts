@@ -3,6 +3,7 @@ import { addDays } from '../domain/dates.js';
 import type { IsoDate } from '../domain/dates.js';
 import type { ExitType } from '../domain/commercial.js';
 import { JourneyError, invalidTransition, notFoundErr } from './errors.js';
+import { demandCells } from './facts.js';
 import type { DemandJourneyRow } from './model.js';
 import { audit, notify } from './notify.js';
 import type { Tx } from './ports.js';
@@ -67,6 +68,7 @@ export async function exitDemand(tx: Tx, demandId: string, input: ExitInput): Pr
   await closeItems(tx, { demandId }, 'cancelled', 'exited');
 
   const view = await tx.rows.get('demand_view', demandId);
+  if (view) await tx.q.adjustGapCells(demandCells(view), -1, 0, tx.now);
   const code = view?.code ?? null;
   for (const owner of await tx.q.ownersOfConfirmedMatchOffers(demandId)) {
     await notify(tx, owner, {

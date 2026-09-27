@@ -8,7 +8,7 @@ import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 import { load } from 'js-yaml';
 import type { EventDataMap, EventType } from '@11e/contracts/events';
 import { authenticate } from '@11e/auth';
-import { createDb, migrate, sql } from '@11e/db';
+import { createDb, sql } from '@11e/db';
 import { observe } from '@11e/observability';
 import { buildApp } from '../src/app.js';
 import { SCHEMA, SERVICE, loadConfig } from '../src/config.js';
@@ -35,13 +35,8 @@ export const env = {
 };
 export const config = loadConfig(env);
 
-let migrated: Promise<unknown> | undefined;
-export const ensureMigrated = () =>
-  (migrated ??= migrate({
-    connectionString: env.MIGRATOR_DATABASE_URL,
-    schema: SCHEMA,
-    dir: new URL('../migrations', import.meta.url).pathname,
-  }));
+/** Migrations run once in tests/global-setup.ts (vitest globalSetup); kept for readability in the test files. */
+export const ensureMigrated = async (): Promise<void> => undefined;
 
 export class TestClock {
   #now: Date;

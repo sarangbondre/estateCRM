@@ -143,6 +143,16 @@ function closeWhere(t: string, f: CloseFilter) {
 
 function makeQueries(db: Db, t: string): Queries {
   const q: Queries = {
+    async nextCode(prefix) {
+      const r = await firstOf(
+        sql<{ v: number }>`insert into code_sequences (tenant_id, prefix, next_value) values (${t}, ${prefix}, 2)
+          on conflict (tenant_id, prefix) do update set next_value = code_sequences.next_value + 1, updated_at = now()
+          returning next_value - 1 as v`,
+        db,
+      );
+      const width = { SRQ: 3, PROP: 4, VIS: 4, DEAL: 4, CALL: 6 }[prefix];
+      return `${prefix}-${String(r?.v ?? 1).padStart(width, '0')}`;
+    },
     async settingsByKind(kind) {
       return firstOf(sql<Tables['settings']>`select * from settings where tenant_id = ${t} and kind = ${kind}`, db);
     },
