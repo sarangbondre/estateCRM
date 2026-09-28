@@ -7,6 +7,7 @@ import { authenticate } from '@11e/auth';
 import { createDb, migrate } from '@11e/db';
 import { observe } from '@11e/observability';
 import { buildApp } from '../src/app.js';
+import { composeApp } from '../src/main.js';
 import { EXPECTED_MIGRATION, SCHEMA, SERVICE, loadConfig } from '../src/config.js';
 import type { IntakeDb } from '../src/adapters/db.js';
 
@@ -32,7 +33,13 @@ beforeAll(async () => {
   const { publicKey } = await generateKeyPair('ES256');
   const jwks = { keys: [{ ...(await exportJWK(publicKey)), kid: 'k1', alg: 'ES256' }] };
   const auth = authenticate({ service: SERVICE, jwks, cronSecret: env.CRON_SECRET });
-  app = buildApp({ config, db: handle.db, obs: observe(SERVICE, { level: 'fatal' }), auth }).app;
+  app = buildApp({
+    config,
+    db: handle.db,
+    obs: observe(SERVICE, { level: 'fatal' }),
+    auth,
+    app: composeApp(config, handle.db),
+  }).app;
 });
 afterAll(() => handle.close());
 
