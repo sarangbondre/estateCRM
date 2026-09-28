@@ -5,6 +5,8 @@ import { observe, setupTelemetry } from '@11e/observability';
 import { buildApp } from './app.js';
 import { SCHEMA, SERVICE, loadConfig } from './config.js';
 import type { CrmEngineDb } from './adapters/db.js';
+import { journeysSubjectStates } from './adapters/journeys-client.js';
+import { recordsMicromarketSource } from './adapters/records-client.js';
 
 export function compose(env: NodeJS.ProcessEnv = process.env) {
   const config = loadConfig(env);
@@ -16,7 +18,27 @@ export function compose(env: NodeJS.ProcessEnv = process.env) {
   });
   const obs = observe(SERVICE);
   const auth = authenticate({ service: SERVICE, jwksUrl: config.jwksUrl, cronSecret: config.cronSecret });
-  const svc = buildApp({ config, db: handle.db, obs, auth });
+  const micromarkets = recordsMicromarketSource({
+    recordsUrl: config.recordsUrl,
+    webUrl: config.webUrl,
+    credential: config.serviceCredential,
+    onCall: obs.onCall,
+  });
+  const subjectStates = journeysSubjectStates({
+    journeysUrl: config.journeysUrl,
+    webUrl: config.webUrl,
+    credential: config.serviceCredential,
+    onCall: obs.onCall,
+  });
+  const svc = buildApp({
+    config,
+    db: handle.db,
+    obs,
+    auth,
+    clock: { now: () => new Date() },
+    micromarkets,
+    subjectStates,
+  });
   return {
     config,
     app: svc.app,
