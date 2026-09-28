@@ -155,7 +155,7 @@ describe('jobs', () => {
       }
     }
     expect((await h.tx((s) => s.getPublication('offer', data.offerId)))?.level).toBe('Private');
-  });
+  }, 180_000); // the sweep covers every tenant in the shared local DB, which grows with test runs
 
   it('every job of the contract enum runs', async () => {
     for (const name of [
