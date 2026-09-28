@@ -59,7 +59,8 @@ describe('properties and offers', () => {
     expect(facts['buildingKey']).toMatch(/^[0-9a-f]{32}$/);
     expect(facts['contactPersonIds']).toHaveLength(1);
     expect(JSON.stringify(facts)).not.toContain('Sea Breeze');
-    expect(JSON.stringify(facts)).not.toContain('703');
+    // Word boundaries: random UUIDs/hashes in the payload may contain the digits 703 by chance.
+    expect(JSON.stringify(facts)).not.toMatch(/\b703\b/);
   });
 
   it('suspects a duplicate (409 with candidates) unless confirmed; dedup-check reports it', async () => {
