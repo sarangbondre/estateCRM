@@ -474,19 +474,43 @@ importers:
       '@11e/outbox':
         specifier: workspace:*
         version: link:../../libs/outbox
+      '@11e/redaction':
+        specifier: workspace:*
+        version: link:../../libs/redaction
+      '@11e/vocabulary':
+        specifier: workspace:*
+        version: link:../../libs/vocabulary
       '@hono/node-server':
         specifier: ^2.1.1
         version: 2.1.1(hono@4.13.9)
+      '@huggingface/inference':
+        specifier: ~4.13.0
+        version: 4.13.30
       hono:
         specifier: ~4.13.9
         version: 4.13.9
       kysely:
         specifier: ~0.29.6
         version: 0.29.6
+      uuidv7:
+        specifier: ~1.2.1
+        version: 1.2.1
     devDependencies:
+      '@11e/testing':
+        specifier: workspace:*
+        version: link:../../libs/testing
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1(ajv@8.20.0)
+      exceljs:
+        specifier: ~4.4.0
+        version: 4.4.0
       jose:
         specifier: ~6.2.12
         version: 6.2.12
@@ -889,6 +913,17 @@ packages:
     engines: {node: '>=20'}
     peerDependencies:
       hono: ^4
+
+  '@huggingface/inference@4.13.30':
+    resolution: {integrity: sha512-d5iD7UxHFH5X4ndNhwn3eFT/P9M08RRcsWDoko40//9lgNCCCn87TziwcKWf7ztvoKOm8d29W+lrYO4ZZvyAnA==}
+    engines: {node: '>=18'}
+
+  '@huggingface/jinja@0.5.10':
+    resolution: {integrity: sha512-SgS1D1bglQ94ceD4ZCL6eayUDy9uV1xuyk61OjgSxU5GJh7upqZCKII0JoTYMc6wWsg3JUgaPRX0ElQzXPk3Cw==}
+    engines: {node: '>=18'}
+
+  '@huggingface/tasks@0.21.48':
+    resolution: {integrity: sha512-+ujPTb9irMxsiCYjL2Jpjs0+aCioJTTYA8Pp/I/+fm2LenzL3tDOs2/0ELj5phMAUDVoOozLviy4y/e7mBltxA==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -3496,6 +3531,10 @@ packages:
     deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
+  uuidv7@1.2.1:
+    resolution: {integrity: sha512-4kPkK3/XTQW9Hbm4CaqfICn+kY9LJtDVEOfgsRRra/+n2Ofg4NqzRFceAkxvQ/Ud/6BpHOPzj8cirqM7TzTN5Q==}
+    hasBin: true
+
   validate.io-array@1.0.6:
     resolution: {integrity: sha512-DeOy7CnPEziggrOO5CZhVKJw6S3Yi7e9e65R1Nl/RTN1vTQKnzjfvks0/8kQ40FP/dsjRAOd4hxmJ7uLa6vxkg==}
 
@@ -3882,6 +3921,15 @@ snapshots:
   '@hono/node-server@2.1.1(hono@4.13.9)':
     dependencies:
       hono: 4.13.9
+
+  '@huggingface/inference@4.13.30':
+    dependencies:
+      '@huggingface/jinja': 0.5.10
+      '@huggingface/tasks': 0.21.48
+
+  '@huggingface/jinja@0.5.10': {}
+
+  '@huggingface/tasks@0.21.48': {}
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -6832,6 +6880,8 @@ snapshots:
   utility-types@3.11.0: {}
 
   uuid@8.3.2: {}
+
+  uuidv7@1.2.1: {}
 
   validate.io-array@1.0.6: {}
 
