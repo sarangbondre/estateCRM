@@ -10,7 +10,7 @@ import type { DrainResult } from '@11e/outbox';
 import { EXPECTED_MIGRATION, SCHEMA, SERVICE } from './config.js';
 import type { AppDeps } from './deps.js';
 import { eventHandlers } from './adapters/events.js';
-import { jobs } from './adapters/jobs.js';
+import { jobDeps, jobs, runJob } from './adapters/jobs.js';
 import { registerRoutes } from './adapters/routes.js';
 import { workHandlers } from './adapters/work.js';
 
@@ -36,7 +36,10 @@ export function buildApp(deps: AppDeps): Service<operations> {
 
   const queue = { db, schema: SCHEMA };
   const handlers = eventHandlers(deps);
-  const work = workHandlers(deps);
+  const continuation = jobDeps(deps);
+  const work = workHandlers(deps, async (job, tenantId) => {
+    await runJob(continuation, job, tenantId);
+  });
   const drains: Record<string, () => Promise<DrainResult>> = {
     [EVENT_QUEUE]: () =>
       drainEvents(queue, {

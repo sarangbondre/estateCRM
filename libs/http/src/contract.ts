@@ -42,6 +42,21 @@ const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 const esc = (s: string) => s.replaceAll('~', '~0').replaceAll('/', '~1');
 const SPEC_ID = 'spec';
 
+/**
+ * `pattern` compiler that also accepts a leading inline-flag group such as `(?i)` (used by contracts, e.g. intake
+ * UploadCreate.fileName). JavaScript RegExp has no global inline flags, so `(?i)abc` becomes `/abc/i`. Other
+ * patterns compile exactly as before (`new RegExp(pattern, 'u')`).
+ */
+export const patternRegExp = Object.assign(
+  (pattern: string, flags: string): RegExp => {
+    const m = /^\(\?([imsu]+)\)/.exec(pattern);
+    if (!m) return new RegExp(pattern, flags);
+    const extra = [...new Set(m[1])].filter((f) => !flags.includes(f)).join('');
+    return new RegExp(pattern.slice(m[0].length), flags + extra);
+  },
+  { code: 'new RegExp' },
+);
+
 export class Contract {
   readonly operations = new Map<string, Operation>();
   readonly #doc: OpenApiDoc;
@@ -51,7 +66,12 @@ export class Contract {
 
   constructor(doc: OpenApiDoc) {
     this.#doc = doc;
-    const opts = { strict: false, allErrors: true, validateSchema: false } as const;
+    const opts = {
+      strict: false,
+      allErrors: true,
+      validateSchema: false,
+      code: { regExp: patternRegExp },
+    } as const;
     this.#bodyAjv = addFormats(new Ajv2020(opts));
     this.#paramAjv = addFormats(new Ajv2020({ ...opts, coerceTypes: 'array', useDefaults: true }));
     this.#bodyAjv.addSchema(doc as object, SPEC_ID);
