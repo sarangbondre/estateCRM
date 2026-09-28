@@ -6,7 +6,13 @@
   "description": "Wire-contract types generated from OpenAPI/AsyncAPI (types only, no logic, no domain models).",
   "exports": {
     "./event-topology.json": "./generated/event-topology.json",
-    "./openapi/*.json": "./generated/openapi/*.json",
+    "./openapi/web.json": "./generated/openapi/web.json",
+    "./openapi/intake.json": "./generated/openapi/intake.json",
+    "./openapi/records.json": "./generated/openapi/records.json",
+    "./openapi/journeys.json": "./generated/openapi/journeys.json",
+    "./openapi/crm-engine.json": "./generated/openapi/crm-engine.json",
+    "./openapi/listings.json": "./generated/openapi/listings.json",
+    "./openapi/insight.json": "./generated/openapi/insight.json",
     "./*": "./generated/ts/*.ts"
   },
   "scripts": {

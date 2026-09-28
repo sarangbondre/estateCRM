@@ -39,6 +39,19 @@ that session. You do every step that involves signing in, passwords or secrets. 
    into your terminal only: `export VERCEL_API_TOKEN=…` (or 1Password). Don't send it in chat.
 4. Claude creates the 7 projects (`web`, `intake`, `records`, `journeys`, `crm-engine`, `listings`, `insight`) in region
    `bom1` with Terraform and links them to the GitHub repo.
+   Project settings, verified with an offline `vercel build` of all 7 projects on 2026-09-28 (each service bundle was
+   also started and answered `/health/ready` 200):
+
+   | Setting | web | intake, records, journeys, crm-engine, listings, insight |
+   |---|---|---|
+   | Root Directory | `services/web` | `services/<service>` |
+   | Framework Preset | Next.js | Other (API-only; `vercel.json` sets an empty `public/` output) |
+   | Install Command | `pnpm install --frozen-lockfile` | same |
+   | Build Command | `pnpm turbo run build --filter=@11e/web...` | `pnpm turbo run build --filter=@11e/<service>...` |
+   | Node.js version | 24.x | 24.x |
+   | Region | `bom1` (from `vercel.json`) | `bom1`, functions 60 s (from `vercel.json`) |
+
+   Enable "Include files outside the root directory" (the default for monorepos): the build uses `libs/` and `contracts/`.
 5. **Environment variables** that you enter yourself in each project's *Settings → Environment Variables*, when Claude
    tells you which: the database passwords for each service role (Claude generates them into a local, git-ignored file,
    and you paste them), and `HF_TOKEN` (section 4).
