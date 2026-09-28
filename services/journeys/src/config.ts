@@ -3,7 +3,7 @@
 export const SERVICE = 'journeys';
 export const SCHEMA = 'journeys';
 /** Newest file in migrations/ (a test keeps them in step). /health/ready reports "behind" until it is applied. */
-export const EXPECTED_MIGRATION = '0001';
+export const EXPECTED_MIGRATION = '0005';
 
 export interface Config {
   port: number;
@@ -12,10 +12,23 @@ export interface Config {
   cronSecret: string;
   /** web's JWKS (service tokens, R-2). */
   jwksUrl: string;
-  /** This service's credential for web POST /internal/v1/service-tokens (only if it calls other services). */
+  /** This service's credential for web POST /internal/v1/service-tokens (records and listings reads). */
   serviceCredential: string | undefined;
   webUrl: string;
   environment: string;
+  /** records base URL (proposal snapshot: GET /v1/offers, /v1/properties). Local: the contract mock. */
+  recordsUrl: string;
+  /** listings base URL (GET /v1/publication-settings). Local: the contract mock. */
+  listingsUrl: string;
+  /** Base of web's public proposal route: `${publicBaseUrl}/p/{token}`. */
+  publicBaseUrl: string;
+  /** Salt for proposal-link open IP hashes (secret; rotated monthly with the month mixed in). */
+  ipHashSalt: string;
+  supabaseUrl: string | undefined;
+  supabaseServiceKey: string | undefined;
+  storageBucket: string;
+  /** Local development without Supabase Storage. */
+  localStorageDir: string | undefined;
 }
 
 export class ConfigError extends Error {
@@ -30,6 +43,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     return v;
   };
   const webUrl = get('WEB_URL') ?? 'http://127.0.0.1:3000';
+  const environment = get('ENVIRONMENT_NAME') ?? 'local';
+  const salt = get('IP_HASH_SALT');
+  if (!salt && environment !== 'local' && environment !== 'test')
+    throw new ConfigError('missing environment variable IP_HASH_SALT (or JOURNEYS_IP_HASH_SALT)');
   return {
     port: Number(get('PORT') ?? 3003),
     databaseUrl: need('DATABASE_URL'),
@@ -38,6 +55,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     jwksUrl: get('JWKS_URL') ?? `${webUrl}/.well-known/jwks.json`,
     serviceCredential: get('SERVICE_CREDENTIAL'),
     webUrl,
-    environment: get('ENVIRONMENT_NAME') ?? 'local',
+    environment,
+    recordsUrl: get('RECORDS_URL') ?? 'http://127.0.0.1:4012',
+    listingsUrl: get('LISTINGS_URL') ?? 'http://127.0.0.1:4015',
+    publicBaseUrl: get('PUBLIC_BASE_URL') ?? webUrl,
+    ipHashSalt: salt ?? 'local-only-salt',
+    supabaseUrl: get('SUPABASE_URL'),
+    supabaseServiceKey: get('SUPABASE_SERVICE_ROLE_KEY'),
+    storageBucket: get('STORAGE_BUCKET') ?? 'journeys-proposals',
+    localStorageDir: get('LOCAL_STORAGE_DIR'),
   };
 }
