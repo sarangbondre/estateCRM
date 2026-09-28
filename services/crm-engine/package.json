@@ -23,6 +23,7 @@
     "@11e/http": "workspace:*",
     "@11e/observability": "workspace:*",
     "@11e/outbox": "workspace:*",
+    "@11e/vocabulary": "workspace:*",
     "@hono/node-server": "^2.1.1",
     "hono": "~4.13.9",
     "kysely": "~0.29.6"
