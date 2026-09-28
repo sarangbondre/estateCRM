@@ -3,7 +3,7 @@
 import { decideDowngrade } from '../domain/autoDowngrade.js';
 import type { CeilingResult } from '../domain/ceiling.js';
 import { computeDemandCeiling, computeOfferCeiling, computeProjectCeiling } from '../domain/ceiling.js';
-import { publicIdFrom } from '../domain/ids.js';
+import { hasContactLikeDigits, publicIdFrom } from '../domain/ids.js';
 import { demandLabel, supplyLabel } from '../domain/labels.js';
 import { changeType, isVisible, rank } from '../domain/levels.js';
 import {
@@ -153,8 +153,9 @@ export async function newPublication(s: Services, store: Store, type: SubjectTyp
 /** Issues `L-…` on the first publish; stable for the subject's life (LLD §4.6). */
 export async function ensurePublicId(s: Services, store: Store, pub: Publication): Promise<string> {
   if (pub.publicId) return pub.publicId;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 16; i++) {
     const candidate = publicIdFrom(s.random.bytes(8));
+    if (hasContactLikeDigits(candidate)) continue; // never publish an id that reads as a phone number (M8)
     if (!(await store.publicIdTaken(candidate))) {
       pub.publicId = candidate;
       return candidate;

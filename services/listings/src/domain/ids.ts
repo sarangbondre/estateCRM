@@ -1,4 +1,5 @@
 // Opaque identifiers generated from caller-supplied random bytes (the CSPRNG lives in an adapter).
+import { scanText } from './privacy.js';
 
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 export const PUBLIC_ID_PATTERN = /^L-[0-9A-HJKMNP-TV-Z]{10}$/;
@@ -16,6 +17,13 @@ export function publicIdFrom(random: Uint8Array): string {
   }
   return `L-${out}`;
 }
+
+/**
+ * True when an id would trip the privacy scan (digit runs and look-alike letters that read as a phone number, etc.).
+ * Public ids are re-drawn until this is false, so the M8 output scan (0 PII-like strings in API output) always holds.
+ */
+export const hasContactLikeDigits = (id: string) =>
+  scanText({ text: id }).some((f) => f.severity === 'block');
 
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 export const API_KEY_PREFIX = 'lk_live_';
