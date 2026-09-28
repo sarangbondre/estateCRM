@@ -3,7 +3,7 @@
 export const SERVICE = 'insight';
 export const SCHEMA = 'insight';
 /** Newest file in migrations/ (a test keeps them in step). /health/ready reports "behind" until it is applied. */
-export const EXPECTED_MIGRATION = '0001';
+export const EXPECTED_MIGRATION = '0004';
 
 export interface Config {
   port: number;
@@ -15,6 +15,21 @@ export interface Config {
   /** This service's credential for web POST /internal/v1/service-tokens (only if it calls other services). */
   serviceCredential: string | undefined;
   webUrl: string;
+  /** records base URL (vocabulary, micromarkets, contacts for exports — service token, R-2/R-21). */
+  recordsUrl: string;
+  /** Hugging Face planner (LLD §4.2): router or dedicated endpoint URL, model id, token (Vercel encrypted env). */
+  hfBaseUrl: string | undefined;
+  hfModel: string;
+  hfToken: string | undefined;
+  /** Concurrent model calls per instance: 5 pilot / 20 paid. */
+  hfConcurrency: number;
+  /** Export row cap: 20,000 in the pilot, 100,000 in production (R-16). */
+  exportMaxRows: number;
+  /** Private export bucket (Supabase Storage); a local directory when the Supabase variables are absent. */
+  supabaseUrl: string | undefined;
+  supabaseServiceKey: string | undefined;
+  exportBucket: string;
+  localExportDir: string | undefined;
   environment: string;
 }
 
@@ -38,6 +53,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     jwksUrl: get('JWKS_URL') ?? `${webUrl}/.well-known/jwks.json`,
     serviceCredential: get('SERVICE_CREDENTIAL'),
     webUrl,
+    recordsUrl: get('RECORDS_URL') ?? 'http://127.0.0.1:3002',
+    hfBaseUrl: get('HF_BASE_URL'),
+    hfModel: get('HF_MODEL') ?? 'Qwen/Qwen2.5-7B-Instruct',
+    hfToken: get('HF_TOKEN'),
+    hfConcurrency: Number(get('HF_CONCURRENCY') ?? 5),
+    exportMaxRows: Number(get('EXPORT_MAX_ROWS') ?? 20_000),
+    supabaseUrl: get('SUPABASE_URL'),
+    supabaseServiceKey: get('SUPABASE_SERVICE_ROLE_KEY'),
+    exportBucket: get('EXPORT_BUCKET') ?? 'insight-exports',
+    localExportDir: get('LOCAL_EXPORT_DIR'),
     environment: get('ENVIRONMENT_NAME') ?? 'local',
   };
 }
