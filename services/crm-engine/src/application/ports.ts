@@ -115,8 +115,43 @@ export interface FeedbackRecord {
 }
 
 export interface WeightsRecord extends Weights {
+  id: string | null;
   createdBy: string | null;
   createdAt: Date;
+}
+
+/** Keyset position of a list page (opaque to clients: encoded by the HTTP adapter). */
+export type Position = Record<string, string | number>;
+
+export interface MatchPageQuery {
+  statuses: readonly MatchStatus[];
+  flag: MatchFlag | null;
+  bundlesOnly: boolean;
+  limit: number;
+  after: Position | null;
+}
+
+/** Read models for the list endpoints (every query served by an index of migration 0002). */
+export interface QueryRepository {
+  /** Sorted by (Confirmed first, score desc, id); fetches limit + 1. */
+  demandMatches(tenantId: string, demandId: string, q: MatchPageQuery): Promise<MatchRecord[]>;
+  /** Sorted by (score desc, id); fetches limit + 1. */
+  offerMatches(
+    tenantId: string,
+    offerId: string,
+    q: Omit<MatchPageQuery, 'bundlesOnly'>,
+  ): Promise<MatchRecord[]>;
+  /** Sorted by (computedAt desc, id); fetches limit + 1. */
+  exclusions(
+    tenantId: string,
+    demandId: string,
+    q: { reason: string | null; limit: number; after: Position | null },
+  ): Promise<(ExclusionRecord & { id: string })[]>;
+  /** Sorted by (updatedAt, id); fetches limit + 1. */
+  rebuild(
+    tenantId: string,
+    q: { updatedSince: Date | null; demandId: string | null; limit: number; after: Position | null },
+  ): Promise<MatchRecord[]>;
 }
 
 export type SubjectType = 'offer' | 'demand';
@@ -284,8 +319,21 @@ export interface RescoreQueue {
     type: SubjectType,
     id: string,
   ): Promise<{ reasons: string[]; runId: string | null } | null>;
+  /** Marks many subjects dirty in one statement (jobs); returns how many were newly queued. */
+  markDirtyMany(tenantId: string, type: SubjectType, ids: readonly string[], reason: string): Promise<number>;
   /** Queues a job continuation (full-rescore batches, micromarket-refresh) on the work queue. */
   enqueueJob(job: string, tenantId: string | null): Promise<void>;
+}
+
+/** Retention (LLD §7): bounded deletes, each returns the number of rows removed. */
+export interface RetentionRepository {
+  closedMatches(tenantId: string, olderThan: Date, limit: number): Promise<number>;
+  feedback(tenantId: string, olderThan: Date, limit: number): Promise<number>;
+  exclusions(tenantId: string, olderThan: Date, limit: number): Promise<number>;
+  runs(tenantId: string, olderThan: Date, limit: number): Promise<number>;
+  mergedProjection(tenantId: string, olderThan: Date, limit: number): Promise<number>;
+  /** Technical tables (R-4): published outbox 7 days, processed events 30 days, expired idempotency keys. */
+  technical(now: Date): Promise<number>;
 }
 
 export interface JobCursorStore {
@@ -314,6 +362,8 @@ export interface Store {
   weights: WeightsRepository;
   hierarchy: HierarchyRepository;
   mergeLog: MergeLogRepository;
+  queries: QueryRepository;
+  retention: RetentionRepository;
   events: EventPublisher;
   rescore: RescoreQueue;
   jobs: JobCursorStore;
@@ -335,6 +385,24 @@ export interface Clock {
 /** records' micromarket reference data (R-13), read with a service token; never on a request path. */
 export interface MicromarketSource {
   fetchAll(tenantId: string): Promise<MmSourceNode[]>;
+}
+
+/** journeys' GET /internal/v1/subject-states (life stage and Commercial axis per subject, projection rebuild). */
+export interface SubjectState {
+  subjectType: SubjectType;
+  subjectId: string;
+  commercialStatus: string;
+  exit: string | null;
+  lifeStage: string;
+  version: number;
+}
+
+export interface SubjectStateSource {
+  page(
+    tenantId: string,
+    subjectType: SubjectType,
+    cursor: string | null,
+  ): Promise<{ items: SubjectState[]; nextCursor: string | null }>;
 }
 
 export interface IdGenerator {

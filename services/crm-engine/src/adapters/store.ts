@@ -1,9 +1,10 @@
 // Postgres implementation of the application ports (src/application/ports.ts), bound to one transaction.
 // Business queries go through tenantScope (NFR-15); every query path is served by an index of migration 0002.
 import { randomUUID } from 'node:crypto';
-import { sql, tenantScope, withTransaction } from '@11e/db';
+import { expireIdempotencyKeys, sql, tenantScope, withTransaction } from '@11e/db';
 import type { Kysely, Transaction } from '@11e/db';
-import { queueSend, writeEvent } from '@11e/outbox';
+import { eventTrace } from '@11e/observability';
+import { purgeProcessedEvents, purgePublishedOutbox, queueSend, writeEvent } from '@11e/outbox';
 import type { EventDataMap, EventType } from '@11e/outbox';
 import { Hierarchy } from '../domain/micromarket.js';
 import type { MmLevel } from '../domain/micromarket.js';
@@ -238,6 +239,7 @@ function toDeal(r: Row): DealRecord {
 function toWeights(r: Row): WeightsRecord {
   const body = r['body'] as Partial<WeightsBody>;
   return {
+    id: r['id'] as string,
     version: r['version'] as number,
     factors: { ...DEFAULT_WEIGHTS.factors, ...(body.factors ?? {}) },
     tuning: {
@@ -837,14 +839,12 @@ export function createStore(db: Db, ctx: StoreContext): Store {
             updated_at: ctx.now(),
           })
           .onConflict((oc) =>
-            oc
-              .column('id')
-              .doUpdateSet({
-                status: d.status,
-                units_booked: d.unitsBooked,
-                closed_at: d.closedAt,
-                updated_at: ctx.now(),
-              }),
+            oc.column('id').doUpdateSet({
+              status: d.status,
+              units_booked: d.unitsBooked,
+              closed_at: d.closedAt,
+              updated_at: ctx.now(),
+            }),
           )
           .execute();
       },
@@ -920,9 +920,10 @@ export function createStore(db: Db, ctx: StoreContext): Store {
         const version = (cur.rows[0]?.v ?? 0) + 1;
         await scope(t).updateTable('weights').set({ active: false }).where('active', '=', true).execute();
         const now = ctx.now();
+        const id = randomUUID();
         await scope(t)
           .insertInto('weights', {
-            id: randomUUID(),
+            id,
             version,
             body: json(body),
             active: true,
@@ -930,7 +931,134 @@ export function createStore(db: Db, ctx: StoreContext): Store {
             created_at: now,
           })
           .execute();
-        return { version, factors: body.factors, tuning: body.tuning, createdBy, createdAt: now };
+        return { id, version, factors: body.factors, tuning: body.tuning, createdBy, createdAt: now };
+      },
+    },
+
+    queries: {
+      async demandMatches(t, demandId, q) {
+        const ord = sql<number>`(case when matches.status = 'Confirmed' then 0 else 1 end)`;
+        let b = scope(t)
+          .selectFrom('matches')
+          .selectAll()
+          .where('demand_id', '=', demandId)
+          .where('status', 'in', [...q.statuses]);
+        if (q.flag) b = b.where(sql<boolean>`flags @> ${sql.val([q.flag])}::text[]`);
+        if (q.bundlesOnly) b = b.where('is_bundle', '=', true);
+        if (q.after)
+          b = b.where(
+            sql<boolean>`(${ord}, -score, id) > (${Number(q.after['o'])}, ${-Number(q.after['s'])}, ${String(q.after['id'])}::uuid)`,
+          );
+        const rows = await b
+          .orderBy(ord)
+          .orderBy('score', 'desc')
+          .orderBy('id')
+          .limit(q.limit + 1)
+          .execute();
+        return rows.map((r) => toMatch(r as Row));
+      },
+      async offerMatches(t, offerId, q) {
+        let b = tenantScope(db, t)
+          .selectFrom('match_offers')
+          .innerJoin('matches', 'matches.id', 'match_offers.match_id')
+          .selectAll('matches')
+          .where('match_offers.offer_id', '=', offerId)
+          .where('match_offers.status', 'in', [...q.statuses]);
+        if (q.flag) b = b.where(sql<boolean>`matches.flags @> ${sql.val([q.flag])}::text[]`);
+        if (q.after)
+          b = b.where(
+            sql<boolean>`(-match_offers.score, match_offers.match_id) > (${-Number(q.after['s'])}, ${String(q.after['id'])}::uuid)`,
+          );
+        const rows = await b
+          .orderBy('match_offers.score', 'desc')
+          .orderBy('match_offers.match_id')
+          .limit(q.limit + 1)
+          .execute();
+        return rows.map((r) => toMatch(r as Row));
+      },
+      async exclusions(t, demandId, q) {
+        let b = scope(t).selectFrom('exclusions').selectAll().where('demand_id', '=', demandId);
+        if (q.reason) b = b.where('reason', '=', q.reason);
+        if (q.after)
+          b = b.where(
+            sql<boolean>`(computed_at < ${new Date(String(q.after['k']))} or (computed_at = ${new Date(String(q.after['k']))} and id > ${String(q.after['id'])}::uuid))`,
+          );
+        const rows = await b
+          .orderBy('computed_at', 'desc')
+          .orderBy('id')
+          .limit(q.limit + 1)
+          .execute();
+        return rows.map((r) => ({
+          id: r.id,
+          demandId: r.demand_id,
+          offerId: r.offer_id,
+          reason: r.reason as ExclusionRecord['reason'],
+          availableFrom: dateStr(r.available_from),
+          moveInBy: dateStr(r.move_in_by),
+          computedAt: r.computed_at,
+        }));
+      },
+      async rebuild(t, q) {
+        let b = scope(t).selectFrom('matches').selectAll();
+        if (q.demandId) b = b.where('demand_id', '=', q.demandId);
+        if (q.updatedSince) b = b.where('updated_at', '>=', q.updatedSince);
+        if (q.after)
+          b = b.where(
+            sql<boolean>`(updated_at, id) > (${new Date(String(q.after['k']))}, ${String(q.after['id'])}::uuid)`,
+          );
+        const rows = await b
+          .orderBy('updated_at')
+          .orderBy('id')
+          .limit(q.limit + 1)
+          .execute();
+        return rows.map((r) => toMatch(r as Row));
+      },
+    },
+
+    retention: {
+      async closedMatches(t, olderThan, limit) {
+        const r = await sql`delete from ${sql.table('matches')} where id in (
+            select id from ${sql.table('matches')} where tenant_id = ${t} and status in ('Rejected', 'Closed')
+              and updated_at < ${olderThan} limit ${limit})`.execute(db);
+        return Number(r.numAffectedRows ?? 0);
+      },
+      async feedback(t, olderThan, limit) {
+        const r = await sql`delete from ${sql.table('feedback')} where id in (
+            select id from ${sql.table('feedback')} where tenant_id = ${t} and at < ${olderThan} limit ${limit})`.execute(
+          db,
+        );
+        return Number(r.numAffectedRows ?? 0);
+      },
+      async exclusions(t, olderThan, limit) {
+        const r = await sql`delete from ${sql.table('exclusions')} where id in (
+            select id from ${sql.table('exclusions')} where tenant_id = ${t} and computed_at < ${olderThan} limit ${limit})`.execute(
+          db,
+        );
+        return Number(r.numAffectedRows ?? 0);
+      },
+      async runs(t, olderThan, limit) {
+        const r = await sql`delete from ${sql.table('matching_runs')} where id in (
+            select id from ${sql.table('matching_runs')} where tenant_id = ${t} and created_at < ${olderThan} limit ${limit})`.execute(
+          db,
+        );
+        return Number(r.numAffectedRows ?? 0);
+      },
+      async mergedProjection(t, olderThan, limit) {
+        const a = await sql`delete from ${sql.table('offer_mx')} where id in (
+            select id from ${sql.table('offer_mx')} where tenant_id = ${t} and merged_into is not null
+              and updated_at < ${olderThan} limit ${limit})`.execute(db);
+        const b = await sql`delete from ${sql.table('demand_mx')} where id in (
+            select id from ${sql.table('demand_mx')} where tenant_id = ${t} and merged_into is not null
+              and updated_at < ${olderThan} limit ${limit})`.execute(db);
+        return Number(a.numAffectedRows ?? 0) + Number(b.numAffectedRows ?? 0);
+      },
+      async technical(now) {
+        const q = { db: db as Kysely<CrmEngineDb>, schema: SCHEMA };
+        return (
+          (await purgePublishedOutbox(q, 7)) +
+          (await purgeProcessedEvents(q, 30)) +
+          (await expireIdempotencyKeys(db as Kysely<CrmEngineDb>, now))
+        );
       },
     },
 
@@ -1019,14 +1147,12 @@ export function createStore(db: Db, ctx: StoreContext): Store {
             updated_at: now,
           })
           .onConflict((oc) =>
-            oc
-              .column('tenant_id')
-              .doUpdateSet({
-                mm_version: next,
-                mm_loaded_at: now,
-                mm_requested_version: null,
-                updated_at: now,
-              }),
+            oc.column('tenant_id').doUpdateSet({
+              mm_version: next,
+              mm_loaded_at: now,
+              mm_requested_version: null,
+              updated_at: now,
+            }),
           )
           .execute();
       },
@@ -1127,6 +1253,7 @@ export function createStore(db: Db, ctx: StoreContext): Store {
           data,
           correlationId: ctx.correlationId,
           producer: PRODUCER,
+          ...eventTrace(),
         } as Parameters<typeof writeEvent>[1]);
       },
     },
@@ -1160,6 +1287,30 @@ export function createStore(db: Db, ctx: StoreContext): Store {
           .returning(['reasons', 'run_id'])
           .executeTakeFirst();
         return r ? { reasons: r.reasons, runId: r.run_id } : null;
+      },
+      async markDirtyMany(t, type, ids, reason) {
+        if (!ids.length) return 0;
+        const r = await sql<{ subject_id: string }>`insert into ${sql.table('rescore_pending')}
+              (id, tenant_id, subject_type, subject_id, reasons, run_id, enqueued_at)
+            select gen_random_uuid(), ${t}, ${type}, x, ${sql.val([reason])}::text[], null, ${ctx.now()}
+            from unnest(${sql.val([...ids])}::uuid[]) as x
+            on conflict (tenant_id, subject_type, subject_id) do nothing
+            returning subject_id`.execute(db);
+        const fresh = r.rows.map((x) => x.subject_id);
+        if (fresh.length) {
+          const payloads = fresh.map((id) =>
+            JSON.stringify({
+              kind: 'subject',
+              tenantId: t,
+              subjectType: type,
+              subjectId: id,
+              correlationId: ctx.correlationId,
+            }),
+          );
+          await sql`select ${sql.id(SCHEMA, 'queue_send')}(${RESCORE_QUEUE}, p, 0)
+              from unnest(${sql.val(payloads)}::jsonb[]) as p`.execute(db);
+        }
+        return fresh.length;
       },
       async enqueueJob(job, tenantId) {
         await queueSend(db, SCHEMA, RESCORE_QUEUE, {

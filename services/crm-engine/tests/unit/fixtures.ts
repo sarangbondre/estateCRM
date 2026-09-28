@@ -75,7 +75,9 @@ export function ctx(weights: Weights = DEFAULT_WEIGHTS, today = TODAY): ScoringC
 let seq = 0;
 const nextId = (prefix: string) => {
   seq++;
-  return `${prefix}${String(seq).padStart(4, '0')}-0000-4000-8000-000000000000`.slice(0, 36);
+  // readable, valid UUIDs: <prefix 4 hex><seq 4 hex>-…-<seq 12 hex>
+  const hex = seq.toString(16);
+  return `${prefix}${hex.slice(-4).padStart(4, '0')}-0000-4000-8000-${hex.padStart(12, '0').slice(-12)}`;
 };
 
 export function offer(p: Partial<OfferMx> = {}): OfferMx {
