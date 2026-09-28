@@ -10,7 +10,7 @@ import type { DrainResult } from '@11e/outbox';
 import { EXPECTED_MIGRATION, SCHEMA, SERVICE } from './config.js';
 import type { AppDeps } from './deps.js';
 import { eventHandlers } from './adapters/events.js';
-import { jobs } from './adapters/jobs.js';
+import { advanceQueuedRecompute, jobs } from './adapters/jobs.js';
 import { registerRoutes } from './adapters/routes.js';
 import { workHandlers } from './adapters/work.js';
 
@@ -38,13 +38,18 @@ export function buildApp(deps: AppDeps): Service<operations> {
   const handlers = eventHandlers(deps);
   const work = workHandlers(deps);
   const drains: Record<string, () => Promise<DrainResult>> = {
-    [EVENT_QUEUE]: () =>
-      drainEvents(queue, {
+    [EVENT_QUEUE]: async () => {
+      const r = await drainEvents(queue, {
         queue: EVENT_QUEUE,
         consumer: SERVICE,
         handlers,
         onError: obs.drainHooks.onError,
-      }),
+      });
+      // recompute-launch-area is on-demand in infra/schedules.yaml: the minute drain advances a queued recompute
+      // by one bounded step so a launch-area or hierarchy change is applied without a separate trigger.
+      await advanceQueuedRecompute(deps).catch((err: unknown) => obs.drainHooks.onError(err, { queue: 'recompute-launch-area', msgId: '-', attempt: 1 }));
+      return r;
+    },
   };
   for (const q of WORK_QUEUES) {
     const handler = work[q];

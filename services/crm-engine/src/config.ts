@@ -3,7 +3,7 @@
 export const SERVICE = 'crm-engine';
 export const SCHEMA = 'crm_engine';
 /** Newest file in migrations/ (a test keeps them in step). /health/ready reports "behind" until it is applied. */
-export const EXPECTED_MIGRATION = '0001';
+export const EXPECTED_MIGRATION = '0002';
 
 export interface Config {
   port: number;
@@ -15,6 +15,10 @@ export interface Config {
   /** This service's credential for web POST /internal/v1/service-tokens (only if it calls other services). */
   serviceCredential: string | undefined;
   webUrl: string;
+  /** records base URL (GET /v1/micromarkets for micromarket-refresh, R-13). */
+  recordsUrl: string;
+  /** journeys base URL (GET /internal/v1/subject-states for projection-reconcile). */
+  journeysUrl: string;
   environment: string;
 }
 
@@ -38,6 +42,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     jwksUrl: get('JWKS_URL') ?? `${webUrl}/.well-known/jwks.json`,
     serviceCredential: get('SERVICE_CREDENTIAL'),
     webUrl,
+    recordsUrl: get('RECORDS_URL') ?? 'http://127.0.0.1:3002',
+    journeysUrl: get('JOURNEYS_URL') ?? 'http://127.0.0.1:3003',
     environment: get('ENVIRONMENT_NAME') ?? 'local',
   };
 }

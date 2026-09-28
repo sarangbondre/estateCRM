@@ -23,13 +23,21 @@
     "@11e/http": "workspace:*",
     "@11e/observability": "workspace:*",
     "@11e/outbox": "workspace:*",
+    "@11e/redaction": "workspace:*",
+    "@11e/vocabulary": "workspace:*",
+    "@huggingface/inference": "~4.13.0",
     "@hono/node-server": "^2.1.1",
     "hono": "~4.13.9",
-    "kysely": "~0.29.6"
+    "kysely": "~0.29.6",
+    "uuidv7": "~1.2.1"
   },
   "devDependencies": {
+    "@11e/testing": "workspace:*",
+    "@types/pg": "^8.23.1",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "exceljs": "~4.4.0",
     "jose": "~6.2.12",
-    "pg": "~8.23.0",
-    "@types/pg": "^8.23.1"
+    "pg": "~8.23.0"
   }
 }

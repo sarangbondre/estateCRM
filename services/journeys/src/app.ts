@@ -48,7 +48,10 @@ export function buildApp(deps: AppDeps): Service<operations> {
   };
   for (const q of WORK_QUEUES) {
     const handler = work[q];
-    if (handler) drains[q] = () => drainWork(queue, { queue: q, handler, onError: obs.drainHooks.onError });
+    // Snapshots and PDFs call records/listings/storage: a few items per call, a longer visibility timeout.
+    if (handler)
+      drains[q] = () =>
+        drainWork(queue, { queue: q, handler, batchSize: 5, visibilityTimeoutSec: 120, onError: obs.drainHooks.onError });
   }
   registerPlatformEndpoints(svc, {
     responseStyle: 'batch',
