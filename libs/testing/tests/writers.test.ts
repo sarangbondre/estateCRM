@@ -160,7 +160,7 @@ describe('XLSX writer', () => {
       break;
     }
     expect(rows).toBe(5_001);
-  });
+  }, 60_000); // CI runners are shared: generous timeout, the assertion is correctness not speed
 });
 
 describe('multi-file datasets', () => {
