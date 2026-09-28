@@ -111,6 +111,8 @@ for (const svc of services) {
       {
         $schema: 'https://openapi.vercel.sh/vercel.json',
         regions: ['bom1'],
+        // API-only project: Vercel still wants a static output folder; it stays empty (never serve dist/).
+        outputDirectory: 'public',
         functions: { 'api/index.ts': { maxDuration: 60 } },
         rewrites: [{ source: '/(.*)', destination: '/api' }],
       },
