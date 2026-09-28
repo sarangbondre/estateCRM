@@ -54,7 +54,7 @@ Change requests:
 - CR-008: APPROVED 2026-09-27, auto-approved (technical, B3): alarm destination = in-DB alarm events + optional webhook; HTTP SLO alarms wired at provisioning
 - CR-009: APPROVED 2026-09-28, auto-approved (technical): contract schema defects (listings settings, insight tiles, intake file-name pattern)
 - CR-010: APPROVED 2026-09-28, auto-approved (technical): intake xlsx reader, sharp for renditions (pending), no btree_gin
-- CR-011: OPEN, for review at delivery: 19 business-rule decisions taken during implementation
-- CR-012: OPEN, needs the product owner: building name in the upload standard, "maybe" feedback, crm_notes, small contract additions
+- CR-011: AWAITING `APPROVED: CR-011` (PO answered 2026-09-28: all accepted; BHK changed to ±1)
+- CR-012: AWAITING `APPROVED: CR-012` (PO answered 2026-09-28: building_name + floor, maybe, import crm_notes, all six small additions)
 
 Open change requests: none
