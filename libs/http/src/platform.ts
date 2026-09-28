@@ -147,7 +147,7 @@ export function registerPlatformEndpoints<Ops, DB>(
     } finally {
       await leases
         .updateTable('job_leases')
-        .set({ leased_until: new Date(), last_finished_at: new Date() })
+        .set({ leased_until: new Date(0), last_finished_at: new Date() }) // fully released: a run starting in the same ms can claim it
         .where('name', '=', name)
         .where('run_id', '=', runId)
         .execute();
