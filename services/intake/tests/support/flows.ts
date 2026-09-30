@@ -54,14 +54,7 @@ export async function uploadAndSplit(
   h: Harness,
   tenant: string,
   bytes: Uint8Array,
-  options: Parameters<typeof uploadFile>[3] & {
-    mapping?: Record<string, unknown>;
-    /**
-     * Targets the domain accepts but the contract's Mapping.columnMap enum does not list yet (building_name, floor,
-     * crm_notes; reported as a CR-012 contract gap): merged into the column map directly.
-     */
-    extraColumnMap?: Record<string, string>;
-  } = {},
+  options: Parameters<typeof uploadFile>[3] & { mapping?: Record<string, unknown> } = {},
 ): Promise<Uploaded> {
   const u = await uploadFile(h, tenant, bytes, options);
   const inspected = await inspect(h, tenant, u);
@@ -71,12 +64,6 @@ export async function uploadAndSplit(
   if (options.mapping) {
     const m = await h.call('PUT', `/v1/uploads/${u.id}/mapping`, u.headers, options.mapping);
     expect(m.status, JSON.stringify(m.body)).toBe(200);
-  }
-  if (options.extraColumnMap) {
-    const current = await h.app.uow.repos.uploads.find(tenant, u.id);
-    await h.app.uow.repos.uploads.update(tenant, u.id, {
-      columnMap: { ...(current?.columnMap ?? {}), ...options.extraColumnMap },
-    });
   }
   if (!(await h.app.uow.repos.vocabulary.active(tenant))) await seedVocabulary(h, tenant);
   const s = await h.call('POST', `/v1/uploads/${u.id}/start`, u.headers, { allowDuplicate: true });

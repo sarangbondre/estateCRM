@@ -263,6 +263,27 @@ describe('templates', () => {
     columnMap: { 'Lead ID': 'external_id', Mobile: 'phones', Text: 'free_text' },
   });
 
+  it('accepts building_name, floor and crm_notes as template targets and suggests them from the template (CR-012)', async () => {
+    const t = newTenant();
+    const hd = await h.staff(t, 'Data operator');
+    const columnMap = { 'Lead ID': 'external_id', Text: 'free_text', Bldg: 'building_name', Flr: 'floor', Remarks: 'crm_notes' };
+    const created = await h.call('POST', '/v1/templates', hd, {
+      name: 'Broker sheet',
+      sourceType: 'Direct',
+      headers: Object.keys(columnMap),
+      columnMap,
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    expect(created.body['columnMap']).toEqual(columnMap);
+    const u = await uploadFile(h, t, csv([Object.keys(columnMap), ['L-1', 'Flat in Sea Breeze', 'Sea Breeze', '4', 'x']]), {
+      fileName: 'broker.csv',
+      contentType: 'text/csv',
+      sourceType: 'Direct',
+    });
+    const up = await inspect(h, t, u);
+    expect(up).toMatchObject({ mode: 'mapping', suggestedMapping: columnMap });
+  });
+
   it('creates, lists by name (cursor, filters), gets, replaces with If-Match and soft-deletes', async () => {
     const t = newTenant();
     const hd = await h.staff(t, 'Data operator');

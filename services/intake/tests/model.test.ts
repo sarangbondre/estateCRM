@@ -193,8 +193,15 @@ describe('CR-012 private columns never reach the model', () => {
       fileName: 'b.csv',
       contentType: 'text/csv',
       sourceType: 'Direct',
-      mapping: { columnMap: { 'Lead ID': 'external_id', Message: 'free_text', Building: null, Floor: null, Notes: null } },
-      extraColumnMap: { Building: 'building_name', Floor: 'floor', Notes: 'crm_notes' },
+      mapping: {
+        columnMap: {
+          'Lead ID': 'external_id',
+          Message: 'free_text',
+          Building: 'building_name',
+          Floor: 'floor',
+          Notes: 'crm_notes',
+        },
+      },
     });
     await processAll(h, t, u.id);
     expect(requests.length).toBe(1);
