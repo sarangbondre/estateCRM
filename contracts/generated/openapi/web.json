@@ -2035,6 +2035,10 @@
         "service": "crm-engine"
       },
       {
+        "prefix": "/v1/notes",
+        "service": "journeys"
+      },
+      {
         "prefix": "/v1/offers/*/journey",
         "service": "journeys"
       },

@@ -3566,6 +3566,163 @@
         "x-pagination": "cursor (limit default 25, max 100); response {items, nextCursor}"
       }
     },
+    "/v1/notes": {
+      "get": {
+        "operationId": "listNotes",
+        "summary": "Notes on a record (imported crm_notes from uploads, CR-012)",
+        "tags": [
+          "Notes"
+        ],
+        "description": "Sorted by (createdAt desc, id). Note text may contain personal data; never logged. Kept 24 months (text), like other free-text notes.",
+        "security": [
+          {
+            "staffViaWeb": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "subjectType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "offer",
+                "demand",
+                "person",
+                "property"
+              ]
+            }
+          },
+          {
+            "name": "subjectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "subjectType",
+                          "subjectId",
+                          "source",
+                          "text",
+                          "createdAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "subjectType": {
+                            "type": "string",
+                            "enum": [
+                              "offer",
+                              "demand",
+                              "person",
+                              "property"
+                            ]
+                          },
+                          "subjectId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "upload_import"
+                            ]
+                          },
+                          "uploadCode": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "text": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "maxLength": 4000,
+                            "description": "null after the retention period"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Manager",
+          "Demand agent",
+          "Supply agent"
+        ],
+        "x-rate-limit": "20/s per user, burst 40 (token bucket at web)",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "safe (read-only)",
+        "x-emits": [],
+        "x-pagination": "cursor (limit default 25, max 100); response {items, nextCursor}"
+      }
+    },
     "/v1/notifications": {
       "get": {
         "operationId": "listNotifications",
