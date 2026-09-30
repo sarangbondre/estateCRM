@@ -1,7 +1,7 @@
 /** Generator knobs, defaults (from the extractor profile) and validation. */
 import { MAX_PEOPLE } from './contacts.js';
 import type { ExtractorColumn } from './columns.js';
-import { EXTRACTOR_COLUMNS } from './columns.js';
+import { EXTRACTOR_COLUMNS, LEGACY_OMITTED_COLUMNS } from './columns.js';
 import { daysBetween, parseIsoDate } from './format.js';
 
 /** Row error codes the generator can inject (intake `RowError.code` values, rejected in strict mode). */
@@ -57,8 +57,13 @@ export interface SyntheticOptions {
    * only point at record_ids of the same file. Default: all rows in one file.
    */
   readonly rowsPerFile: number;
-  /** Columns left out of the header (the file then reads as mapping mode). Default none. */
+  /**
+   * Columns left out of the header. The file then reads as mapping mode, except when only `building_name` and
+   * `floor` are left out (the legacy 89-column header, still strict, CR-012). Default none.
+   */
   readonly omitColumns: readonly ExtractorColumn[];
+  /** Emit the legacy 89-column header of older extractor versions (adds building_name, floor to omitColumns). */
+  readonly legacyHeader: boolean;
 }
 
 export const DEFAULT_DATE_FROM = '2026-05-01';
@@ -84,7 +89,10 @@ export function resolveOptions(
     anonymised: input.anonymised ?? false,
     people: input.people ?? Math.min(MAX_PEOPLE, Math.max(50, Math.ceil(rows / 5))),
     rowsPerFile: input.rowsPerFile ?? Math.max(1, rows),
-    omitColumns: input.omitColumns ?? [],
+    omitColumns: [
+      ...new Set([...(input.omitColumns ?? []), ...(input.legacyHeader ? LEGACY_OMITTED_COLUMNS : [])]),
+    ],
+    legacyHeader: input.legacyHeader ?? false,
   };
   validateOptions(options);
   return options;

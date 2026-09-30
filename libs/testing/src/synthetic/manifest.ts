@@ -3,7 +3,7 @@
  * read, reject, load and send to review). Built incrementally in constant memory.
  */
 import { VOCABULARY_VERSION } from '@11e/vocabulary';
-import { EXTRACTOR_COLUMNS, type ExtractorColumn } from './columns.js';
+import { EXTRACTOR_COLUMNS, LEGACY_OMITTED_COLUMNS, type ExtractorColumn } from './columns.js';
 import type { SyntheticRecord } from './generator.js';
 import {
   INJECTED_ERROR_CODES,
@@ -167,7 +167,8 @@ export class ManifestBuilder {
       vocabularyVersion: VOCABULARY_VERSION,
       options: this.options,
       columns,
-      mode: omitted.size === 0 ? 'strict' : 'mapping',
+      // the 89-column files of older extractor versions (without building_name and floor) are strict too (CR-012)
+      mode: [...omitted].every((c) => LEGACY_OMITTED_COLUMNS.includes(c as ExtractorColumn)) ? 'strict' : 'mapping',
       files,
       totals: {
         rows: this.rows,

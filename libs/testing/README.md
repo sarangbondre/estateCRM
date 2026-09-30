@@ -2,7 +2,7 @@
 
 Shared test helpers (F-05, F-17). Infrastructure only: never domain models (CLAUDE.md §3.9).
 
-This release contains the **synthetic data generator** (task F-17): seeded, streaming rows in the 89-column extractor
+This release contains the **synthetic data generator** (task F-17): seeded, streaming rows in the 91-column extractor
 upload schema (PRD Appendix C), with synthetic people and contacts only. Used by intake/records integration tests,
 the QA-02 pilot (sample data only, CR-005), JOU-11 (life curve on 5M subjects) and the REL-02 load tests.
 
@@ -34,7 +34,7 @@ const { manifest } = await writeDataset({ rows: 20_000, seed: 3 }, { format: 'cs
 
 | Export                                                          | What it is                                                                                                                                                                                    |
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EXTRACTOR_COLUMNS`, `ExtractorRow`, `CellValue`                | The 89 Appendix C columns in PRD order (a test parses the PRD so the list cannot drift). Dates are ISO `YYYY-MM-DD` strings, blank is `null`                                                  |
+| `EXTRACTOR_COLUMNS`, `ExtractorRow`, `CellValue`                | The 91 Appendix C columns in PRD order (a test parses the PRD so the list cannot drift). Dates are ISO `YYYY-MM-DD` strings, blank is `null`                                                  |
 | `SyntheticGenerator(options).records()`                         | Streaming generator of `{ row, meta }`. `meta`: row number, file index, kind (`ad`/`split`/`repeat`), injected error/warning, repeat source, person index, outside-MMR, expected needs_review |
 | `generate(options)`                                             | Same, collected into an array (tests)                                                                                                                                                         |
 | `writeDataset(options, { format, out, manifestPath? })`         | Generates and streams to NDJSON / CSV / XLSX, optionally split into files; writes and returns the manifest, elapsed time and rows/s                                                           |
@@ -62,6 +62,7 @@ const { manifest } = await writeDataset({ rows: 20_000, seed: 3 }, { format: 'cs
 | `people`             | `--people`          | rows / 5 (min 50)        | Synthetic people pool (capacity plan ratio: 5M records, 1M people). Max 2,000,000                       |
 | `rowsPerFile`        | `--rows-per-file`   | all rows                 | Split into upload-sized files; `{n}` in `--out` or `-NNN` before the extension numbers them             |
 | `omitColumns`        | `--omit-columns`    | none                     | Leave columns out of the header: the file then reads as **mapping mode** (`manifest.mode`)              |
+| `legacyHeader`       | `--legacy-header`   | false                    | The legacy 89-column header (no `building_name`, `floor`; CR-012), still **strict** mode                |
 | `anonymised`         | `--anonymised`      | false                    | Contacts in the form intake writes with the pilot anonymise switch on                                   |
 
 Format: `--format ndjson|csv|xlsx`, else taken from the `--out` extension. `--manifest <path>` or `-` for none.
@@ -111,7 +112,7 @@ number in PII/free-text columns is synthetic (apply it to text columns, not to 1
 - `errors` / `warnings`: count per code.
 - `classification`: counts over loaded rows per record_scope, side, deal_type, market, segment, property_type,
   route_to (`(blank)` for blank).
-- `columns`, `mode` (`strict` for the full 89 columns, else `mapping`), `files` (row ranges), resolved `options`.
+- `columns`, `mode` (`strict` for the full 91 columns or the 89 without `building_name`/`floor`, else `mapping`), `files` (row ranges), resolved `options`.
 
 ## Recipes
 
@@ -157,7 +158,10 @@ Throughput (Apple M-series laptop, Node 24): NDJSON ≈ 95k rows/s, CSV ≈ 98k 
 6. **sale_mode** is only ever Auction (profile) and comes with party_type Bank; Private is never generated.
 7. **WhatsApp** defaults to 0% because the profiled master is newspaper-only; sender and text_variants values are
    invented until a sample WhatsApp extractor file is available (PRD OQ-P11).
-8. `lead_status` is always `New`; `follow_up_date` and `crm_notes` are blank (as in the profile).
+8. `lead_status` is always `New`; `follow_up_date` is blank. About 3% of rows carry a synthetic `crm_notes` value
+   (fixed invented phrases, no personal data; CR-012). `building_name` is the building the ad text names (invented
+   names); about 40% of those rows also have a `floor` (`"12"`, `"G"`, `"5 of 20"`). These come from a separate random
+   stream, so the other columns are unchanged for a given seed.
 9. `duplicate-external-ref` needs an earlier row in the same file; if there is none, another requested code is used.
 10. Publication names are real newspaper titles (public, not personal data); building, company, developer and bank
     names are invented word combinations.

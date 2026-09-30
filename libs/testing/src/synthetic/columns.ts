@@ -1,6 +1,7 @@
 /**
- * The 89-column extractor upload schema (PRD Appendix C, CR-006 Z-1), in Appendix C order.
- * A file whose header equals this set is read by intake in strict mode (intake LLD §4.2).
+ * The 91-column extractor upload schema (PRD Appendix C, CR-006 Z-1; CR-012 added building_name and floor), in
+ * Appendix C order. A file whose header equals this set (or this set without building_name and floor, the older
+ * 89-column files) is read by intake in strict mode (intake LLD §4.2).
  * `tests/columns.test.ts` checks this list against the PRD so the two cannot drift.
  */
 export const EXTRACTOR_COLUMNS = [
@@ -23,6 +24,8 @@ export const EXTRACTOR_COLUMNS = [
   'segment',
   'property_type',
   'property_detail',
+  'building_name',
+  'floor',
   'land_use',
   'side',
   'side_evidence',
@@ -112,6 +115,9 @@ export const EXTRACTOR_COLUMNS = [
 ] as const;
 
 export type ExtractorColumn = (typeof EXTRACTOR_COLUMNS)[number];
+
+/** Optional since CR-012: without them the header is the legacy 89-column one, which intake still reads as strict. */
+export const LEGACY_OMITTED_COLUMNS: readonly ExtractorColumn[] = ['building_name', 'floor'];
 
 /** A cell value. Dates are ISO `YYYY-MM-DD` strings; blank is `null`. */
 export type CellValue = string | number | boolean | null;

@@ -41,6 +41,8 @@ export class HttpError extends Error {
   readonly detail: string | undefined;
   readonly errors: FieldError[] | undefined;
   readonly headers: Record<string, string> | undefined;
+  /** RFC 7807 extension members (e.g. `candidates`); never PII. Rendered and stored for idempotent replay. */
+  readonly extensions: Record<string, unknown> | undefined;
 
   constructor(
     status: number,
@@ -49,6 +51,7 @@ export class HttpError extends Error {
       detail?: string;
       errors?: FieldError[];
       headers?: Record<string, string>;
+      extensions?: Record<string, unknown>;
       cause?: unknown;
     } = {},
   ) {
@@ -58,6 +61,7 @@ export class HttpError extends Error {
     this.detail = options.detail;
     this.errors = options.errors;
     this.headers = options.headers;
+    this.extensions = options.extensions;
   }
 }
 
@@ -73,8 +77,10 @@ export const versionMismatch = () => new HttpError(412, 'version-mismatch');
 export const dependencyUnavailable = (detail?: string) =>
   new HttpError(503, 'dependency-unavailable', detail ? { detail } : {});
 
-export function toProblem(err: HttpError, correlationId: string): Problem {
-  const p: Problem = {
+/** Standard members always win over extension members of the same name. */
+export function toProblem(err: HttpError, correlationId: string): Problem & Record<string, unknown> {
+  const p: Problem & Record<string, unknown> = {
+    ...(err.extensions ?? {}),
     type: `${ERROR_TYPE_BASE}${err.code}`,
     title: TITLES[err.code] ?? err.code,
     status: err.status,
@@ -82,7 +88,9 @@ export function toProblem(err: HttpError, correlationId: string): Problem {
     correlationId,
   };
   if (err.detail) p.detail = err.detail;
+  else delete p['detail'];
   if (err.errors?.length) p.errors = err.errors;
+  else delete p['errors'];
   return p;
 }
 
