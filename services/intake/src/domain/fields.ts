@@ -46,6 +46,8 @@ export const FIELD_SPECS: Readonly<Record<TargetField, FieldSpec>> = {
   segment: { kind: 'special', key: 'segment' },
   property_type: { kind: 'special', key: 'propertyTypes' },
   property_detail: t('propertyDetail'),
+  building_name: t('buildingName'),
+  floor: t('floor'),
   land_use: { kind: 'special', key: 'landUse' },
   side: { kind: 'special', key: 'side' },
   side_evidence: t('sideEvidence'),

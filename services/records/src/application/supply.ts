@@ -165,6 +165,7 @@ export function emptyOffer(app: App, tx: Tx, code: string, propertyId: string, d
     review_reason_code: null,
     route_to_suggestion: null,
     sourced_for_demand_id: null,
+    sourcing_request_id: null,
     owner_user_id: null,
     ingested_record_id: null,
     source_ad_id: null,

@@ -124,6 +124,8 @@ export interface RawRowsTable {
   sheet_name: string | null;
   original: Json<Record<string, string | null>>;
   normalised: NullableJson<Record<string, unknown>>;
+  /** PII (CR-012). */
+  crm_notes: Defaulted<string | null>;
   external_source: string;
   external_ref: string;
   parent_external_ref: string | null;

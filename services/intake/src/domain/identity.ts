@@ -22,11 +22,17 @@ export function canonicalJson(value: unknown): string {
 export const sha256Hex = (s: string) => createHash('sha256').update(s).digest('hex');
 
 /** Fields excluded from the content hash (CRM working columns, CR-006 Z-8). */
-const HASH_EXCLUDED = new Set(['crmNotes', 'leadStatus', 'followUpDate', 'rowNo', 'sheetName']);
+const HASH_EXCLUDED = new Set(['crmNotes', 'hasCrmNotes', 'leadStatus', 'followUpDate', 'rowNo', 'sheetName']);
+/** Optional columns added by CR-012: left out while blank, so 89-column rows keep the hash they had before. */
+const HASH_OPTIONAL = new Set(['buildingName', 'floor']);
 
 /** sha256 of the canonical normalised row (§4.5). Deterministic anonymised values keep it stable across uploads. */
 export function contentHash(fields: Readonly<Record<string, unknown>>): string {
-  const kept = Object.fromEntries(Object.entries(fields).filter(([k]) => !HASH_EXCLUDED.has(k)));
+  const kept = Object.fromEntries(
+    Object.entries(fields).filter(
+      ([k, v]) => !HASH_EXCLUDED.has(k) && !(HASH_OPTIONAL.has(k) && (v === null || v === undefined)),
+    ),
+  );
   return sha256Hex(canonicalJson(kept));
 }
 

@@ -38,7 +38,7 @@ describe('CSV', () => {
     const { bytes } = await synthFile({ rows: 30, seed: 3 }, 'csv');
     const { rows } = await readAll(bytes);
     expect(rows).toHaveLength(31);
-    expect(rows[0]?.cells).toHaveLength(89);
+    expect(rows[0]?.cells).toHaveLength(91);
   });
 });
 

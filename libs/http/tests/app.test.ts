@@ -9,7 +9,9 @@ import {
   encodeCursor,
   ifMatchVersion,
   pageLimit,
+  problemResponse,
   toPage,
+  toProblem,
 } from '../src/index.js';
 import type { OpenApiDoc, RequestEndInfo } from '../src/index.js';
 
@@ -210,5 +212,19 @@ describe('request helpers', () => {
     expect(pageLimit(1000)).toBe(100);
     expect(() => decodeCursor('%%%')).toThrow(HttpError);
     expect(() => decodeCursor(encodeCursor({ a: 1 }).slice(0, 3))).toThrow(HttpError);
+  });
+
+  it('problems carry extension members; standard members win over them', async () => {
+    const plain = toProblem(new HttpError(404, 'not-found'), 'cid-1');
+    expect(Object.keys(plain).sort()).toEqual(['code', 'correlationId', 'status', 'title', 'type']);
+    const err = new HttpError(409, 'duplicate-property', {
+      detail: 'looks like an existing property',
+      extensions: { candidates: [{ id: 'p1' }], status: 200, code: 'x' },
+    });
+    const p = toProblem(err, 'cid-2');
+    expect(p).toMatchObject({ status: 409, code: 'duplicate-property', candidates: [{ id: 'p1' }] });
+    const r = problemResponse(err, 'cid-2');
+    expect(r.status).toBe(409);
+    expect(await r.json()).toMatchObject({ candidates: [{ id: 'p1' }], correlationId: 'cid-2' });
   });
 });

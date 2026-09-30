@@ -140,6 +140,12 @@ export interface IntakeRow {
   segment?: string | null;
   propertyTypes?: string[];
   propertyDetail?: string | null;
+  /** CR-012: private (dedup and proposals only; never in events or public). */
+  buildingName?: string | null;
+  /** CR-012: PII-sensitive floor text; stored as floor_no/total_floors. */
+  floor?: string | null;
+  /** CR-012: the row carried crm_notes (journeys fetches the text from intake). */
+  hasCrmNotes?: boolean;
   landUse?: string | null;
   side?: 'Supply' | 'Demand' | 'None' | null;
   sideEvidence?: string | null;

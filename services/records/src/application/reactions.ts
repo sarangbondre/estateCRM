@@ -71,19 +71,17 @@ async function recordMarketData(app: App, tx: Tx, point: Omit<MarketDataRow, 'id
   const id = app.ids.next();
   const inserted = await tx.store.insertIgnore('market_data_points', { id, ...point });
   if (!inserted) return null;
-  // market_data.recorded.v1 knows closed_by_us / closed_elsewhere / reported only (see report: lost_competing).
-  if (point.source !== 'lost_competing') {
-    await tx.events.emit('market_data.recorded.v1', agg('market_data', id, 1), {
-      marketDataId: id,
-      kind: point.source,
-      ...(point.segment ? { segment: point.segment } : {}),
-      ...(point.deal_type ? { dealType: point.deal_type } : {}),
-      ...(point.micromarket_id ? { micromarket: point.micromarket_id } : {}),
-      ...((point.price_inr ?? point.rent_monthly_inr) !== null ? { priceInr: (point.price_inr ?? point.rent_monthly_inr) as number } : {}),
-      ...(point.area_sqft !== null ? { areaSqft: point.area_sqft } : {}),
-      recordedOn: point.observed_on,
-    });
-  }
+  // Every kind, lost_competing included (CR-012).
+  await tx.events.emit('market_data.recorded.v1', agg('market_data', id, 1), {
+    marketDataId: id,
+    kind: point.source,
+    ...(point.segment ? { segment: point.segment } : {}),
+    ...(point.deal_type ? { dealType: point.deal_type } : {}),
+    ...(point.micromarket_id ? { micromarket: point.micromarket_id } : {}),
+    ...((point.price_inr ?? point.rent_monthly_inr) !== null ? { priceInr: (point.price_inr ?? point.rent_monthly_inr) as number } : {}),
+    ...(point.area_sqft !== null ? { areaSqft: point.area_sqft } : {}),
+    recordedOn: point.observed_on,
+  });
   return id;
 }
 

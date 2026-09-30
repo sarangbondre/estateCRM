@@ -179,6 +179,48 @@ describe('leftovers → redaction → Hugging Face (intercepted)', () => {
   });
 });
 
+describe('CR-012 private columns never reach the model', () => {
+  it('masks building_name and floor inside the text; crm_notes is never part of the model input', async () => {
+    requests.length = 0;
+    mode = 'ok';
+    const t = newTenant();
+    const file = csv([
+      ['Lead ID', 'Message', 'Building', 'Floor', 'Notes'],
+      ['B-1', 'Godown type space in Kalpataru Aura on the 7th floor, Ghatkopar', 'Kalpataru Aura', '7', 'owner abroad'],
+      ['B-2', 'Something at Floor 12 of 20 in Sea Breeze Tower, Worli', 'sea breeze tower', '12 of 20', null],
+    ]);
+    const u = await uploadAndSplit(h, t, file, {
+      fileName: 'b.csv',
+      contentType: 'text/csv',
+      sourceType: 'Direct',
+      mapping: {
+        columnMap: {
+          'Lead ID': 'external_id',
+          Message: 'free_text',
+          Building: 'building_name',
+          Floor: 'floor',
+          Notes: 'crm_notes',
+        },
+      },
+    });
+    await processAll(h, t, u.id);
+    expect(requests.length).toBe(1);
+    const sent = requests.map((r) => r.body).join('\n');
+    for (const value of ['Kalpataru', 'Aura', '7th floor', 'Sea Breeze', '12 of 20', 'owner abroad'])
+      expect(sent).not.toContain(value);
+    expect(sent).toContain('Ghatkopar');
+    const raw = await h.db
+      .selectFrom('raw_rows')
+      .select(['normalised', 'crm_notes'])
+      .where('upload_id', '=', u.id)
+      .orderBy('row_no')
+      .execute();
+    expect(raw[0]?.normalised).toMatchObject({ buildingName: 'Kalpataru Aura', floor: '7', hasCrmNotes: true });
+    expect(raw[0]?.crm_notes).toBe('owner abroad');
+    expect(raw[1]?.normalised).toMatchObject({ buildingName: 'sea breeze tower', floor: '12 of 20', hasCrmNotes: false });
+  });
+});
+
 describe('model output validation', () => {
   it('parses a JSON array out of surrounding text and validates against the vocabulary', () => {
     expect(parseModelJson('```json\n[{"id":"1"}]\n```')).toEqual([{ id: '1' }]);

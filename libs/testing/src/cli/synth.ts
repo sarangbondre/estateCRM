@@ -30,6 +30,7 @@ const USAGE = `Usage: 11e-synth --rows <n> --out <path> [options]
   --people <n>            synthetic people pool (default rows / 5, max 2,000,000)
   --rows-per-file <n>     split the dataset into files of n rows (e.g. 100000 per upload)
   --omit-columns <list>   comma list of columns to leave out (file reads as mapping mode)
+  --legacy-header         the 89-column header of older extractor versions (no building_name, floor; still strict)
   --anonymised            contacts in intake's anonymised form (+9100000…, example.invalid)
   --manifest <path>       manifest path (default <out>.manifest.json); "-" = do not write
   --help                  this text
@@ -86,6 +87,7 @@ async function main(): Promise<void> {
       people: { type: 'string' },
       'rows-per-file': { type: 'string' },
       'omit-columns': { type: 'string' },
+      'legacy-header': { type: 'boolean' },
       anonymised: { type: 'boolean' },
       manifest: { type: 'string' },
       help: { type: 'boolean' },
@@ -124,6 +126,7 @@ async function main(): Promise<void> {
     ['people', num('people', values.people)],
     ['rowsPerFile', num('rows-per-file', values['rows-per-file'])],
     ['omitColumns', omit as ExtractorColumn[] | undefined],
+    ['legacyHeader', values['legacy-header']],
     ['anonymised', values.anonymised],
   ];
   const options = Object.fromEntries(entries.filter(([, v]) => v !== undefined)) as Partial<SyntheticOptions>;

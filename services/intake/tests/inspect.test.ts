@@ -23,17 +23,25 @@ const MAPPING_CSV = csv([
 ]);
 
 describe('POST /inspect and the inspection worker', () => {
-  it('detects strict mode on the 89 standard columns and makes the upload ready', async () => {
+  it('detects strict mode on the 91 standard columns and makes the upload ready', async () => {
     const t = newTenant();
     const u = await uploadFile(h, t, strictBytes);
     const up = await inspect(h, t, u);
     expect(up).toMatchObject({ status: 'ready', mode: 'strict', sheetName: 'Leads', suggestedMapping: null });
     expect(up['sheetNames']).toEqual(['Leads', 'run_log']);
-    expect(up['header']).toHaveLength(89);
+    expect(up['header']).toHaveLength(91);
     expect(up['hasMigrationMap']).toBe(false);
     // a repeat is naturally idempotent (200, current upload)
     const again = await h.call('POST', `/v1/uploads/${u.id}/inspect`, u.headers);
     expect(again.status).toBe(200);
+  });
+
+  it('still detects strict mode on the 89-column header of older extractor versions (CR-012)', async () => {
+    const t = newTenant();
+    const { bytes } = await synthFile({ rows: 5, seed: 12, omitColumns: ['building_name', 'floor'] });
+    const up = await inspect(h, t, await uploadFile(h, t, bytes));
+    expect(up).toMatchObject({ status: 'ready', mode: 'strict' });
+    expect(up['header']).toHaveLength(89);
   });
 
   it('detects mapping mode with a suggested mapping (headers only, no cell values)', async () => {
@@ -253,6 +261,27 @@ describe('templates', () => {
     sourceType: 'Digi',
     headers: ['Lead ID', 'Mobile', 'Text'],
     columnMap: { 'Lead ID': 'external_id', Mobile: 'phones', Text: 'free_text' },
+  });
+
+  it('accepts building_name, floor and crm_notes as template targets and suggests them from the template (CR-012)', async () => {
+    const t = newTenant();
+    const hd = await h.staff(t, 'Data operator');
+    const columnMap = { 'Lead ID': 'external_id', Text: 'free_text', Bldg: 'building_name', Flr: 'floor', Remarks: 'crm_notes' };
+    const created = await h.call('POST', '/v1/templates', hd, {
+      name: 'Broker sheet',
+      sourceType: 'Direct',
+      headers: Object.keys(columnMap),
+      columnMap,
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    expect(created.body['columnMap']).toEqual(columnMap);
+    const u = await uploadFile(h, t, csv([Object.keys(columnMap), ['L-1', 'Flat in Sea Breeze', 'Sea Breeze', '4', 'x']]), {
+      fileName: 'broker.csv',
+      contentType: 'text/csv',
+      sourceType: 'Direct',
+    });
+    const up = await inspect(h, t, u);
+    expect(up).toMatchObject({ mode: 'mapping', suggestedMapping: columnMap });
   });
 
   it('creates, lists by name (cursor, filters), gets, replaces with If-Match and soft-deletes', async () => {

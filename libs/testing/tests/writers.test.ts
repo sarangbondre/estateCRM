@@ -101,10 +101,21 @@ describe('CSV writer', () => {
       { format: 'csv', out, manifestPath: null },
     );
     const [header] = parseCsv(readFileSync(out, 'utf8'));
-    expect(header).toHaveLength(87);
+    expect(header).toHaveLength(89);
     expect(header).not.toContain('record_id');
     expect(manifest.mode).toBe('mapping');
     expect(manifest.columns).toEqual(header);
+  });
+
+  it('the 89-column header of older extractor versions (no building_name, floor) is still strict (CR-012)', async () => {
+    const out = join(dir, 'legacy89.csv');
+    const { manifest } = await writeDataset(
+      { rows: 5, seed: 1, legacyHeader: true },
+      { format: 'csv', out, manifestPath: null },
+    );
+    const [header] = parseCsv(readFileSync(out, 'utf8'));
+    expect(header).toHaveLength(89);
+    expect(manifest.mode).toBe('strict');
   });
 });
 

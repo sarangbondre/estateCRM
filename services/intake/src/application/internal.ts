@@ -25,6 +25,24 @@ export async function getBatchRows(
   return { upload, batchNo, rows };
 }
 
+export interface RowNoteView {
+  upload: Upload;
+  rowNo: number;
+  note: string;
+}
+
+/**
+ * crm_notes of one upload row for journeys (CR-012). 404 when the upload or row is unknown, the row has no note, or
+ * the raw rows were purged (retention). The note is PII: never logged or cached.
+ */
+export async function getRowNote(app: App, tenantId: string, uploadId: string, rowNo: number): Promise<RowNoteView> {
+  const upload = await app.uow.repos.uploads.find(tenantId, uploadId);
+  if (!upload) throw notFound('upload');
+  const note = upload.purgedAt ? undefined : await app.uow.repos.rawRows.note(tenantId, upload.id, rowNo);
+  if (!note) throw notFound('note');
+  return { upload, rowNo, note };
+}
+
 export async function getInternalMigrationMap(
   app: App,
   tenantId: string,

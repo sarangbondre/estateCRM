@@ -1,7 +1,7 @@
 // HTTP plumbing shared by the route modules: principal → actor, RecordsError → RFC 7807, pagination, idempotency.
 import type { MiddlewareHandler } from 'hono';
 import { principalOf } from '@11e/auth';
-import { HttpError, decodeCursor, encodeCursor, idempotent, ifMatchVersion, pageLimit, toProblem } from '@11e/http';
+import { HttpError, decodeCursor, encodeCursor, idempotent, ifMatchVersion, pageLimit } from '@11e/http';
 import type { OperationHandler, ServiceContext, ServiceEnv } from '@11e/http';
 import type { Kysely } from 'kysely';
 import type { Actor } from '../../application/context.js';
@@ -10,26 +10,17 @@ import type { After } from '../../application/queries.js';
 import { RecordsError } from '../../domain/errors.js';
 import { SERVICE_USER_ID } from './constants.js';
 
-/** An HttpError carrying RFC 7807 extension members (e.g. `candidates`). */
-export class ExtendedHttpError extends HttpError {
-  readonly extensions: Record<string, unknown>;
-  constructor(status: number, code: string, detail: string | undefined, extensions: Record<string, unknown>) {
-    super(status, code, detail ? { detail } : {});
-    this.extensions = extensions;
-  }
-}
-
 export function toHttpError(err: unknown): unknown {
   if (!(err instanceof RecordsError)) return err;
-  if (err.extensions) return new ExtendedHttpError(err.status, err.code, err.detail, err.extensions);
   return new HttpError(err.status, err.code, {
     ...(err.detail ? { detail: err.detail } : {}),
     ...(err.errors ? { errors: err.errors } : {}),
     ...(err.headers ? { headers: err.headers } : {}),
+    ...(err.extensions ? { extensions: err.extensions } : {}),
   });
 }
 
-/** Runs use-case code, translating business errors to HTTP errors (so idempotent() can store 4xx replays). */
+/** Runs use-case code, translating business errors to HTTP errors (so idempotent() stores 4xx replays with extensions). */
 export async function guard<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
@@ -38,21 +29,13 @@ export async function guard<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Wraps an operation handler: business errors become RFC 7807 responses (with extension members when present). */
+/** Wraps an operation handler: business errors become RFC 7807 responses (extension members included by @11e/http). */
 export function wrap<Op>(handler: OperationHandler<Op>): OperationHandler<Op> {
   return async (c, input) => {
     try {
       return await handler(c, input);
     } catch (err) {
-      const e = toHttpError(err);
-      if (e instanceof ExtendedHttpError) {
-        const body = { ...toProblem(e, c.get('correlationId')), ...e.extensions };
-        return new Response(JSON.stringify(body), {
-          status: e.status,
-          headers: { 'content-type': 'application/problem+json', 'x-correlation-id': c.get('correlationId') },
-        });
-      }
-      throw e;
+      throw toHttpError(err);
     }
   };
 }

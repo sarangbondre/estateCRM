@@ -6,7 +6,7 @@ import { processChunk } from '../src/application/chunk.js';
 import { runFinalize } from '../src/application/finalize.js';
 import { createHarness, newTenant } from './support/harness.js';
 import type { Harness } from './support/harness.js';
-import { synthFile, workbook } from './support/files.js';
+import { strictCsv, synthFile, workbook } from './support/files.js';
 import { runUpload, uploadAndSplit } from './support/flows.js';
 
 let h: Harness;
@@ -73,6 +73,12 @@ describe('finalize', () => {
   });
 });
 
+const NOTES_FILE = strictCsv([
+  { building_name: 'Sea Breeze Tower', floor: '12', crm_notes: 'keys with the watchman' },
+  { building_name: null, floor: null, crm_notes: '  ' },
+]);
+const NOTES_MAPPING = { fileName: 'notes.csv', contentType: 'text/csv' };
+
 describe('internal API for records', () => {
   it('serves the rows of an emitted batch (PII, no-store) to records only', async () => {
     const t = newTenant();
@@ -109,6 +115,40 @@ describe('internal API for records', () => {
         )
       ).status,
     ).toBe(404);
+  });
+
+  it('serves building_name, floor and hasCrmNotes in IntakeRow, never the note text (CR-012)', async () => {
+    const t = newTenant();
+    const u = await runUpload(h, t, NOTES_FILE, NOTES_MAPPING);
+    const r = await h.call('GET', `/internal/v1/uploads/${u.id}/rows?batch=1`, await h.service(t, 'records'));
+    const rows = r.body['rows'] as Record<string, unknown>[];
+    expect(rows[0]).toMatchObject({ buildingName: 'Sea Breeze Tower', floor: '12', hasCrmNotes: true });
+    expect(rows[1]).toMatchObject({ buildingName: null, floor: null, hasCrmNotes: false });
+    expect(JSON.stringify(rows)).not.toContain('keys with the watchman');
+  });
+
+  it('serves the crm_notes text of one row to journeys only (no-store); 404 without a note or after purge', async () => {
+    const t = newTenant();
+    const u = await runUpload(h, t, NOTES_FILE, NOTES_MAPPING);
+    const journeys = await h.service(t, 'journeys');
+    const note = await h.call('GET', `/internal/v1/uploads/${u.id}/rows/1/note`, journeys);
+    expect(note.status).toBe(200);
+    expect(note.headers.get('cache-control')).toBe('no-store');
+    const code = (await h.call('GET', `/v1/uploads/${u.id}`, u.headers)).body['code'];
+    expect(note.body).toEqual({ uploadId: u.id, uploadCode: code, rowNo: 1, note: 'keys with the watchman' });
+    expect((await h.call('GET', `/internal/v1/uploads/${u.id}/rows/2/note`, journeys)).status).toBe(404);
+    expect((await h.call('GET', `/internal/v1/uploads/${u.id}/rows/99/note`, journeys)).status).toBe(404);
+    expect((await h.call('GET', `/internal/v1/uploads/${randomUUID()}/rows/1/note`, journeys)).status).toBe(404);
+    expect((await h.call('GET', `/internal/v1/uploads/${u.id}/rows/1/note`, await h.service(t, 'records'))).status).toBe(
+      403,
+    );
+    expect((await h.call('GET', `/internal/v1/uploads/${u.id}/rows/1/note`, await h.staff(t))).status).toBe(403);
+    expect(
+      (await h.call('GET', `/internal/v1/uploads/${u.id}/rows/1/note`, await h.service(newTenant(), 'journeys'))).status,
+    ).toBe(404);
+    // retention purge: the note goes with the raw rows
+    await h.app.uow.repos.rawRows.purge(t, u.id, 1000);
+    expect((await h.call('GET', `/internal/v1/uploads/${u.id}/rows/1/note`, journeys)).status).toBe(404);
   });
 
   it('pages the migration map in entry order', async () => {

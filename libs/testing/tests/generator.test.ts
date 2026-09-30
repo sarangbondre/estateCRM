@@ -148,8 +148,22 @@ describe('determinism', () => {
   });
 });
 
+describe('CR-012 columns', () => {
+  it('building_name comes from the ad text, floor only with a building, crm_notes on a few rows', () => {
+    const rows = SAMPLE.map((r) => r.row);
+    const withBuilding = rows.filter((r) => r.building_name !== null);
+    expect(withBuilding.length).toBeGreaterThan(1000);
+    for (const r of withBuilding) expect(String(r.raw_text)).toContain(String(r.building_name));
+    expect(rows.some((r) => r.floor !== null)).toBe(true);
+    for (const r of rows) if (r.floor !== null) expect(r.building_name).not.toBeNull();
+    const notes = rows.filter((r) => r.crm_notes !== null).length / rows.length;
+    expect(notes).toBeGreaterThan(0.01);
+    expect(notes).toBeLessThan(0.06);
+  });
+});
+
 describe('every loadable row is valid', () => {
-  it('rows hold exactly the 89 columns in schema order', () => {
+  it('rows hold exactly the 91 columns in schema order', () => {
     for (const row of SAMPLE_ROWS.slice(0, 500)) expect(Object.keys(row)).toEqual([...EXTRACTOR_COLUMNS]);
   });
 
@@ -416,7 +430,7 @@ describe('error injection and the manifest', () => {
     expect(manifest.totals.splitChildren).toBe(records.filter((r) => r.row.parent_record_id !== null).length);
     expect(manifest.totals.repeats).toBe(records.filter((r) => r.meta.kind === 'repeat').length);
     expect(manifest.mode).toBe('strict');
-    expect(manifest.columns).toHaveLength(89);
+    expect(manifest.columns).toHaveLength(91);
   });
 
   it('restricting error codes injects only those codes', () => {

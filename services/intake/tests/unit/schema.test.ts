@@ -12,8 +12,8 @@ import {
 } from '../../src/domain/schema.js';
 
 describe('standard schema', () => {
-  it('has the 89 Appendix C columns (same list as the synthetic generator, which is checked against the PRD)', () => {
-    expect(STANDARD_COLUMNS).toHaveLength(89);
+  it('has the 91 Appendix C columns (same list as the synthetic generator, which is checked against the PRD)', () => {
+    expect(STANDARD_COLUMNS).toHaveLength(91);
     expect([...STANDARD_COLUMNS]).toEqual([...EXTRACTOR_COLUMNS]);
   });
 
@@ -24,9 +24,21 @@ describe('standard schema', () => {
 });
 
 describe('strict vs mapping mode', () => {
-  it('is strict only when the normalised header set equals the 89 names, in any order and case', () => {
+  it('is strict only when the normalised header set equals the 91 names, in any order and case', () => {
     const shuffled = [...STANDARD_COLUMNS].reverse().map((c) => c.toUpperCase().replace(/_/g, ' '));
     expect(isStrictHeader(shuffled)).toBe(true);
+  });
+
+  it('also accepts the 89-column header of older extractor versions, but not a half-migrated one (CR-012)', () => {
+    const legacy = STANDARD_COLUMNS.filter((c) => c !== 'building_name' && c !== 'floor');
+    expect(legacy).toHaveLength(89);
+    expect(isStrictHeader(legacy)).toBe(true);
+    expect(isStrictHeader([...legacy, 'building_name'])).toBe(false);
+    expect(isStrictHeader([...legacy, 'floor', 'floor'])).toBe(false);
+  });
+
+  it('offers building_name and floor as mapping targets', () => {
+    expect(suggestMapping(['Building Name', 'Floor'])).toEqual({ 'Building Name': 'building_name', Floor: 'floor' });
   });
 
   it('is mapping mode with a missing, an extra or a repeated column (Q-I1)', () => {
