@@ -149,6 +149,8 @@ export const CLOSE_REASONS = [
   'offer_retired',
   'offer_expired',
   'demand_exited',
+  'demand_expired',
+  'demand_paused',
   'demand_closed',
   'deal_closed',
   'superseded',

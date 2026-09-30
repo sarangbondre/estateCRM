@@ -194,6 +194,49 @@ describe('planMerge', () => {
     ]);
   });
 
+  it.each(['demand_expired', 'demand_paused'] as const)(
+    'Closed %s reopens as demand_reactivated (Suggested) or back to Confirmed once the demand is live again',
+    (closedReason) => {
+      const s = match({
+        offerSetKey: 'a',
+        status: 'Closed',
+        closedReason,
+        priorStatus: 'Suggested',
+        rank: null,
+      });
+      const c = match({
+        offerSetKey: 'b',
+        status: 'Closed',
+        closedReason,
+        priorStatus: 'Confirmed',
+        rank: null,
+      });
+      const plan = planMerge(
+        d,
+        [s, c],
+        evals([
+          ['a', pass(75)],
+          ['b', pass(70)],
+        ]),
+        T,
+      );
+      expect(plan.events).toEqual(
+        expect.arrayContaining([
+          { type: 'reopened', matchId: s.id, reason: 'demand_reactivated' },
+          { type: 'reopened', matchId: c.id, reason: 'demand_reactivated' },
+        ]),
+      );
+      expect(plan.updates.find((u) => u.id === c.id)).toMatchObject({
+        status: 'Confirmed',
+        closedReason: null,
+      });
+      expect(plan.updates.find((u) => u.id === s.id)).toMatchObject({
+        status: 'Suggested',
+        closedReason: null,
+      });
+    },
+  );
+
   it('Closed superseded is re-suggested when it re-enters the top N; other close reasons stay closed', () => {
     const sup = match({ offerSetKey: 'a', status: 'Closed', closedReason: 'superseded', rank: null });
     const deal = match({ offerSetKey: 'b', status: 'Closed', closedReason: 'deal_closed', rank: null });
@@ -260,6 +303,9 @@ describe('planMerge', () => {
       'demand_exited',
       'demand_exited',
     ]);
+    // CR-012: a demand Expired / Paused by its life curve (no exit) closes with its own reason
+    expect(reasons(demand({ lifeStage: 'Expired' }))).toEqual(['demand_expired', 'demand_expired']);
+    expect(reasons(demand({ lifeStage: 'Paused' }))).toEqual(['demand_paused', 'demand_paused']);
     expect(reasons(demand({ commercialStatus: 'Closed' }))).toEqual(['demand_closed', 'demand_closed']);
     expect(reasons(demand({ voided: true }))).toEqual(['voided', 'voided']);
     expect(reasons(demand({ mergedInto: 'x' }))).toEqual(['merged', 'merged']);
@@ -325,5 +371,9 @@ describe('close causes (BRD §7 close propagation)', () => {
     expect(demandCloseCause(demand())).toBeNull();
     expect(demandCloseCause(demand({ lifeStage: 'Stale' }))).toBeNull();
     expect(demandCloseCause(demand({ exitType: 'Invalid' }))).toBe('demand_exited');
+    expect(demandCloseCause(demand({ lifeStage: 'Expired' }))).toBe('demand_expired');
+    expect(demandCloseCause(demand({ lifeStage: 'Paused' }))).toBe('demand_paused');
+    // an exit wins over the life stage it sets (Dormant → Paused)
+    expect(demandCloseCause(demand({ exitType: 'Dormant', lifeStage: 'Paused' }))).toBe('demand_exited');
   });
 });

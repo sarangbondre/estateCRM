@@ -1,6 +1,6 @@
 // Hard filters (LLD §4.1, PRD §4.5, BRD §7): order, outcomes and reasons.
 import { describe, expect, it } from 'vitest';
-import { evaluateHardFilters, normaliseTagKey } from '../../src/domain/filters.js';
+import { bhkGap, evaluateHardFilters, normaliseTagKey } from '../../src/domain/filters.js';
 import { demand, offer } from './fixtures.js';
 
 const kind = (o: ReturnType<typeof offer>, d: ReturnType<typeof demand>, requireAcceptsNew = false) =>
@@ -133,6 +133,53 @@ describe('hard filters', () => {
     expect(kind(offer({ propertyTypes: ['Shop', 'Office'] }), demand()).kind).toBe('pass');
     expect(kind(offer({ propertyTypes: [] }), demand()).kind).toBe('pass');
     expect(kind(offer(), demand({ propertyTypes: [] })).kind).toBe('pass');
+  });
+
+  describe('6: residential BHK within ±1 of the demand (CR-011 item 3)', () => {
+    const flat = (bhkMin: number | null, bhkMax: number | null = bhkMin) =>
+      offer({ segment: 'Residential', propertyTypes: ['Apartment'], bhkMin, bhkMax });
+    const need = (bhkMin: number | null, bhkMax: number | null = bhkMin) =>
+      demand({ segment: 'Residential', propertyTypes: ['Apartment'], bhkMin, bhkMax });
+    it('4BHK need: 3, 4 and 5 BHK pass; 2 and 6 BHK are skipped (never a candidate, no exclusion row)', () => {
+      for (const b of [3, 4, 5]) expect(kind(flat(b), need(4)).kind).toBe('pass');
+      for (const b of [2, 6]) {
+        const r = kind(flat(b), need(4));
+        expect(r).toMatchObject({ kind: 'skip', failed: 'property_type' });
+        expect(r.checks.at(-1)?.detail).toBe(`${b} BHK vs 4 BHK (±1 allowed)`);
+      }
+    });
+    it('a demand for a BHK range (2–3, i.e. "2 or 3 BHK") allows 1 to 4 BHK', () => {
+      for (const b of [1, 2, 3, 4]) expect(kind(flat(b), need(2, 3)).kind).toBe('pass');
+      expect(kind(flat(5), need(2, 3))).toMatchObject({ kind: 'skip', failed: 'property_type' });
+      expect(kind(flat(4), need(2, 3)).checks.find((c) => c.filter === 'property_type')?.passed).toBe(true);
+    });
+    it('an offer with a BHK range (project configurations 5–6) passes when any part is within ±1', () => {
+      expect(kind(flat(5, 6), need(4)).kind).toBe('pass');
+      expect(kind(flat(6, 7), need(4))).toMatchObject({ kind: 'skip', failed: 'property_type' });
+    });
+    it('half BHKs and 1 RK (0.5): 1 RK suits a 1 BHK need, not a 2 BHK need; 3.5 BHK suits a 4 BHK need', () => {
+      expect(kind(flat(0.5), need(1)).kind).toBe('pass');
+      expect(kind(flat(0.5), need(2))).toMatchObject({ kind: 'skip', failed: 'property_type' });
+      expect(kind(flat(3.5), need(4)).kind).toBe('pass');
+      expect(kind(flat(2.5), need(4))).toMatchObject({ kind: 'skip', failed: 'property_type' });
+    });
+    it('a range with one end blank is that single value', () => {
+      expect(kind(flat(null, 2), need(4))).toMatchObject({ kind: 'skip', failed: 'property_type' });
+      expect(kind(flat(3), need(4, null)).kind).toBe('pass');
+    });
+    it('unknown BHK on either side is never filtered (the bhk factor is then not applicable)', () => {
+      expect(kind(flat(null), need(4)).kind).toBe('pass');
+      expect(kind(flat(2), need(null)).kind).toBe('pass');
+      expect(bhkGap({ bhkMin: null, bhkMax: null }, { bhkMin: 4, bhkMax: 4 })).toBeNull();
+    });
+    it('non-residential segments ignore BHK', () => {
+      expect(kind(offer({ bhkMin: 2, bhkMax: 2 }), demand({ bhkMin: 4, bhkMax: 4 })).kind).toBe('pass');
+    });
+    it('bhkGap: 0 on overlap, else the distance between the ranges', () => {
+      expect(bhkGap({ bhkMin: 3, bhkMax: 5 }, { bhkMin: 4, bhkMax: 4 })).toBe(0);
+      expect(bhkGap({ bhkMin: 2, bhkMax: 2 }, { bhkMin: 4, bhkMax: 5 })).toBe(2);
+      expect(bhkGap({ bhkMin: 6, bhkMax: 6 }, { bhkMin: 4, bhkMax: 5 })).toBe(1);
+    });
   });
 
   it('7: deal tags the client stated must match; a blank offer value is compatible', () => {

@@ -141,7 +141,8 @@ export async function onDemandChange(store: Store, change: Change<DemandRecord> 
     (after.lifeStage === 'Expired' || after.lifeStage === 'Paused') &&
     before.lifeStage !== after.lifeStage
   ) {
-    await closeOpenForDemand(store, after.tenantId, after.id, 'demand_exited');
+    const reason = after.lifeStage === 'Expired' ? 'demand_expired' : 'demand_paused';
+    await closeOpenForDemand(store, after.tenantId, after.id, reason);
   }
 }
 

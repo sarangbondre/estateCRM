@@ -12,6 +12,7 @@ import {
   scorePair,
   timingFactor,
 } from '../../src/domain/scoring.js';
+import { evaluateSingle } from '../../src/domain/engine.js';
 import { DEFAULT_WEIGHTS } from '../../src/domain/weights.js';
 import type { FactorName } from '../../src/domain/types.js';
 import { ctx, demand, offer } from './fixtures.js';
@@ -165,7 +166,7 @@ describe('score = round(100 × Σ w·v / Σ w) over applicable factors', () => {
     });
   });
 
-  it('bhk (Residential only): overlap 1.0, off by 0.5 → 0.6, by 1 → 0.3, more → 0', () => {
+  it('bhk (Residential only) within the ±1 band (CR-011): exact 1.0, off by 0.5 → 0.6, by 1 → 0.3 (more is filtered; 0 kept for safety)', () => {
     const d = demand({ segment: 'Residential', bhkMin: 2, bhkMax: 2 });
     const v = (bhk: number) =>
       bhkFactor(offer({ segment: 'Residential', bhkMin: bhk, bhkMax: bhk }), d).value;
@@ -176,6 +177,17 @@ describe('score = round(100 × Σ w·v / Σ w) over applicable factors', () => {
     expect(v(4)).toBe(0);
     expect(bhkFactor(offer({ bhkMin: 2, bhkMax: 2 }), demand({ bhkMin: 2 })).applicable).toBe(false); // Commercial
     expect(bhkFactor(offer({ segment: 'Residential' }), d).applicable).toBe(false); // offer bhk unknown
+    expect(
+      bhkFactor(offer({ segment: 'Residential', bhkMin: 2, bhkMax: 2 }), demand({ segment: 'Residential' }))
+        .applicable,
+    ).toBe(false); // demand bhk unknown
+    // a "2 or 3 BHK" demand: both are exact
+    const range = demand({ segment: 'Residential', bhkMin: 2, bhkMax: 3 });
+    expect(bhkFactor(offer({ segment: 'Residential', bhkMin: 3, bhkMax: 3 }), range)).toMatchObject({
+      value: 1,
+      note: '3 BHK vs 2–3 BHK',
+    });
+    expect(bhkFactor(offer({ segment: 'Residential', bhkMin: 4, bhkMax: 4 }), range).value).toBe(0.3);
   });
 
   describe('timing (demand has move_in_by)', () => {
@@ -288,9 +300,14 @@ describe("the user's example: an industrial requirement of 4,000 sq ft", () => {
     expect(scorePair(shed(4000), need, ctx()).score).toBe(95);
     expect(scorePair(shed(4200), need, ctx()).score).toBe(85); // 200 sq ft over: area 1 − 200/600
   });
-  it('3,600 sq ft is inside the ±15% band and still suggestible; 2,500 and 400 sq ft are not single matches', () => {
+  it('CR-011 item 1: a single match needs the offer area within tolerance — 3,600 sq ft is inside the ±15% band and suggestible; 2,500 and 400 sq ft are not single matches (bundles only)', () => {
     expect(scorePair(shed(3600), need, ctx()).areaOutOfRange).toBe(false);
     expect(scorePair(shed(2500), need, ctx()).areaOutOfRange).toBe(true);
     expect(scorePair(shed(400), need, ctx()).areaOutOfRange).toBe(true);
+    // the engine never suggests it alone, even though it passes every hard filter
+    const single = evaluateSingle(shed(400), need, ctx());
+    expect(single.filter.kind).toBe('pass');
+    expect(single.eval).toMatchObject({ kind: 'pass', suggestible: false });
+    expect(evaluateSingle(shed(3600), need, ctx()).eval).toMatchObject({ kind: 'pass', suggestible: true });
   });
 });

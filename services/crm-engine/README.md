@@ -83,7 +83,7 @@ days, merged projection rows 30 days, published outbox 7 days, processed events 
 
 Hard filters in order (LLD §4.1): launch area → liveness (Closed/voided/merged offers skipped; Expired/Inactive offers
 and a Stale demand's new pairs become exclusions) → deal type → market (Sale; demand Any/blank matches both; blank offer
-market → `market_unknown`) → segment + property type → stated deal tags → micromarket overlap (hierarchy) → possession
+market → `market_unknown`) → segment + property type + residential BHK within ±1 of the demand (CR-011) → stated deal tags → micromarket overlap (hierarchy) → possession
 window (`available_too_late`). Scoring: micromarket 0.25, price 0.25, area 0.20, bhk 0.10, timing 0.10, furnishing
 0.10 over the applicable factors, minimum 40, top 20 open suggestions per demand. Bundles: Commercial/Industrial, 2–3
 offers too small alone, same building / micromarket / adjacent micromarkets, combined area and price within the demand.
@@ -91,18 +91,27 @@ offers too small alone, same building / micromarket / adjacent micromarkets, com
 ### Decisions where the documents were silent (see the service report)
 
 1. A single match needs its area within tolerance (area value > 0); from LLD §4.3 "an offer that meets the area alone
-   is a single match". Engine bundles use only offers that cannot be single matches.
+   is a single match". Engine bundles use only offers that cannot be single matches. Confirmed by CR-011 item 1.
 2. Timing when the availability month straddles `move_in_by`: 0.4.
 3. A Suggested pair that stops qualifying closes `superseded`; Confirmed pairs close only for offer/demand causes.
-4. Expired / Paused demands close their matches `demand_exited` (no dedicated reason in the contract).
+4. Demands Expired / Paused by their life curve close their matches `demand_expired` / `demand_paused` (CR-012); an
+   exit (including Dormant, which also sets Paused) closes them `demand_exited`. All three reopen as
+   `demand_reactivated`. Matches closed `demand_exited` before CR-012 keep that reason.
 5. `match.suggested.v1` on re-rank is emitted for Suggested matches only (not Confirmed).
 6. A same-named locality under another micromarket is disambiguated by the offer's micromarket; zones never overlap.
 7. Manual bundles score (and flag) an over-budget or over-area combination instead of rejecting it (no error code).
 8. `projection-reconcile` repairs journeys-owned axes only; records facts rely on at-least-once events and the DLQ.
 9. A journeys event for a subject that is not projected yet is retried by the drain (projection gap).
+10. Residential BHK band (CR-011): the offer's BHK range must come within 1 BHK of the demand's range (a "2 or 3 BHK"
+    demand is the range 2–3, so 1–4 BHK pass; 1 RK = 0.5). A blank BHK on either side is never filtered and the bhk
+    factor is then not applicable (no flag: the contract's flag list has none for BHK). A failure is reported under the
+    `property_type` check (the contract has no BHK filter name) and, like a property type mismatch, is skipped, not
+    recorded as an exclusion (the exclusion reasons are date/liveness reasons only). Within the band, bhk scores
+    exact 1.0, ½ BHK away 0.6, 1 BHK away 0.3.
+11. A `maybe` proposal verdict (CR-012) is neutral: no feedback row is written.
 
 ## Performance (local stack, ENG-07)
 
 `tests/perf/matching.perf.test.ts` on one dense cell: demand-side run p95 55 ms with 3,000 candidates and 149 ms with
-6,000 offers (5,000 cap + price narrowing), target ≤ 500 ms (LLD §8); offer-side run p95 35–114 ms (across runs); `GET
+6,000 offers (5,000 cap + price narrowing), target ≤ 500 ms (LLD §8); offer-side run p95 35–200 ms (across runs; re-run after CR-011: demand-side p95 56–60 ms at 3,000 and 146 ms at 6,000 offers); `GET
 /v1/demands/{id}/matches` p95 3 ms and explanation p95 2 ms, target < 300 ms (NFR-2).

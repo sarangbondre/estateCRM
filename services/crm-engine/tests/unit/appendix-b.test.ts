@@ -289,10 +289,64 @@ describe('AS-S2: newspaper 2BHK Andheri West at ₹75K → 2 rent demands', () =
     expect(suggest(relevant[0] as DemandMx, [flat]).plan.inserts[0]?.score).toBe(95); // same micromarket 0.85
     expect(suggest(irrelevant[0] as DemandMx, [flat]).keys).toEqual([]);
     expect(suggest(irrelevant[1] as DemandMx, [flat]).keys).toEqual([]);
-    // bhk is scored, not filtered (LLD §4.2): a 4BHK seeker still sees the 2BHK, ranked lower (bhk value 0)
-    const fourBhk = suggest(irrelevant[2] as DemandMx, [flat]).plan.inserts[0];
-    expect(fourBhk?.score).toBe(83);
-    expect(fourBhk?.factors.find((f) => f.factor === 'bhk')).toMatchObject({ applicable: true, value: 0 });
+    // CR-011: residential BHK is filtered to ±1, so a 4BHK seeker never sees the 2BHK (skipped, no exclusion row)
+    const fourBhk = suggest(irrelevant[2] as DemandMx, [flat]);
+    expect(fourBhk.keys).toEqual([]);
+    expect(fourBhk.run.singles.get(flat.id)?.filter).toMatchObject({ kind: 'skip', failed: 'property_type' });
+    expect(fourBhk.run.exclusions).toEqual([]);
+  });
+});
+
+describe('CR-011: a 4BHK need lists 3, 4 and 5 BHK (exact first), never the 2BHK', () => {
+  const flat = (bhk: number) =>
+    offer({
+      segment: 'Residential',
+      propertyTypes: ['Apartment'],
+      bhkMin: bhk,
+      bhkMax: bhk,
+      micromarket: 'Andheri West',
+      locality: 'Versova',
+      areaSqftMin: null,
+      areaSqftMax: null,
+      areaBasis: null,
+      rentMonthlyInrMin: 200_000,
+    });
+  const [two, three, four, five] = [flat(2), flat(3), flat(4), flat(5)] as [
+    OfferMx,
+    OfferMx,
+    OfferMx,
+    OfferMx,
+  ];
+  const need = demand({
+    code: 'DEM-000210',
+    segment: 'Residential',
+    propertyTypes: ['Apartment'],
+    bhkMin: 4,
+    bhkMax: 4,
+    micromarkets: ['Andheri West'],
+    localities: [],
+    areaSqftMin: null,
+    areaSqftMax: null,
+    areaBasis: null,
+    rentMonthlyInrMin: null,
+    rentMonthlyInrMax: 250_000,
+  });
+  const { run, plan } = suggest(need, [two, three, four, five]);
+  it('the 2BHK is not listed', () => {
+    expect(plan.inserts.map((i) => i.offerSetKey)).not.toContain(keyOf(two));
+    expect(run.singles.get(two.id)?.filter).toMatchObject({ kind: 'skip', failed: 'property_type' });
+  });
+  it('the exact 4BHK ranks first; the 3BHK and 5BHK follow with the same, lower score', () => {
+    const score = (o: OfferMx) => plan.inserts.find((i) => i.offerSetKey === keyOf(o))?.score;
+    expect(plan.inserts).toHaveLength(3);
+    expect(plan.inserts[0]?.offerSetKey).toBe(keyOf(four));
+    expect(new Set(plan.inserts.slice(1).map((i) => i.offerSetKey))).toEqual(
+      new Set([keyOf(three), keyOf(five)]),
+    );
+    // micromarket 0.85, price 1, bhk 1 (exact) vs 0.3 (±1) → 94 vs 82
+    expect(score(four)).toBe(94);
+    expect(score(three)).toBe(82);
+    expect(score(five)).toBe(82);
   });
 });
 
@@ -497,10 +551,39 @@ describe('ENG-07 precision check on the Appendix B scenario inventory', () => {
     s2100: shed(2100),
     s400: shed(400),
   };
-  const inventory = [...inventory127, flat, ...Object.values(sheds)];
+  // CR-011: a 4BHK family need against 2–5 BHK flats (areas far outside the 2BHK renter's band)
+  const bigFlat = (bhk: number, area: number) =>
+    offer({
+      segment: 'Residential',
+      propertyTypes: ['Apartment'],
+      bhkMin: bhk,
+      bhkMax: bhk,
+      micromarket: 'Andheri West',
+      locality: 'Versova',
+      areaSqftMin: area,
+      areaSqftMax: area,
+      areaBasis: 'Carpet',
+      rentMonthlyInrMin: 220_000,
+    });
+  const flats = { b2: bigFlat(2, 1100), b3: bigFlat(3, 1500), b4: bigFlat(4, 1900), b5: bigFlat(5, 2300) };
+  const fourBhkNeed = demand({
+    segment: 'Residential',
+    propertyTypes: ['Apartment'],
+    bhkMin: 4,
+    bhkMax: 4,
+    micromarkets: ['Andheri West'],
+    localities: [],
+    areaSqftMin: null,
+    areaSqftMax: null,
+    areaBasis: null,
+    rentMonthlyInrMin: null,
+    rentMonthlyInrMax: 250_000,
+  });
+  const inventory = [...inventory127, flat, ...Object.values(sheds), ...Object.values(flats)];
   const cases: { d: DemandMx; relevant: string[] }[] = [
     { d: dem127, relevant: [keyOf(inv452), keyOf(chakala6500), keyOf(marolFloor1, marolFloor2)] },
     { d: renter, relevant: [keyOf(flat)] },
+    { d: fourBhkNeed, relevant: [keyOf(flats.b3), keyOf(flats.b4), keyOf(flats.b5)] },
     // the user's example: an industrial requirement of 4,000 sq ft
     {
       d: warehouseNeed,
