@@ -127,7 +127,8 @@ export function stepFor(status: string | null | undefined): Step {
 }
 
 export const TERMINAL_STATUSES: readonly string[] = ['completed', 'failed', 'cancelled'];
-export const isTerminal = (status: string | null | undefined): boolean => !!status && TERMINAL_STATUSES.includes(status);
+export const isTerminal = (status: string | null | undefined): boolean =>
+  !!status && TERMINAL_STATUSES.includes(status);
 
 /** Statuses where the upload itself should be re-read every 2 s (inspection runs in the background). */
 export const pollUpload = (status: string | null | undefined): boolean => status === 'inspecting';
@@ -140,19 +141,104 @@ export const canCancel = (status: string | null | undefined): boolean => !!statu
 
 /** Target fields a column can map to: the enum of putUploadMapping `columnMap` values (Appendix C), without null. */
 export const MAPPING_TARGETS = [
-  'route_to', 'needs_review', 'review_reason', 'record_id', 'parent_record_id', 'split_index', 'record_scope', 'deal_type',
-  'market', 'segment', 'property_type', 'property_detail', 'land_use', 'side', 'side_evidence', 'sale_mode', 'deadline_date',
-  'tenancy_status', 'tenure', 'agreement_form', 'is_jodi', 'possession_status', 'possession_date', 'furnishing', 'sector',
-  'includes_property', 'business_description', 'participant_role', 'signal_type', 'project_name', 'developer_name', 'bhk_min',
-  'bhk_max', 'features', 'locality', 'city', 'state', 'landmark', 'location_text', 'area_sqft_min', 'area_sqft_max',
-  'area_basis', 'land_area_value', 'land_area_unit', 'land_area_sqft', 'area_text', 'price_text', 'sale_price_inr_min',
-  'sale_price_inr_max', 'sale_rate_inr', 'sale_rate_unit', 'price_negotiable', 'rent_monthly_inr_min', 'rent_monthly_inr_max',
-  'rent_rate_psf', 'deposit_inr', 'deposit_months', 'current_rent_inr', 'yield_pct', 'contact_name', 'company_name',
-  'party_type', 'phones', 'whatsapp_phone', 'emails', 'rera_number', 'other_contact', 'source_channel', 'source_name',
-  'source_edition', 'source_supplement', 'source_date', 'source_page', 'source_files', 'first_seen_date', 'last_seen_date',
-  'times_seen', 'possible_repeat_of', 'raw_text', 'source_language', 'ocr_used', 'extraction_confidence', 'extractor_notes',
-  'sender_name', 'sender_phone', 'text_variants', 'external_id', 'campaign_ref', 'form_ref', 'listing_ref', 'project_ref',
-  'enquiry_message', 'enquiry_received_at', 'photo_urls', 'free_text',
+  'route_to',
+  'needs_review',
+  'review_reason',
+  'record_id',
+  'parent_record_id',
+  'split_index',
+  'record_scope',
+  'deal_type',
+  'market',
+  'segment',
+  'property_type',
+  'property_detail',
+  'building_name',
+  'floor',
+  'crm_notes',
+  'land_use',
+  'side',
+  'side_evidence',
+  'sale_mode',
+  'deadline_date',
+  'tenancy_status',
+  'tenure',
+  'agreement_form',
+  'is_jodi',
+  'possession_status',
+  'possession_date',
+  'furnishing',
+  'sector',
+  'includes_property',
+  'business_description',
+  'participant_role',
+  'signal_type',
+  'project_name',
+  'developer_name',
+  'bhk_min',
+  'bhk_max',
+  'features',
+  'locality',
+  'city',
+  'state',
+  'landmark',
+  'location_text',
+  'area_sqft_min',
+  'area_sqft_max',
+  'area_basis',
+  'land_area_value',
+  'land_area_unit',
+  'land_area_sqft',
+  'area_text',
+  'price_text',
+  'sale_price_inr_min',
+  'sale_price_inr_max',
+  'sale_rate_inr',
+  'sale_rate_unit',
+  'price_negotiable',
+  'rent_monthly_inr_min',
+  'rent_monthly_inr_max',
+  'rent_rate_psf',
+  'deposit_inr',
+  'deposit_months',
+  'current_rent_inr',
+  'yield_pct',
+  'contact_name',
+  'company_name',
+  'party_type',
+  'phones',
+  'whatsapp_phone',
+  'emails',
+  'rera_number',
+  'other_contact',
+  'source_channel',
+  'source_name',
+  'source_edition',
+  'source_supplement',
+  'source_date',
+  'source_page',
+  'source_files',
+  'first_seen_date',
+  'last_seen_date',
+  'times_seen',
+  'possible_repeat_of',
+  'raw_text',
+  'source_language',
+  'ocr_used',
+  'extraction_confidence',
+  'extractor_notes',
+  'sender_name',
+  'sender_phone',
+  'text_variants',
+  'external_id',
+  'campaign_ref',
+  'form_ref',
+  'listing_ref',
+  'project_ref',
+  'enquiry_message',
+  'enquiry_received_at',
+  'photo_urls',
+  'free_text',
 ] as const;
 export type MappingTarget = (typeof MAPPING_TARGETS)[number];
 const TARGET_SET: ReadonlySet<string> = new Set(MAPPING_TARGETS);
@@ -189,7 +275,14 @@ export function initialColumnMap(
 /** Targets that need a column or a constant (putUploadMapping description). */
 export const CONTENT_TARGETS: readonly MappingTarget[] = ['raw_text', 'property_type', 'deal_type'];
 
-export const RECORD_SCOPES = ['Property', 'Business', 'Capital', 'Equipment', 'Market Participant', 'Market Signal'] as const;
+export const RECORD_SCOPES = [
+  'Property',
+  'Business',
+  'Capital',
+  'Equipment',
+  'Market Participant',
+  'Market Signal',
+] as const;
 
 /** Client-side check before PUT /mapping; the service re-validates. Returns human messages (empty = ok). */
 export function mappingProblems(map: ColumnMap, constantRecordScope: string | null): string[] {
@@ -215,7 +308,10 @@ export function buildMappingBody(input: {
   saveAsTemplate?: string | null;
 }): MappingBody {
   const name = input.saveAsTemplate?.trim().slice(0, 100);
-  const scope = input.columnMap && Object.values(input.columnMap).includes('record_scope') ? null : input.constantRecordScope;
+  const scope =
+    input.columnMap && Object.values(input.columnMap).includes('record_scope')
+      ? null
+      : input.constantRecordScope;
   return {
     columnMap: { ...input.columnMap },
     ...(input.sheetName ? { sheetName: input.sheetName } : {}),
@@ -239,7 +335,10 @@ export const STAGES = [
 const clampPct = (n: number): number => (Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0);
 
 /** Overall percent from chunks (0 when the chunk count is not known yet). */
-export function chunkPercent(chunksDone: number | null | undefined, chunkCount: number | null | undefined): number {
+export function chunkPercent(
+  chunksDone: number | null | undefined,
+  chunkCount: number | null | undefined,
+): number {
   if (!chunkCount || chunkCount <= 0) return 0;
   return clampPct(Math.round(((chunksDone ?? 0) / chunkCount) * 100));
 }
@@ -282,7 +381,8 @@ export function reportTiles(c: Partial<UploadCounts> | null | undefined): [strin
     ['Unchanged', n(c?.unchanged)],
   ];
   if (typeof c?.unclassified === 'number') tiles.push(['Unclassified', c.unclassified]);
-  if (typeof c?.migrationEntries === 'number' && c.migrationEntries > 0) tiles.push(['Migration map entries', c.migrationEntries]);
+  if (typeof c?.migrationEntries === 'number' && c.migrationEntries > 0)
+    tiles.push(['Migration map entries', c.migrationEntries]);
   return tiles;
 }
 
@@ -304,7 +404,9 @@ const ROW_ERROR_LABELS: Record<string, string> = {
 export const rowErrorLabel = (code: string): string => ROW_ERROR_LABELS[code] ?? code.replace(/-/g, ' ');
 
 /** Rejection reasons from a page of row errors: code → count, most frequent first (errors only, not warnings). */
-export function rejectionReasons(errors: readonly Pick<RowError, 'code' | 'severity'>[]): { code: string; label: string; count: number }[] {
+export function rejectionReasons(
+  errors: readonly Pick<RowError, 'code' | 'severity'>[],
+): { code: string; label: string; count: number }[] {
   const m = new Map<string, number>();
   for (const e of errors) if (e.severity !== 'warning') m.set(e.code, (m.get(e.code) ?? 0) + 1);
   return [...m]
@@ -386,7 +488,10 @@ export interface ReviewGroup {
  */
 export function reviewGroups(
   summary: readonly { reasonCode: string; open: number; oldestAt?: string | null }[] | null | undefined,
-  records: { merges?: { open: number; more: boolean } | null; priceGaps?: { open: number; more: boolean } | null } = {},
+  records: {
+    merges?: { open: number; more: boolean } | null;
+    priceGaps?: { open: number; more: boolean } | null;
+  } = {},
 ): ReviewGroup[] {
   const byCode = new Map<ReviewReason, { open: number; oldestAt: string | null }>();
   for (const g of summary ?? []) {
@@ -401,13 +506,24 @@ export function reviewGroups(
   const groups: ReviewGroup[] = [];
   for (const code of CLASSIFICATION_REASONS) {
     const g = byCode.get(code);
-    if (g && g.open > 0) groups.push({ key: code, label: REASON_LABELS[code], open: g.open, oldestAt: g.oldestAt });
+    if (g && g.open > 0)
+      groups.push({ key: code, label: REASON_LABELS[code], open: g.open, oldestAt: g.oldestAt });
   }
   if (records.merges && records.merges.open > 0) {
-    groups.push({ key: 'uncertain_merge', label: REASON_LABELS.uncertain_merge, open: records.merges.open, more: records.merges.more });
+    groups.push({
+      key: 'uncertain_merge',
+      label: REASON_LABELS.uncertain_merge,
+      open: records.merges.open,
+      more: records.merges.more,
+    });
   }
   if (records.priceGaps && records.priceGaps.open > 0) {
-    groups.push({ key: 'price_gap', label: REASON_LABELS.price_gap, open: records.priceGaps.open, more: records.priceGaps.more });
+    groups.push({
+      key: 'price_gap',
+      label: REASON_LABELS.price_gap,
+      open: records.priceGaps.open,
+      more: records.priceGaps.more,
+    });
   }
   return groups;
 }
@@ -445,7 +561,7 @@ export interface ClassDraft {
 export function draftFrom(item: Pick<ReviewItem, 'current' | 'suggested'>): ClassDraft {
   const s = item.suggested ?? null;
   const c = item.current ?? {};
-  const first = <T,>(...v: (T | null | undefined)[]): T | null => v.find((x) => x != null) ?? null;
+  const first = <T>(...v: (T | null | undefined)[]): T | null => v.find((x) => x != null) ?? null;
   return {
     recordScope: first(s?.recordScope, c.recordScope),
     side: first(s?.side, c.side),
@@ -460,12 +576,21 @@ export function draftFrom(item: Pick<ReviewItem, 'current' | 'suggested'>): Clas
  * Classification for `set`: the current values with the draft applied (BRD order). A market is kept only when the deal
  * types include Sale (resolveReviewItem rule "market only with Sale").
  */
-export function classificationFrom(current: Classification | null | undefined, draft: ClassDraft): Classification {
+export function classificationFrom(
+  current: Classification | null | undefined,
+  draft: ClassDraft,
+): Classification {
   const c = current ?? {};
-  const pick = <T,>(d: T | null | undefined, cur: T | null | undefined): T | null => (d !== undefined ? d : cur) ?? null;
-  const dealTypes = draft.dealType !== undefined ? (draft.dealType ? [draft.dealType] : []) : [...(c.dealTypes ?? [])];
+  const pick = <T>(d: T | null | undefined, cur: T | null | undefined): T | null =>
+    (d !== undefined ? d : cur) ?? null;
+  const dealTypes =
+    draft.dealType !== undefined ? (draft.dealType ? [draft.dealType] : []) : [...(c.dealTypes ?? [])];
   const propertyTypes =
-    draft.propertyType !== undefined ? (draft.propertyType ? [draft.propertyType] : []) : [...(c.propertyTypes ?? [])];
+    draft.propertyType !== undefined
+      ? draft.propertyType
+        ? [draft.propertyType]
+        : []
+      : [...(c.propertyTypes ?? [])];
   const market = dealTypes.includes('Sale') ? pick(draft.market, c.market) : null;
   return {
     recordScope: pick(draft.recordScope, c.recordScope) as Exclude<Classification['recordScope'], undefined>,
@@ -514,7 +639,8 @@ export function buildBulk(
 }
 
 /** Bulk "set side" keeps each item's other values, so it is only offered for the side groups. */
-export const bulkSideGroup = (reason: string): boolean => reason === 'side_unclear' || reason === 'side_defaulted';
+export const bulkSideGroup = (reason: string): boolean =>
+  reason === 'side_unclear' || reason === 'side_defaulted';
 
 /** Short text for a classification ("Property · Rent · Commercial · Office · Supply"); blanks are skipped. */
 export function classificationText(c: Classification | null | undefined): string {
@@ -533,7 +659,9 @@ export function classificationText(c: Classification | null | undefined): string
 // Record-side review (records service)
 
 /** Merge the incoming record (right) into the existing one (left), keeping the existing record (prototype C-05). */
-export function buildMerge(c: Pick<MergeCandidate, 'id' | 'aggregateType' | 'leftId' | 'rightId'>): MergeBody | null {
+export function buildMerge(
+  c: Pick<MergeCandidate, 'id' | 'aggregateType' | 'leftId' | 'rightId'>,
+): MergeBody | null {
   if (!c.rightId || c.rightId === c.leftId) return null;
   return { aggregateType: c.aggregateType, survivorId: c.leftId, mergedIds: [c.rightId], candidateId: c.id };
 }
@@ -556,7 +684,8 @@ export function evidenceRows(evidence: unknown): [string, string][] {
   const rows: [string, string][] = [];
   for (const [k, v] of Object.entries(evidence as Record<string, unknown>)) {
     if (rows.length >= 8) break;
-    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') rows.push([targetLabel(k), String(v)]);
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')
+      rows.push([targetLabel(k), String(v)]);
   }
   return rows;
 }
