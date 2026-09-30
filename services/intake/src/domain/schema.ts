@@ -4,12 +4,13 @@ import { createHash } from 'node:crypto';
 import { isValidValue } from '@11e/vocabulary';
 import type { FieldIssue } from './errors.js';
 
-/** The 89 Appendix C columns, in Appendix C order. */
+/** The 91 Appendix C columns (CR-012 added building_name and floor), in Appendix C order. */
 export const STANDARD_COLUMNS = [
   'lead_status', 'follow_up_date', 'crm_notes', 'route_to',
   'needs_review', 'review_reason',
   'record_id', 'parent_record_id', 'split_index',
-  'record_scope', 'deal_type', 'market', 'segment', 'property_type', 'property_detail', 'land_use', 'side', 'side_evidence',
+  'record_scope', 'deal_type', 'market', 'segment', 'property_type', 'property_detail',
+  'building_name', 'floor', 'land_use', 'side', 'side_evidence',
   'sale_mode', 'deadline_date', 'tenancy_status', 'tenure', 'agreement_form', 'is_jodi', 'possession_status',
   'possession_date', 'furnishing',
   'sector', 'includes_property', 'business_description', 'participant_role', 'signal_type',
@@ -47,6 +48,12 @@ export const MAPPING_TARGETS: readonly TargetField[] = [...STANDARD_COLUMNS, ...
 const TARGET_SET: ReadonlySet<string> = new Set(MAPPING_TARGETS);
 const STANDARD_SET: ReadonlySet<string> = new Set(STANDARD_COLUMNS);
 
+/** Optional since CR-012: the 89-column files of older extractor versions lack them and are still strict. */
+export const OPTIONAL_STANDARD_COLUMNS: readonly StandardColumn[] = ['building_name', 'floor'];
+const LEGACY_SET: ReadonlySet<string> = new Set(
+  STANDARD_COLUMNS.filter((c) => !OPTIONAL_STANDARD_COLUMNS.includes(c)),
+);
+
 /** Targets that may be mapped from several columns (values are concatenated). */
 export const MULTI_TARGETS: ReadonlySet<TargetField> = new Set(['phones', 'emails', 'free_text']);
 
@@ -65,6 +72,9 @@ export const PII_FIELDS: ReadonlySet<string> = new Set([
   'enquiry_message',
   'free_text',
   'side_evidence',
+  // CR-012: private (never public); floor is PII-sensitive, the building name identifies the unit's location
+  'building_name',
+  'floor',
 ]);
 
 export const LOAD_SHEET = 'leads';
@@ -88,12 +98,16 @@ export function headerFingerprint(headers: readonly (string | null)[]): string {
   return createHash('sha256').update(sorted.join('\n')).digest('hex');
 }
 
-/** Strict iff the normalised header set equals the 89 Appendix C names (order ignored; no extras, no repeats). */
+/**
+ * Strict iff the normalised header set equals the 91 Appendix C names, or the 89 names of older extractor versions
+ * (without building_name and floor, CR-012). Order ignored; no extras, no repeats.
+ */
 export function isStrictHeader(headers: readonly (string | null)[]): boolean {
   const names = headers.map(normaliseHeader).filter((h) => h !== '');
-  if (names.length !== STANDARD_COLUMNS.length) return false;
   const set = new Set(names);
-  return set.size === STANDARD_COLUMNS.length && [...set].every((n) => STANDARD_SET.has(n));
+  if (set.size !== names.length) return false;
+  const equals = (want: ReadonlySet<string>) => set.size === want.size && [...set].every((n) => want.has(n));
+  return equals(STANDARD_SET) || equals(LEGACY_SET);
 }
 
 /** Load sheet: `Leads` if present (case-insensitive), else the first sheet. */

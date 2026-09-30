@@ -287,6 +287,8 @@ export interface RawRowRecord {
   original: Record<string, string | null>;
   /** IntakeRow data fields. PII. */
   normalised: Record<string, unknown>;
+  /** crm_notes text (CR-012). PII: served only by the internal note endpoint, never logged; purged with the row. */
+  crmNote: string | null;
   externalSource: 'extractor' | 'upload';
   externalRef: string;
   parentExternalRef: string | null;
@@ -317,6 +319,8 @@ export interface RawRowRepository {
   /** Rejected rows in row order after `afterRowNo` (finalize builds the rejected-rows file). */
   rejected(tenantId: string, uploadId: string, afterRowNo: number, limit: number): Promise<RawRowRecord[]>;
   find(tenantId: string, rowId: string): Promise<RawRowRecord | undefined>;
+  /** crm_notes of one row of an upload (CR-012): undefined when the row does not exist, null when it has no note. */
+  note(tenantId: string, uploadId: string, rowNo: number): Promise<string | null | undefined>;
   /** Retention: deletes up to `limit` rows of an upload; returns how many were deleted. */
   purge(tenantId: string, uploadId: string, limit: number): Promise<number>;
 }

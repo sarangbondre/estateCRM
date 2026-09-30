@@ -4,6 +4,7 @@
 // `model_unavailable`; confidence < 0.70 → `low_confidence` (suggestion kept for the reviewer). Processing continues.
 import { redact } from '@11e/redaction';
 import { LOW_CONFIDENCE, mergeSuggestion, validateModelOutput } from '../domain/model-output.js';
+import { maskPrivateTerms } from '../domain/private-terms.js';
 import { intakeReason } from '../domain/reasons.js';
 import { classificationOf } from '../domain/rows.js';
 import type { NormalisedRow } from '../domain/rows.js';
@@ -24,7 +25,8 @@ export async function classifyLeftovers(app: App, rows: readonly NormalisedRow[]
   const result: LeftoverResult = { usedModel: new Set(), suggestions: new Map() };
   const items: { row: NormalisedRow; id: string; text: string }[] = [];
   for (const row of rows) {
-    const r = redact(row.classifierText ?? '');
+    // building_name and floor are masked first (CR-012); crm_notes is never part of the classifier text
+    const r = redact(maskPrivateTerms(row.classifierText ?? '', row.fields));
     if (r.uncertain) row.reasons.push({ code: 'other', detail: 'redaction_uncertain' });
     else items.push({ row, id: String(items.length + 1), text: r.text });
   }

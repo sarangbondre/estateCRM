@@ -23,17 +23,25 @@ const MAPPING_CSV = csv([
 ]);
 
 describe('POST /inspect and the inspection worker', () => {
-  it('detects strict mode on the 89 standard columns and makes the upload ready', async () => {
+  it('detects strict mode on the 91 standard columns and makes the upload ready', async () => {
     const t = newTenant();
     const u = await uploadFile(h, t, strictBytes);
     const up = await inspect(h, t, u);
     expect(up).toMatchObject({ status: 'ready', mode: 'strict', sheetName: 'Leads', suggestedMapping: null });
     expect(up['sheetNames']).toEqual(['Leads', 'run_log']);
-    expect(up['header']).toHaveLength(89);
+    expect(up['header']).toHaveLength(91);
     expect(up['hasMigrationMap']).toBe(false);
     // a repeat is naturally idempotent (200, current upload)
     const again = await h.call('POST', `/v1/uploads/${u.id}/inspect`, u.headers);
     expect(again.status).toBe(200);
+  });
+
+  it('still detects strict mode on the 89-column header of older extractor versions (CR-012)', async () => {
+    const t = newTenant();
+    const { bytes } = await synthFile({ rows: 5, seed: 12, omitColumns: ['building_name', 'floor'] });
+    const up = await inspect(h, t, await uploadFile(h, t, bytes));
+    expect(up).toMatchObject({ status: 'ready', mode: 'strict' });
+    expect(up['header']).toHaveLength(89);
   });
 
   it('detects mapping mode with a suggested mapping (headers only, no cell values)', async () => {

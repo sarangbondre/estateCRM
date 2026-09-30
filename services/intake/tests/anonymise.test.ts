@@ -44,6 +44,13 @@ describe('Anonymiser (domain)', () => {
       `call ${anon.phone('90000 33333')}`,
     ]);
   });
+
+  it('leaves building_name and floor as they are (not contact data, CR-012)', () => {
+    expect(anon.row(['building_name', 'floor'], ['Sea Breeze Tower', '12 of 20'])).toEqual([
+      'Sea Breeze Tower',
+      '12 of 20',
+    ]);
+  });
 });
 
 let h: Harness;
