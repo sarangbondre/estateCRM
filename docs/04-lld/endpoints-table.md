@@ -9,11 +9,11 @@ Auth: staff = staffViaWeb (signed-in user via web), svc = serviceToken, cron = X
 | web | 17 | 0 | 4 |
 | intake | 31 | 0 | 6 |
 | records | 69 | 0 | 6 |
-| journeys | 60 | 0 | 4 |
+| journeys | 61 | 0 | 4 |
 | crm-engine | 19 | 0 | 4 |
 | listings | 25 | 6 | 3 |
 | insight | 20 | 0 | 3 |
-| **Total** | **241** | | |
+| **Total** | **242** | | |
 
 ## web (17)
 
@@ -147,7 +147,7 @@ Auth: staff = staffViaWeb (signed-in user via web), svc = serviceToken, cron = X
 | GET | `/health/live` | none | — | safe |  | none (health probe) | 2000 | — | Liveness (process up) |
 | GET | `/health/ready` | none | — | safe |  | none (health probe) | 2000 | — | Readiness (DB reachable, migrations at expected version) |
 
-## journeys (60)
+## journeys (61)
 
 | Method | Path | Auth | Roles | Idempotency | Paged | Rate limit | Timeout ms | Emits | Summary |
 |---|---|---|---|---|---|---|---|---|---|
@@ -195,6 +195,7 @@ Auth: staff = staffViaWeb (signed-in user via web), svc = serviceToken, cron = X
 | POST | `/v1/deals/{idOrCode}/cancel` | staff | Admin, Manager, Demand agent | Idempotency-Key |  | 20/s per user, burst 40 (token bucket at web) | 2000 | deal.cancelled.v1, deal.updated.v1, offer.commercial_status_changed.v1, demand.status_changed.v1, lifecycle.stage_changed.v1, audit.recorded.v1 | Cancel a deal (compensation): offer → Available, demand → Active; deal kept |
 | POST | `/v1/deals/{idOrCode}/follow-ups` | staff | Admin, Manager, Demand agent, Supply agent | Idempotency-Key |  | 20/s per user, burst 40 (token bucket at web) | 2000 | deal.updated.v1, demand.confirmed.v1, offer.confirmed.v1, lifecycle.stage_changed.v1 | Log a follow-up on an open deal and set the next one (resets both life curves) |
 | GET | `/v1/lease-renewals` | staff | all | safe | yes | 20/s per user, burst 40 (token bucket at web) | 2000 | — | Scheduled lease renewals (month 10 of 11-month leases, US-16) |
+| GET | `/v1/notes` | staff | Admin, Manager, Demand agent, Supply agent | safe | yes | 20/s per user, burst 40 (token bucket at web) | 2000 | — | Notes on a record (imported crm_notes from uploads, CR-012) |
 | GET | `/v1/notifications` | staff | all | safe | yes | 20/s per user, burst 40 (token bucket at web) | 2000 | — | My in-app notifications (FR-NTF-1) |
 | GET | `/v1/notifications/unread-count` | staff | all | safe |  | 20/s per user, burst 40 (token bucket at web) | 2000 | — | Unread notification count (sidebar badge) |
 | POST | `/v1/notifications/mark-read` | staff | all | Idempotency-Key |  | 20/s per user, burst 40 (token bucket at web) | 2000 | — | Mark notifications read (by ids or up to a time) |

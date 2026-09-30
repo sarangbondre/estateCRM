@@ -1335,7 +1335,7 @@ components:
           additionalProperties:
             type: [string, 'null']
             enum: [route_to, needs_review, review_reason, record_id, parent_record_id, split_index, record_scope, deal_type, market,
-              segment, property_type, property_detail, land_use, side, side_evidence, sale_mode, deadline_date, tenancy_status, tenure,
+              segment, property_type, property_detail, building_name, floor, crm_notes, land_use, side, side_evidence, sale_mode, deadline_date, tenancy_status, tenure,
               agreement_form, is_jodi, possession_status, possession_date, furnishing, sector, includes_property, business_description,
               participant_role, signal_type, project_name, developer_name, bhk_min, bhk_max, features, locality, city, state, landmark,
               location_text, area_sqft_min, area_sqft_max, area_basis, land_area_value, land_area_unit, land_area_sqft, area_text, price_text,
@@ -1492,7 +1492,7 @@ components:
           additionalProperties:
             type: [string, 'null']
             enum: [route_to, needs_review, review_reason, record_id, parent_record_id, split_index, record_scope, deal_type, market,
-              segment, property_type, property_detail, land_use, side, side_evidence, sale_mode, deadline_date, tenancy_status, tenure,
+              segment, property_type, property_detail, building_name, floor, crm_notes, land_use, side, side_evidence, sale_mode, deadline_date, tenancy_status, tenure,
               agreement_form, is_jodi, possession_status, possession_date, furnishing, sector, includes_property, business_description,
               participant_role, signal_type, project_name, developer_name, bhk_min, bhk_max, features, locality, city, state, landmark,
               location_text, area_sqft_min, area_sqft_max, area_basis, land_area_value, land_area_unit, land_area_sqft, area_text, price_text,

@@ -625,6 +625,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Notes on a record (imported crm_notes from uploads, CR-012)
+         * @description Sorted by (createdAt desc, id). Note text may contain personal data; never logged. Kept 24 months (text), like other free-text notes.
+         */
+        get: operations["listNotes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notifications": {
         parameters: {
             query?: never;
@@ -3433,6 +3453,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LeaseRenewalPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooMany"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    listNotes: {
+        parameters: {
+            query: {
+                limit?: components["parameters"]["Limit"];
+                cursor?: components["parameters"]["Cursor"];
+                subjectType: "offer" | "demand" | "person" | "property";
+                subjectId: string;
+            };
+            header?: {
+                "X-Correlation-Id"?: components["parameters"]["CorrelationId"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            subjectType: "offer" | "demand" | "person" | "property";
+                            /** Format: uuid */
+                            subjectId: string;
+                            /** @enum {string} */
+                            source: "upload_import";
+                            uploadCode?: string | null;
+                            /** @description null after the retention period */
+                            text: string | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                        }[];
+                        nextCursor: string | null;
+                    };
                 };
             };
             400: components["responses"]["BadRequest"];

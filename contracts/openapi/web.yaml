@@ -79,6 +79,7 @@ x-routes:
     - { prefix: '/v1/matching-runs', service: crm-engine }
     - { prefix: '/v1/weights', service: crm-engine }
     # journeys
+    - { prefix: '/v1/notes', service: journeys }
     - { prefix: '/v1/offers/*/journey', service: journeys }
     - { prefix: '/v1/offers/*/retire', service: journeys }
     - { prefix: '/v1/demands/*/journey', service: journeys }
