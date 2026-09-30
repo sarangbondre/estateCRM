@@ -1291,7 +1291,7 @@ export interface components {
             matchId: string;
             offerIds: string[];
             /** @enum {string|null} */
-            feedback?: "liked" | "rejected" | "visit_requested" | null;
+            feedback?: "liked" | "rejected" | "visit_requested" | "maybe" | null;
             feedbackNote?: string | null;
         };
         ProposalCreate: {
@@ -1384,8 +1384,11 @@ export interface components {
         ProposalFeedback: {
             options: {
                 position: number;
-                /** @enum {string} */
-                feedback: "liked" | "rejected" | "visit_requested";
+                /**
+                 * @description maybe = neutral (CR-012)
+                 * @enum {string}
+                 */
+                feedback: "liked" | "rejected" | "visit_requested" | "maybe";
                 note?: string | null;
             }[];
         };
@@ -1592,7 +1595,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "match_suggested" | "match_confirmed" | "match_closed" | "match_flagged" | "srq_assigned" | "srq_fulfilled" | "enquiry" | "offer_closed" | "demand_exited" | "deal_follow_up_overdue" | "proposal_opened" | "visit_scheduled" | "dormant_revisit" | "watchlist_task";
+            kind: "match_suggested" | "match_confirmed" | "match_closed" | "match_flagged" | "srq_assigned" | "srq_fulfilled" | "enquiry" | "offer_closed" | "demand_exited" | "deal_follow_up_overdue" | "proposal_opened" | "visit_scheduled" | "dormant_revisit" | "watchlist_task" | "queue_reassigned" | "proposal_failed" | "demand_touch";
             /** @description Codes and labels only, never contact PII */
             title: string;
             body?: string | null;

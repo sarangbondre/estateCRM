@@ -153,3 +153,7 @@ components:
     ServerError:
       description: internal or dependency-unavailable
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    ServiceUnavailable:
+      description: dependency-unavailable (e.g. object storage not configured or down); retry later
+      headers: { Retry-After: { $ref: '#/components/headers/RetryAfter' } }
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }

@@ -250,6 +250,7 @@ const toRawRow = (r: Selectable<RawRowsTable>): RawRowRecord => ({
   sheetName: r.sheet_name,
   original: r.original,
   normalised: r.normalised ?? {},
+  crmNote: r.crm_notes,
   externalSource: r.external_source as 'extractor' | 'upload',
   externalRef: r.external_ref,
   parentExternalRef: r.parent_external_ref,
@@ -296,6 +297,7 @@ export function rawRowRepository(db: Db): RawRowRepository {
               sheet_name: r.sheetName,
               original: JSON.stringify(r.original),
               normalised: JSON.stringify(r.normalised),
+              crm_notes: r.crmNote,
               external_source: r.externalSource,
               external_ref: r.externalRef,
               parent_external_ref: r.parentExternalRef,
@@ -354,6 +356,17 @@ export function rawRowRepository(db: Db): RawRowRepository {
         .where('id', '=', rowId)
         .executeTakeFirst();
       return r ? toRawRow(r as Selectable<RawRowsTable>) : undefined;
+    },
+
+    async note(tenantId, uploadId, rowNo) {
+      // raw_rows_row (tenant_id, upload_id, row_no, partition_month)
+      const r = await tenantScope(db, tenantId)
+        .selectFrom('raw_rows')
+        .select('crm_notes')
+        .where('upload_id', '=', uploadId)
+        .where('row_no', '=', rowNo)
+        .executeTakeFirst();
+      return r ? r.crm_notes : undefined;
     },
 
     async purge(tenantId, uploadId, limit) {

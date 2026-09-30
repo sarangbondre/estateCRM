@@ -85,15 +85,24 @@ export function offerCloseCause(
 export const closeReasonForOfferClosed = (dealType: string): CloseReason =>
   dealType === 'Lease' ? 'leased_to_another_client' : 'sold_to_another_client';
 
-/** Why a demand's open matches close when it stops being matchable. Expired / Paused map to demand_exited. */
+/**
+ * Why a demand's open matches close when it stops being matchable. An exit wins over the life stage it sets
+ * (Dormant → Paused closes as demand_exited); a demand Expired / Paused by its lifecycle closes as demand_expired /
+ * demand_paused (CR-011 item 4, CR-012).
+ */
 export function demandCloseCause(d: DemandMx): CloseReason | null {
   if (demandIsMatchable(d)) return null;
   if (d.voided) return 'voided';
   if (d.mergedInto) return 'merged';
   if (d.commercialStatus === 'Closed' && !d.exitType) return 'demand_closed';
   if (d.outsideLaunchArea) return 'superseded';
+  if (!d.exitType && d.lifeStage === 'Expired') return 'demand_expired';
+  if (!d.exitType && d.lifeStage === 'Paused') return 'demand_paused';
   return 'demand_exited';
 }
+
+/** Close reasons of a demand that stopped being live; they reopen as demand_reactivated. */
+export const DEMAND_REOPENABLE: readonly CloseReason[] = ['demand_exited', 'demand_expired', 'demand_paused'];
 
 /** Close reasons a rescore may undo when the pair is valid again. */
 const OFFER_REOPENABLE: CloseReason[] = [
@@ -232,7 +241,7 @@ export function planMerge(
         events.push({ type: 'reopened', matchId: m.id, reason: 'offer_reactivated' });
       } else if (ev.suggestible)
         wants.push({ key: m.offerSetKey, score: ev.score, existing: m, eval: ev, how: 'reopen' });
-    } else if (reason === 'demand_exited') {
+    } else if (reason && DEMAND_REOPENABLE.includes(reason)) {
       if (m.priorStatus === 'Confirmed') {
         put({
           ...m,
@@ -309,7 +318,10 @@ export function planMerge(
       events.push({
         type: 'reopened',
         matchId: m.id,
-        reason: m.closedReason === 'demand_exited' ? 'demand_reactivated' : 'offer_reactivated',
+        reason:
+          m.closedReason && DEMAND_REOPENABLE.includes(m.closedReason)
+            ? 'demand_reactivated'
+            : 'offer_reactivated',
       });
     else events.push({ type: 'suggested', matchId: m.id });
   });

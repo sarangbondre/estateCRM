@@ -244,6 +244,7 @@ async function runChunk(app: App, upload: Upload, chunk: ChunkRecord, correlatio
       sheetName: upload.sheetName,
       original: p.original,
       normalised: p.row.fields,
+      crmNote: p.row.crmNote,
       externalSource: p.source,
       externalRef: p.ref,
       parentExternalRef: p.row.parentRef,

@@ -3,7 +3,7 @@ import { addDays, availabilityPeriod, maxDate } from './dates.js';
 import type { Hierarchy } from './micromarket.js';
 import { proximity } from './micromarket.js';
 import { budgetMaxFor, budgetMinFor, isSalePriced, priceKeyOf } from './matchable.js';
-import { statedTag } from './filters.js';
+import { bhkGap, statedTag } from './filters.js';
 import type { DemandMx, FactorName, FactorResult, IsoDate, MatchFlag, OfferMx } from './types.js';
 import { FACTORS } from './types.js';
 import type { Weights } from './weights.js';
@@ -152,19 +152,21 @@ export function areaFactor(
 }
 
 // --- bhk -------------------------------------------------------------------------------------------------------------
+/**
+ * BHK factor among the ±1 band the hard filter allows (CR-011): exact (overlap) 1.0, ½ BHK away 0.6, 1 BHK away 0.3.
+ * A pair outside the band never reaches scoring; 0 is kept for safety.
+ */
 export function bhkFactor(o: OfferMx, d: DemandMx): FactorValue {
   if (d.segment !== 'Residential') return NA;
-  const oMin = o.bhkMin ?? o.bhkMax;
-  const oMax = o.bhkMax ?? o.bhkMin;
-  const dMin = d.bhkMin ?? d.bhkMax;
-  const dMax = d.bhkMax ?? d.bhkMin;
-  if (oMin === null || oMax === null || dMin === null || dMax === null) return NA;
-  const gap = oMax < dMin ? dMin - oMax : oMin > dMax ? oMin - dMax : 0;
+  const gap = bhkGap(o, d);
+  if (gap === null) return NA;
   const value = gap === 0 ? 1 : gap <= 0.5 ? 0.6 : gap <= 1 ? 0.3 : 0;
+  const oMin = (o.bhkMin ?? o.bhkMax) as number;
+  const dMin = (d.bhkMin ?? d.bhkMax) as number;
   return {
     applicable: true,
     value,
-    note: `${rangeText(oMin, oMax, String)} BHK vs ${rangeText(dMin, dMax, String)} BHK`,
+    note: `${rangeText(oMin, o.bhkMax ?? oMin, String)} BHK vs ${rangeText(dMin, d.bhkMax ?? dMin, String)} BHK`,
   };
 }
 

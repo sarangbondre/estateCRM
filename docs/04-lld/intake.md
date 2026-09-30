@@ -666,3 +666,9 @@ G-I2/G-I3 (`uploadId`, `action` incl. `discard`), G-I5 (R-2 service tokens), G-I
 | Q-I1 | Strict mode = normalised header set **equal** to the 89 names; any missing or extra column → mapping mode with an identity suggestion | as stated | confirm with Vinit |
 | Q-I3 | Mapping-mode targets beyond Appendix C (`external_id`, `campaign_ref`, `form_ref`, `listing_ref`, `project_ref`, `enquiry_message`, `enquiry_received_at`, `photo_urls`, `free_text`) for Digi exports and broker sheets | added in this contract | confirm; add to PRD Appendix C via a CR if kept |
 | Q-I4 | Anonymised phone format `+9100000xxxxxx` (deliberately not a valid Indian number) | as stated | confirm |
+
+## Amendments: CR-011 and CR-012 (approved 2026-09-30)
+- Upload schema: optional `building_name`, `floor` (strict mode accepts 89 or 91 columns). Both are stored on raw rows, served in
+  `IntakeRow.buildingName/floor`, never public, and redacted (UNIT/NAME) before any AI call. The anonymiser leaves them as they are (not contact data).
+- `crm_notes`: stored with the raw row (PII-sensitive), flagged as `IntakeRow.hasCrmNotes`, and served only by
+  `GET /internal/v1/uploads/{uploadId}/rows/{rowNo}/note` (x-callers journeys). Purged with raw rows (retention).

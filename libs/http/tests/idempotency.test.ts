@@ -42,7 +42,7 @@ afterAll(async () => {
 
 describe('idempotent()', () => {
   let created = 0;
-  let mode: 'ok' | 'boom' | 'reject' = 'ok';
+  let mode: 'ok' | 'boom' | 'reject' | 'reject-ext' = 'ok';
   const svc = createService<operations>({
     service: 'records',
     spec,
@@ -53,6 +53,8 @@ describe('idempotent()', () => {
     idempotent(c, handle.db, who, input.body, async () => {
       if (mode === 'boom') throw new Error('db down');
       if (mode === 'reject') throw new HttpError(409, 'conflict', { detail: 'offer exists' });
+      if (mode === 'reject-ext')
+        throw new HttpError(409, 'duplicate-property', { extensions: { candidates: [{ propertyId: PROPERTY }] } });
       created++;
       return { status: 201, body: { n: created } };
     }),
@@ -100,6 +102,19 @@ describe('idempotent()', () => {
     expect(replay.status).toBe(409);
     expect(replay.headers.get('content-type')).toBe('application/problem+json');
     expect(await replay.json()).toMatchObject({ code: 'conflict', detail: 'offer exists' });
+  });
+
+  it('keeps RFC 7807 extension members on the first response and on replay', async () => {
+    const key = randomUUID();
+    mode = 'reject-ext';
+    const first = await post(key);
+    mode = 'ok';
+    const replay = await post(key);
+    expect([first.status, replay.status]).toEqual([409, 409]);
+    const want = { code: 'duplicate-property', candidates: [{ propertyId: PROPERTY }] };
+    expect(await first.json()).toMatchObject(want);
+    expect(await replay.json()).toMatchObject(want);
+    expect(replay.headers.get('idempotent-replayed')).toBe('true');
   });
 
   it('runs without a key', async () => {

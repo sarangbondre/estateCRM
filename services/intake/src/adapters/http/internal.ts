@@ -1,10 +1,10 @@
-// Internal routes for records (service token, x-callers [records]): batch rows (PII, never cached) and the migration
-// map. The response is never logged (the logger has no body fields).
+// Internal routes (service tokens; x-callers enforced by libs/auth): batch rows and the migration map for records,
+// the crm_notes text of one row for journeys (CR-012). PII, never cached. The response is never logged (the logger has no body fields).
 import { toPage } from '@11e/http';
 import type { Service } from '@11e/http';
 import type { components, operations } from '@11e/contracts/intake';
 import type { App } from '../../application/context.js';
-import { getBatchRows, getInternalMigrationMap } from '../../application/internal.js';
+import { getBatchRows, getInternalMigrationMap, getRowNote } from '../../application/internal.js';
 import type { RawRowRecord } from '../../application/ports.js';
 import type { Upload } from '../../domain/upload.js';
 import { cursorOf, guard, serviceActor } from './support.js';
@@ -47,6 +47,15 @@ export function registerInternalRoutes(svc: Service<operations>, app: App): void
         vocabularyVersion: v.upload.vocabularyVersion ?? '',
         rows: v.rows.map((r) => presentIntakeRow(r, v.upload)),
       });
+    }),
+  );
+
+  svc.op('internalGetRowNote', (c, { params }) =>
+    guard(async () => {
+      const actor = serviceActor(c);
+      const v = await getRowNote(app, actor.tenantId, params.uploadId, params.rowNo);
+      c.header('cache-control', 'no-store');
+      return c.json({ uploadId: v.upload.id, uploadCode: v.upload.code, rowNo: v.rowNo, note: v.note });
     }),
   );
 

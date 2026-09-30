@@ -19,14 +19,14 @@ function appendixCColumns(): string[] {
 }
 
 describe('extractor column schema', () => {
-  it('has 89 distinct columns', () => {
-    expect(EXTRACTOR_COLUMNS).toHaveLength(89);
-    expect(new Set(EXTRACTOR_COLUMNS).size).toBe(89);
+  it('has 91 distinct columns (CR-012)', () => {
+    expect(EXTRACTOR_COLUMNS).toHaveLength(91);
+    expect(new Set(EXTRACTOR_COLUMNS).size).toBe(91);
   });
 
   it('equals PRD Appendix C exactly, in the same order', () => {
     const prd = appendixCColumns();
-    expect(prd).toHaveLength(89);
+    expect(prd).toHaveLength(91);
     expect([...EXTRACTOR_COLUMNS]).toEqual(prd);
   });
 });

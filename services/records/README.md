@@ -52,10 +52,13 @@ A tenant's reference data (vocabulary v0.6, the MMR hierarchy, launch-area citie
 
 ## Owned data
 
-Schema `records` (owner `records_owner`, runtime role `records_svc`), migrations `0001`–`0004`: every table of LLD §3
-plus `reveal_log` (reveal audit ids and the 60/hour limit). Personal data (marked `-- PII`): person names, phones,
+Schema `records` (owner `records_owner`, runtime role `records_svc`), migrations `0001`–`0005`: every table of LLD §3
+plus `reveal_log` (reveal audit ids and the 60/hour limit) and `note_imports` (CR-012: one `record.note_imported.v1`
+per upload row with `crm_notes`, ids only; the note text stays in intake). Personal data (marked `-- PII`): person names, phones,
 e-mails, other contact; unit, wing and exact floor; source-ad raw text, variants and sender; enquiry messages;
-unrouted row snapshots. It is never logged, never in events (events carry `contactPersonIds` and an opaque
+unrouted row snapshots. Uploaded `building_name` (private: staff APIs and proposals) and `floor` (parsed into
+`floor_no`/`total_floors`) are stored on the property and drive the "same property" dedup branch (CR-012). It is never
+logged, never in events (events carry `contactPersonIds` and an opaque
 `buildingKey`), masked on read and only returned by `POST /v1/reveals` (audited) and the insight contacts batch.
 Retention: `retention-purge` erases it 24 months after the last activity (NFR-18).
 
@@ -70,7 +73,8 @@ Retention: `retention-purge` erases it 24 months after the last activity (NFR-18
   `demand.updated`, `demand.touch_added`, `demand.voided`, `enquiry.received`, `records.merged`,
   `records.merge_undone`, `merge_candidate.raised`, `person.flagged`, `person.flag_removed`, `project.created`,
   `project.updated`, `price_sheet.applied`, `photo.added`, `photo.removed`, `desk_item.created`, `desk_item.updated`,
-  `watchlist_item.created`, `market_data.recorded`, `micromarkets.updated`, `vocabulary.released`, `audit.recorded`
+  `watchlist_item.created`, `market_data.recorded` (every kind, `lost_competing` included), `record.note_imported`,
+  `micromarkets.updated`, `vocabulary.released`, `audit.recorded`
   (all `.v1`) to `q_crm_engine`, `q_insight`, `q_intake`, `q_journeys`, `q_listings`, `q_web`.
 - Scheduled jobs: `activate-vocabulary`, `recompute-launch-area` (on demand; a queued recompute is also advanced after
   each `q_records` drain), `resolve-pending-repeats`, `retention-purge`, `expire-idempotency-keys`,

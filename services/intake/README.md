@@ -3,7 +3,7 @@
 Turns uploaded files (and typed free text) into validated, classified candidate rows in the standard vocabulary and
 hands them to records. It never creates business records itself. Service owner: see CODEOWNERS.
 Design: [docs/04-lld/intake.md](../../docs/04-lld/intake.md). Contract:
-[contracts/openapi/intake.yaml](../../contracts/openapi/intake.yaml) (30 operations, all implemented; a test asserts
+[contracts/openapi/intake.yaml](../../contracts/openapi/intake.yaml) (31 operations, all implemented; a test asserts
 `svc.unimplemented()` is empty).
 
 ## Run locally
@@ -34,6 +34,7 @@ POST /v1/uploads ─► browser PUTs the file to Storage (signed URL) ─► POS
   raw rows, row errors, review items, rows.classified.v1 per ≤ 500 rows, review_item.created.v1)
   ─► q_intake_finalize (rejected-rows CSV, upload.completed.v1 | upload.failed.v1)
 records pulls the full rows: GET /internal/v1/uploads/{id}/rows?batch= (service token, sub=records).
+journeys fetches a row's crm_notes: GET /internal/v1/uploads/{id}/rows/{rowNo}/note (service token, sub=journeys).
 ```
 
 ## Environment
@@ -58,7 +59,7 @@ records pulls the full rows: GET /internal/v1/uploads/{id}/rows?batch= (service 
 ## Owned data
 
 Schema `intake` (owner `intake_owner`, runtime role `intake_svc`): `uploads`, `upload_chunks`, `raw_rows` (monthly
-partitions, PII), `row_errors`, `row_fingerprints`, `templates`, `review_items` (context is PII-sensitive),
+partitions, PII; `crm_notes` holds the row's note text since CR-012), `row_errors`, `row_fingerprints`, `templates`, `review_items` (context is PII-sensitive),
 `migration_map_entries`, `vocabulary_cache`, `legacy_terms`, `code_sequences`, and the technical tables
 `idempotency_keys`, `outbox`, `processed_events`, `job_leases`. Storage: `intake-uploads` (sources, chunk files) and
 `intake-rejected` (rejected-rows CSV, 7 days).
@@ -74,7 +75,10 @@ partitions, PII), `row_errors`, `row_fingerprints`, `templates`, `review_items` 
 ## Privacy
 
 PII never leaves through events or logs. The model only ever receives redacted text (`@11e/redaction`); text that
-still fails the post-check is not sent. In pilot mode every contact is replaced by a consistent fake at split time and
+still fails the post-check is not sent. The row's `building_name` and `floor` (Appendix C since CR-012, both optional:
+strict mode accepts the 91-column header and the older 89-column one) are masked in that text first; `crm_notes` is
+never sent to the model and never appears in IntakeRow (only the `hasCrmNotes` flag): journeys fetches it from the
+note endpoint, and it is purged with the raw rows. In pilot mode every contact is replaced by a consistent fake at split time and
 the original file is deleted. Tests use synthetic contacts only (`@11e/testing`) and an intercepting mock for the model.
 
 ## Performance (INT-11, local, Apple silicon, local Supabase)

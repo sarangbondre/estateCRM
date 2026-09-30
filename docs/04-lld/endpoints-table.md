@@ -7,13 +7,13 @@ Auth: staff = staffViaWeb (signed-in user via web), svc = serviceToken, cron = X
 | Service | Operations | Public (API key) | Internal (svc/cron) |
 |---|---|---|---|
 | web | 17 | 0 | 4 |
-| intake | 30 | 0 | 5 |
+| intake | 31 | 0 | 6 |
 | records | 69 | 0 | 6 |
 | journeys | 60 | 0 | 4 |
 | crm-engine | 19 | 0 | 4 |
 | listings | 25 | 6 | 3 |
 | insight | 20 | 0 | 3 |
-| **Total** | **240** | | |
+| **Total** | **241** | | |
 
 ## web (17)
 
@@ -37,7 +37,7 @@ Auth: staff = staffViaWeb (signed-in user via web), svc = serviceToken, cron = X
 | GET | `/health/live` | none | anonymous | safe |  | none | 500 | — |  |
 | GET | `/health/ready` | none | anonymous | safe |  | none | 1000 | — |  |
 
-## intake (30)
+## intake (31)
 
 | Method | Path | Auth | Roles | Idempotency | Paged | Rate limit | Timeout ms | Emits | Summary |
 |---|---|---|---|---|---|---|---|---|---|
@@ -65,6 +65,7 @@ Auth: staff = staffViaWeb (signed-in user via web), svc = serviceToken, cron = X
 | POST | `/v1/review-items/bulk-resolve` | staff | Admin, Manager, Data operator | Idempotency-Key |  | 20 req/s per user, burst 40 (enforced at web, conventions §4) | 2000 | review_item.resolved.v1 | Resolve up to 100 review items with one classification (e.g. accept defaulted side) |
 | POST | `/v1/parse` | staff | Admin, Manager, Demand agent, Supply agent | by design |  | 30 req/min per user (bounds model spend; conventions §4 default otherwise) | 4000 | — | Parse typed free text into a suggested classification (quick add prefill) |
 | GET | `/internal/v1/uploads/{uploadId}/rows` | svc | — | safe |  | records drainers only (≤ 8 concurrent); no user limit | 2000 | — | Rows of one emitted batch, with PII and raw text (records ingestion) |
+| GET | `/internal/v1/uploads/{uploadId}/rows/{rowNo}/note` | svc | — | safe |  | journeys drainers only; no user limit | 2000 | — | The crm_notes text of one upload row (journeys note import, CR-012) |
 | GET | `/internal/v1/uploads/{uploadId}/migration-map` | svc | — | safe | yes | records drainers only; no user limit | 2000 | — | Migration map entries for records to apply before any batch of this upload |
 | POST | `/internal/v1/relay` | cron | — | by design |  | n/a: pg_cron/pg_net only (1 call/min per job plus pokes) | 60000 | — | Relay unpublished outbox rows to consumer pgmq queues |
 | POST | `/internal/v1/drain/{queue}` | cron | — | by design |  | n/a: pg_cron/pg_net only (1 call/min per job plus pokes) | 60000 | — | Drain one of this service's pgmq queues |

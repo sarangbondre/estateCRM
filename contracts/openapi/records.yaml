@@ -370,6 +370,7 @@ paths:
         '409': {$ref: ./_common.yaml#/components/responses/Conflict}
         '412': {$ref: ./_common.yaml#/components/responses/PreconditionFailed}
         '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '503': {$ref: ./_common.yaml#/components/responses/ServiceUnavailable}
         '429': {$ref: ./_common.yaml#/components/responses/TooMany}
       x-roles: [Admin, Manager, Supply agent, Demand agent]
       x-rate-limit: 20 req/s per user, burst 40 (enforced at web, conventions §4)
@@ -679,6 +680,7 @@ paths:
         '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
         '404': {$ref: ./_common.yaml#/components/responses/NotFound}
         '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '503': {$ref: ./_common.yaml#/components/responses/ServiceUnavailable}
         '429': {$ref: ./_common.yaml#/components/responses/TooMany}
       x-roles: [Admin, Manager, Demand agent, Supply agent, Data operator]
       x-rate-limit: 20 req/s per user, burst 40 (enforced at web, conventions §4)
@@ -2427,6 +2429,7 @@ paths:
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
         '415': {$ref: '#/components/responses/UnsupportedMediaType'}
         '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '503': {$ref: ./_common.yaml#/components/responses/ServiceUnavailable}
         '429': {$ref: ./_common.yaml#/components/responses/TooMany}
       x-roles: [Admin, Manager, Supply agent, Demand agent]
       x-rate-limit: 20 req/s per user, burst 40 (enforced at web, conventions §4)
@@ -2470,6 +2473,7 @@ paths:
         '409': {$ref: ./_common.yaml#/components/responses/Conflict}
         '415': {$ref: '#/components/responses/UnsupportedMediaType'}
         '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '503': {$ref: ./_common.yaml#/components/responses/ServiceUnavailable}
         '429': {$ref: ./_common.yaml#/components/responses/TooMany}
       x-roles: [Admin, Manager, Supply agent, Demand agent]
       x-rate-limit: 20 req/s per user, burst 40 (enforced at web, conventions §4)
@@ -2499,6 +2503,7 @@ paths:
         '403': {$ref: ./_common.yaml#/components/responses/Forbidden}
         '404': {$ref: ./_common.yaml#/components/responses/NotFound}
         '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '503': {$ref: ./_common.yaml#/components/responses/ServiceUnavailable}
         '429': {$ref: ./_common.yaml#/components/responses/TooMany}
       x-roles: [Admin, Manager, Supply agent, Demand agent]
       x-rate-limit: 20 req/s per user, burst 40 (enforced at web, conventions §4)
@@ -2570,6 +2575,7 @@ paths:
         '404': {$ref: ./_common.yaml#/components/responses/NotFound}
         '429': {$ref: ./_common.yaml#/components/responses/TooMany}
         '500': {$ref: ./_common.yaml#/components/responses/ServerError}
+        '503': {$ref: ./_common.yaml#/components/responses/ServiceUnavailable}
       x-roles: []
       x-rate-limit: listings only; no user limit
       x-timeout-ms: 2000
@@ -2855,6 +2861,10 @@ components:
       properties:
         id: {type: string, format: uuid}
         code: {type: string}
+        sourcingRequestId:
+          type: [string, 'null']
+          format: uuid
+          description: The sourcing request this offer was added for via add-supply (CR-012), if any.
         propertyId: {type: string, format: uuid}
         propertyCode: {type: string}
         projectId:

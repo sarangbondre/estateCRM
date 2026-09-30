@@ -398,6 +398,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/uploads/{uploadId}/rows/{rowNo}/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The crm_notes text of one upload row (journeys note import, CR-012)
+         * @description Service token minted by web (R-2) with aud=intake, sub=journeys. The note may contain PII; the response is never cached or logged. 404 not-found when the row has no note or raw rows were purged (retention).
+         */
+        get: operations["internalGetRowNote"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/uploads/{uploadId}/migration-map": {
         parameters: {
             query?: never;
@@ -622,7 +642,7 @@ export interface components {
             sheetName?: string;
             /** @description sourceHeader → target field (Appendix C snake_case name) or null to ignore */
             columnMap: {
-                [key: string]: "route_to" | "needs_review" | "review_reason" | "record_id" | "parent_record_id" | "split_index" | "record_scope" | "deal_type" | "market" | "segment" | "property_type" | "property_detail" | "land_use" | "side" | "side_evidence" | "sale_mode" | "deadline_date" | "tenancy_status" | "tenure" | "agreement_form" | "is_jodi" | "possession_status" | "possession_date" | "furnishing" | "sector" | "includes_property" | "business_description" | "participant_role" | "signal_type" | "project_name" | "developer_name" | "bhk_min" | "bhk_max" | "features" | "locality" | "city" | "state" | "landmark" | "location_text" | "area_sqft_min" | "area_sqft_max" | "area_basis" | "land_area_value" | "land_area_unit" | "land_area_sqft" | "area_text" | "price_text" | "sale_price_inr_min" | "sale_price_inr_max" | "sale_rate_inr" | "sale_rate_unit" | "price_negotiable" | "rent_monthly_inr_min" | "rent_monthly_inr_max" | "rent_rate_psf" | "deposit_inr" | "deposit_months" | "current_rent_inr" | "yield_pct" | "contact_name" | "company_name" | "party_type" | "phones" | "whatsapp_phone" | "emails" | "rera_number" | "other_contact" | "source_channel" | "source_name" | "source_edition" | "source_supplement" | "source_date" | "source_page" | "source_files" | "first_seen_date" | "last_seen_date" | "times_seen" | "possible_repeat_of" | "raw_text" | "source_language" | "ocr_used" | "extraction_confidence" | "extractor_notes" | "sender_name" | "sender_phone" | "text_variants" | "external_id" | "campaign_ref" | "form_ref" | "listing_ref" | "project_ref" | "enquiry_message" | "enquiry_received_at" | "photo_urls" | "free_text" | null;
+                [key: string]: "route_to" | "needs_review" | "review_reason" | "record_id" | "parent_record_id" | "split_index" | "record_scope" | "deal_type" | "market" | "segment" | "property_type" | "property_detail" | "building_name" | "floor" | "crm_notes" | "land_use" | "side" | "side_evidence" | "sale_mode" | "deadline_date" | "tenancy_status" | "tenure" | "agreement_form" | "is_jodi" | "possession_status" | "possession_date" | "furnishing" | "sector" | "includes_property" | "business_description" | "participant_role" | "signal_type" | "project_name" | "developer_name" | "bhk_min" | "bhk_max" | "features" | "locality" | "city" | "state" | "landmark" | "location_text" | "area_sqft_min" | "area_sqft_max" | "area_basis" | "land_area_value" | "land_area_unit" | "land_area_sqft" | "area_text" | "price_text" | "sale_price_inr_min" | "sale_price_inr_max" | "sale_rate_inr" | "sale_rate_unit" | "price_negotiable" | "rent_monthly_inr_min" | "rent_monthly_inr_max" | "rent_rate_psf" | "deposit_inr" | "deposit_months" | "current_rent_inr" | "yield_pct" | "contact_name" | "company_name" | "party_type" | "phones" | "whatsapp_phone" | "emails" | "rera_number" | "other_contact" | "source_channel" | "source_name" | "source_edition" | "source_supplement" | "source_date" | "source_page" | "source_files" | "first_seen_date" | "last_seen_date" | "times_seen" | "possible_repeat_of" | "raw_text" | "source_language" | "ocr_used" | "extraction_confidence" | "extractor_notes" | "sender_name" | "sender_phone" | "text_variants" | "external_id" | "campaign_ref" | "form_ref" | "listing_ref" | "project_ref" | "enquiry_message" | "enquiry_received_at" | "photo_urls" | "free_text" | null;
             };
             constants?: {
                 /** @enum {string} */
@@ -734,7 +754,7 @@ export interface components {
             sourceDetail?: string;
             headers: string[];
             columnMap: {
-                [key: string]: "route_to" | "needs_review" | "review_reason" | "record_id" | "parent_record_id" | "split_index" | "record_scope" | "deal_type" | "market" | "segment" | "property_type" | "property_detail" | "land_use" | "side" | "side_evidence" | "sale_mode" | "deadline_date" | "tenancy_status" | "tenure" | "agreement_form" | "is_jodi" | "possession_status" | "possession_date" | "furnishing" | "sector" | "includes_property" | "business_description" | "participant_role" | "signal_type" | "project_name" | "developer_name" | "bhk_min" | "bhk_max" | "features" | "locality" | "city" | "state" | "landmark" | "location_text" | "area_sqft_min" | "area_sqft_max" | "area_basis" | "land_area_value" | "land_area_unit" | "land_area_sqft" | "area_text" | "price_text" | "sale_price_inr_min" | "sale_price_inr_max" | "sale_rate_inr" | "sale_rate_unit" | "price_negotiable" | "rent_monthly_inr_min" | "rent_monthly_inr_max" | "rent_rate_psf" | "deposit_inr" | "deposit_months" | "current_rent_inr" | "yield_pct" | "contact_name" | "company_name" | "party_type" | "phones" | "whatsapp_phone" | "emails" | "rera_number" | "other_contact" | "source_channel" | "source_name" | "source_edition" | "source_supplement" | "source_date" | "source_page" | "source_files" | "first_seen_date" | "last_seen_date" | "times_seen" | "possible_repeat_of" | "raw_text" | "source_language" | "ocr_used" | "extraction_confidence" | "extractor_notes" | "sender_name" | "sender_phone" | "text_variants" | "external_id" | "campaign_ref" | "form_ref" | "listing_ref" | "project_ref" | "enquiry_message" | "enquiry_received_at" | "photo_urls" | "free_text" | null;
+                [key: string]: "route_to" | "needs_review" | "review_reason" | "record_id" | "parent_record_id" | "split_index" | "record_scope" | "deal_type" | "market" | "segment" | "property_type" | "property_detail" | "building_name" | "floor" | "crm_notes" | "land_use" | "side" | "side_evidence" | "sale_mode" | "deadline_date" | "tenancy_status" | "tenure" | "agreement_form" | "is_jodi" | "possession_status" | "possession_date" | "furnishing" | "sector" | "includes_property" | "business_description" | "participant_role" | "signal_type" | "project_name" | "developer_name" | "bhk_min" | "bhk_max" | "features" | "locality" | "city" | "state" | "landmark" | "location_text" | "area_sqft_min" | "area_sqft_max" | "area_basis" | "land_area_value" | "land_area_unit" | "land_area_sqft" | "area_text" | "price_text" | "sale_price_inr_min" | "sale_price_inr_max" | "sale_rate_inr" | "sale_rate_unit" | "price_negotiable" | "rent_monthly_inr_min" | "rent_monthly_inr_max" | "rent_rate_psf" | "deposit_inr" | "deposit_months" | "current_rent_inr" | "yield_pct" | "contact_name" | "company_name" | "party_type" | "phones" | "whatsapp_phone" | "emails" | "rera_number" | "other_contact" | "source_channel" | "source_name" | "source_edition" | "source_supplement" | "source_date" | "source_page" | "source_files" | "first_seen_date" | "last_seen_date" | "times_seen" | "possible_repeat_of" | "raw_text" | "source_language" | "ocr_used" | "extraction_confidence" | "extractor_notes" | "sender_name" | "sender_phone" | "text_variants" | "external_id" | "campaign_ref" | "form_ref" | "listing_ref" | "project_ref" | "enquiry_message" | "enquiry_received_at" | "photo_urls" | "free_text" | null;
             };
             constants?: Record<string, never>;
         };
@@ -887,6 +907,12 @@ export interface components {
             segment?: string | null;
             propertyTypes?: string[];
             propertyDetail?: string | null;
+            /** @description Upload column building_name (CR-012). Private: dedup and proposals only, never public, redacted before any AI call. */
+            buildingName?: string | null;
+            /** @description Upload column floor (CR-012). PII-sensitive (conventions §9): never public. */
+            floor?: string | null;
+            /** @description The row carried a non-empty crm_notes value (CR-012). The text is served only by the note endpoint. */
+            hasCrmNotes?: boolean;
             landUse?: string | null;
             side?: components["schemas"]["Side"];
             sideEvidence?: string | null;
@@ -1980,6 +2006,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IntakeRowBatch"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooMany"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    internalGetRowNote: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Correlation-Id"?: components["parameters"]["CorrelationId"];
+            };
+            path: {
+                uploadId: string;
+                rowNo: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Note text */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        uploadId: string;
+                        uploadCode?: string;
+                        rowNo: number;
+                        note: string;
+                    };
                 };
             };
             400: components["responses"]["BadRequest"];

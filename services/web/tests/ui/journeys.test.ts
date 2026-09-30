@@ -10,6 +10,7 @@ import {
   buildDealPatch,
   buildExit,
   buildFeedback,
+  feedbackLabel,
   buildProposal,
   buildReassign,
   buildRetire,
@@ -265,14 +266,17 @@ describe('qualify, sourcing, proposal, visit', () => {
     expect(buildProposal(DEM, Array.from({ length: 21 }, (_, i) => `m${i}`))).toHaveProperty('errors');
   });
 
-  it('keeps "maybe" feedback out of the request (not recordable yet)', () => {
+  it('sends "maybe" feedback like the other verdicts (CR-012) and skips options without a verdict', () => {
     const r = buildFeedback([
       { position: 1, feedback: 'liked', note: 'good light' },
       { position: 2, feedback: 'maybe' },
       { position: 3, feedback: null },
     ]);
-    expect(r).toEqual({ body: { options: [{ position: 1, feedback: 'liked', note: 'good light' }] }, skipped: [2] });
-    expect(buildFeedback([{ position: 1, feedback: 'maybe' }])).toHaveProperty('errors');
+    expect(r).toEqual({ body: { options: [{ position: 1, feedback: 'liked', note: 'good light' }, { position: 2, feedback: 'maybe' }] } });
+    expect(buildFeedback([{ position: 1, feedback: 'maybe' }])).toEqual({ body: { options: [{ position: 1, feedback: 'maybe' }] } });
+    expect(buildFeedback([{ position: 1, feedback: null }])).toHaveProperty('errors');
+    expect(feedbackLabel('maybe')).toBe('Maybe');
+    expect(feedbackLabel('visit_requested')).toBe('Wants a site visit');
   });
 
   it('schedules a visit with 1–10 offers and an IST time', () => {

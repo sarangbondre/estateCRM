@@ -1,0 +1,19 @@
+{
+  "eventId": "21ab2112-3b1c-46d4-8561-cd3be6fd60de",
+  "eventType": "record.note_imported.v1",
+  "schemaVersion": 1,
+  "occurredAt": "2026-01-01T00:00:00.000Z",
+  "correlationId": "fixture-record.note_imported.v1",
+  "producer": "records",
+  "tenantId": "00000000-0000-4000-8000-000000000001",
+  "aggregateType": "record",
+  "aggregateId": "c3bd3c32-ee64-496c-8d8f-43e8e76f0a1b",
+  "aggregateVersion": 1,
+  "data": {
+    "subjectType": "demand",
+    "subjectId": "d94a713d-425b-4841-94a2-293df6c6aa8f",
+    "uploadId": "82e11f23-33bf-4cdb-959f-1c61e78cde81",
+    "rowNo": 641,
+    "uploadCode": "X4zRLzL"
+  }
+}

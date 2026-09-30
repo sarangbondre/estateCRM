@@ -15,15 +15,16 @@ beforeAll(async () => {
 afterAll(() => h.close());
 
 describe('contract coverage', () => {
-  it('implements all 30 operations of intake.yaml', () => {
+  it('implements all 31 operations of intake.yaml', () => {
     expect(h.svc.unimplemented()).toEqual([]);
-    expect(h.svc.contract.operations.size).toBe(30);
+    expect(h.svc.contract.operations.size).toBe(31);
   });
 
   it('answers every operation with a status the contract declares', async () => {
     const t = newTenant();
     const admin = await h.staff(t, 'Admin');
     const records = await h.service(t, 'records');
+    const journeys = await h.service(t, 'journeys');
     const { bytes } = await synthFile({ rows: 30, seed: 71, errorRate: 0.1 });
     const u = await runUpload(h, t, bytes);
     const item = (await h.call('GET', '/v1/review-items?status=open', admin)).body.items?.[0];
@@ -75,13 +76,14 @@ describe('contract coverage', () => {
       ['POST', '/v1/parse', admin, { text: '2BHK wanted in Powai on rent' }],
       ['GET', `/internal/v1/uploads/${id}/rows?batch=1`, records],
       ['GET', `/internal/v1/uploads/${id}/migration-map`, records],
+      ['GET', `/internal/v1/uploads/${id}/rows/1/note`, journeys],
       ['POST', '/internal/v1/relay', h.cron],
       ['POST', '/internal/v1/drain/q_intake', h.cron],
       ['POST', '/internal/v1/jobs/reap-chunk-leases', h.cron],
       ['GET', '/health/live', {}],
       ['GET', '/health/ready', {}],
     ];
-    expect(calls).toHaveLength(30);
+    expect(calls).toHaveLength(31);
     for (const [method, path, headers, body] of calls) {
       const r = await h.call(method, path, headers, body);
       expect(r.status, `${method} ${path}: ${JSON.stringify(r.body)}`).not.toBe(500);

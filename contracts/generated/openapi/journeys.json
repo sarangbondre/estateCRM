@@ -6417,6 +6417,7 @@
               "liked",
               "rejected",
               "visit_requested",
+              "maybe",
               null
             ]
           },
@@ -6785,8 +6786,10 @@
                   "enum": [
                     "liked",
                     "rejected",
-                    "visit_requested"
-                  ]
+                    "visit_requested",
+                    "maybe"
+                  ],
+                  "description": "maybe = neutral (CR-012)"
                 },
                 "note": {
                   "type": [
@@ -7740,7 +7743,10 @@
               "proposal_opened",
               "visit_scheduled",
               "dormant_revisit",
-              "watchlist_task"
+              "watchlist_task",
+              "queue_reassigned",
+              "proposal_failed",
+              "demand_touch"
             ]
           },
           "title": {

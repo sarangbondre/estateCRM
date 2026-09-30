@@ -287,5 +287,40 @@ describe('proposals (JOU-07)', () => {
     await buildSnapshot({ runner: h.runner, integrations: h.integrations }, msg, 3);
     h.content.failing = false;
     expect((await da.get(`/v1/proposals/${p.body['id']}`)).body['status']).toBe('Failed');
+    // CR-012: its own notification kind (was the proposal_opened stand-in)
+    const bell = await da.get('/v1/notifications');
+    const failed = bell.body.items?.filter((i) => i['subjectId'] === p.body['id']);
+    expect(failed).toMatchObject([{ kind: 'proposal_failed', subjectType: 'proposal', title: `${p.body['code']}: content could not be prepared` }]);
+  });
+
+  it('maybe feedback (CR-012): stored, shown and emitted as a neutral verdict; the proposal still waits for the rest', async () => {
+    const d = await qualifiedDemand();
+    const [o1, o2] = [await offer(), await offer()];
+    const m1 = await confirmedMatch(d.demandId, [o1.offerId]);
+    const m2 = await confirmedMatch(d.demandId, [o2.offerId]);
+    const da = await h.as(demandAgent, 'Demand agent');
+    const p = await da.post('/v1/proposals', { demandId: d.demandId, options: [{ matchId: m1 }, { matchId: m2 }] });
+    const id = p.body['id'] as string;
+    await buildSnapshot({ runner: h.runner, integrations: h.integrations }, { kind: 'build_snapshot', tenantId: h.tenantId, proposalId: id, correlationId: 't' }, 1);
+    expect((await da.post(`/v1/proposals/${id}/mark-sent`, { channel: 'Email' })).status).toBe(200);
+    const journeyBefore = (await da.get(`/v1/demands/${d.demandId}/journey`)).body;
+
+    const fb = await da.post(`/v1/proposals/${id}/feedback`, { options: [{ position: 1, feedback: 'maybe', note: 'will think' }] });
+    expect(fb.status).toBe(200);
+    expect(fb.body['options']).toMatchObject([{ position: 1, feedback: 'maybe', feedbackNote: 'will think' }, { position: 2, feedback: null }]);
+    const [stored] = await h.rows<{ feedback: string }>(sql`select feedback from proposal_options where proposal_id = ${id} and position = 1`);
+    expect(stored?.feedback).toBe('maybe');
+    expect((await da.get(`/v1/proposals/${id}`)).body['options'][0]).toMatchObject({ feedback: 'maybe' });
+    const emitted = (await events('proposal.feedback_recorded.v1', id)).at(-1);
+    expect(emitted?.['data']).toEqual({ proposalId: id, demandId: d.demandId, feedback: [{ matchId: m1, verdict: 'maybe' }] });
+    expect(eventProblems(emitted)).toBeNull();
+
+    // neutral: no commercial change, and the follow-up stays open until every option has a verdict
+    const journeyAfter = (await da.get(`/v1/demands/${d.demandId}/journey`)).body;
+    expect(journeyAfter['commercialStatus']).toBe(journeyBefore['commercialStatus']);
+    expect((await da.get(`/v1/offers/${o1.offerId}/journey`)).body['commercialStatus']).toBe('In proposal');
+    expect((await openItems(id)).map((i) => i.section)).toEqual(['proposals_out']);
+    await da.post(`/v1/proposals/${id}/feedback`, { options: [{ position: 2, feedback: 'maybe' }] });
+    expect(await openItems(id)).toEqual([]);
   });
 });

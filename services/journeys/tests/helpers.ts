@@ -81,7 +81,17 @@ export class FakeContent {
   rendered: PdfInput[] = [];
 }
 
-export function fakeIntegrations(content = new FakeContent(), storage = new MemoryStorage()): Integrations {
+/** Fake intake note endpoint (CR-012): `${uploadId}:${rowNo}` → note; missing → 404; `failing` → 5xx after retries. */
+export class FakeIntake {
+  notes = new Map<string, { note: string; uploadCode: string | null }>();
+  failing = false;
+  calls: string[] = [];
+  set(uploadId: string, rowNo: number, note: string, uploadCode: string | null = null) {
+    this.notes.set(`${uploadId}:${rowNo}`, { note, uploadCode });
+  }
+}
+
+export function fakeIntegrations(content = new FakeContent(), storage = new MemoryStorage(), intake = new FakeIntake()): Integrations {
   return {
     content: {
       offer: async (_t, id) => {
@@ -92,6 +102,13 @@ export function fakeIntegrations(content = new FakeContent(), storage = new Memo
       photos: async (_t, id) => content.photoUrls.get(id) ?? [],
     },
     publication: { mahareraAgentNumber: async () => content.rera },
+    uploadNotes: {
+      rowNote: async (_t, uploadId, rowNo) => {
+        intake.calls.push(`${uploadId}:${rowNo}`);
+        if (intake.failing) throw new Error('intake unavailable');
+        return intake.notes.get(`${uploadId}:${rowNo}`) ?? null;
+      },
+    },
     storage,
     pdf: {
       render: async (input) => {
@@ -151,13 +168,14 @@ export async function serviceHeaders(tenantId: string, caller: string): Promise<
   return { authorization: `Bearer ${token}` };
 }
 
-export function harness(opts: { clock?: TestClock; content?: FakeContent; storage?: MemoryStorage } = {}) {
+export function harness(opts: { clock?: TestClock; content?: FakeContent; storage?: MemoryStorage; intake?: FakeIntake } = {}) {
   // journeys_svc has a pilot connection cap of 4: one connection per test file, waiting for a free one if needed.
   const handle = createDb<JourneysDb>({ connectionString: config.databaseUrl, schema: SCHEMA, maxConnections: 1, acquireTimeoutMs: 60_000, idleTimeoutMs: 1_000 });
   const clock = opts.clock ?? new TestClock();
   const content = opts.content ?? new FakeContent();
   const storage = opts.storage ?? new MemoryStorage();
-  const integrations = fakeIntegrations(content, storage);
+  const intake = opts.intake ?? new FakeIntake();
+  const integrations = fakeIntegrations(content, storage, intake);
   const auth = authenticate({ service: SERVICE, jwks, cronSecret: env.CRON_SECRET });
   const svc = buildApp({
     config,
@@ -266,6 +284,7 @@ export function harness(opts: { clock?: TestClock; content?: FakeContent; storag
     clock,
     content,
     storage,
+    intake,
     tenantId,
     tx,
     deliver,

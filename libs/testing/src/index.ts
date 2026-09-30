@@ -1,6 +1,7 @@
 // @11e/testing: public API. See README.md.
 export {
   EXTRACTOR_COLUMNS,
+  LEGACY_OMITTED_COLUMNS,
   DATE_COLUMNS,
   PII_COLUMNS,
   blankRow,

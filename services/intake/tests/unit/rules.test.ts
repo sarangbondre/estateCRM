@@ -10,6 +10,7 @@ import {
   extractSide,
 } from '../../src/domain/classify.js';
 import { batchNumbers, contentHash, externalIdentity, uuidV5 } from '../../src/domain/identity.js';
+import { maskPrivateTerms } from '../../src/domain/private-terms.js';
 import { extractorReasons, primaryReason } from '../../src/domain/reasons.js';
 import { finaliseReasons, normaliseMapping, normaliseStrict, rejected } from '../../src/domain/rows.js';
 import type { TargetField } from '../../src/domain/schema.js';
@@ -149,6 +150,31 @@ describe('identity', () => {
   it('hashes canonical content ignoring key order and CRM working columns', () => {
     expect(contentHash({ a: 1, b: [1, 2] })).toBe(contentHash({ b: [1, 2], a: 1, crmNotes: 'x' }));
     expect(contentHash({ a: 1 })).not.toBe(contentHash({ a: 2 }));
+  });
+
+  it('keeps the hash of 89-column rows: blank building/floor and the note flag do not count (CR-012)', () => {
+    const old = contentHash({ a: 1 });
+    expect(contentHash({ a: 1, buildingName: null, floor: null, hasCrmNotes: true, crmNotes: null })).toBe(old);
+    expect(contentHash({ a: 1, buildingName: 'Sea Breeze' })).not.toBe(old);
+  });
+
+  it('masks the building name and floor in model text (CR-012)', () => {
+    const t = 'Flat in SEA BREEZE  tower on 7th floor, near Sea Breeze Tower gate; 7 lakh; floor no. 7';
+    const out = maskPrivateTerms(t, { buildingName: 'Sea Breeze Tower', floor: '7' });
+    expect(out).toBe('Flat in [UNIT_1] on [UNIT_2], near [UNIT_1] gate; 7 lakh; [UNIT_2]');
+    expect(maskPrivateTerms('G floor shop', { floor: 'G' })).toBe('[UNIT_1] shop');
+    expect(maskPrivateTerms('12 of 20, Worli', { floor: '12 of 20' })).toBe('[UNIT_1], Worli');
+    expect(maskPrivateTerms('At Om, Thane', { buildingName: 'Om' })).toBe('At Om, Thane'); // too short to mask
+  });
+
+  it('normalises building_name, floor and crm_notes (flag only in the IntakeRow fields)', () => {
+    const r = normaliseStrict(
+      getter({ ...STRICT_OK, building_name: ' Sea Breeze ', floor: '12', crm_notes: 'call after 6' }),
+      opts,
+    );
+    expect(r.fields).toMatchObject({ buildingName: 'Sea Breeze', floor: '12', hasCrmNotes: true, crmNotes: null });
+    expect(r.crmNote).toBe('call after 6');
+    expect(normaliseStrict(getter(STRICT_OK), opts).fields['hasCrmNotes']).toBe(false);
   });
 
   it('chooses the external reference (§4.5)', () => {

@@ -126,6 +126,11 @@ channels:
     messages:
       price_sheet_applied_v1:
         $ref: "#/components/messages/price_sheet_applied_v1"
+  record_note_imported_v1:
+    address: "record.note_imported.v1"
+    messages:
+      record_note_imported_v1:
+        $ref: "#/components/messages/record_note_imported_v1"
   offer_voided_v1:
     address: "offer.voided.v1"
     messages:
@@ -787,6 +792,16 @@ operations:
     channel:
       $ref: "#/channels/price_sheet_applied_v1"
     summary: "Consumed by insight (queue q_insight)"
+  publish_record_note_imported_v1:
+    action: "send"
+    channel:
+      $ref: "#/channels/record_note_imported_v1"
+    summary: "Published by records"
+  journeys_consumes_record_note_imported_v1:
+    action: "receive"
+    channel:
+      $ref: "#/channels/record_note_imported_v1"
+    summary: "Consumed by journeys (queue q_journeys)"
   publish_offer_voided_v1:
     action: "send"
     channel:
@@ -3179,6 +3194,49 @@ components:
                     items:
                       type: "string"
                       format: "uuid"
+    record_note_imported_v1:
+      name: "record.note_imported.v1"
+      title: "record.note_imported.v1"
+      summary: "A crm_notes value from an upload row belongs to this record (CR-012). Carries no note text (it may hold PII): journeys fetches it from intake GET /internal/v1/uploads/{uploadId}/rows/{rowNo}/note with a service token and stores it as a note marked imported."
+      x-producer: "records"
+      x-consumers:
+        - "journeys"
+      x-ordering: "per aggregate (aggregateVersion)"
+      x-delivery: "at-least-once; consumers dedupe on eventId"
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/Envelope"
+          - type: "object"
+            properties:
+              eventType:
+                const: "record.note_imported.v1"
+              data:
+                type: "object"
+                additionalProperties: false
+                required:
+                  - "subjectType"
+                  - "subjectId"
+                  - "uploadId"
+                  - "rowNo"
+                properties:
+                  subjectType:
+                    type: "string"
+                    enum:
+                      - "offer"
+                      - "demand"
+                      - "person"
+                      - "property"
+                  subjectId:
+                    type: "string"
+                    format: "uuid"
+                  uploadId:
+                    type: "string"
+                    format: "uuid"
+                  rowNo:
+                    type: "integer"
+                    minimum: 1
+                  uploadCode:
+                    type: "string"
     offer_voided_v1:
       name: "offer.voided.v1"
       title: "offer.voided.v1"
@@ -3427,6 +3485,7 @@ components:
                       - "closed_by_us"
                       - "closed_elsewhere"
                       - "reported"
+                      - "lost_competing"
                   segment:
                     type: "string"
                     x-vocabulary: "segment"
@@ -4329,6 +4388,8 @@ components:
                             - "liked"
                             - "rejected"
                             - "visit_requested"
+                            - "maybe"
+                          description: "maybe = neutral (CR-012)"
     deal_updated_v1:
       name: "deal.updated.v1"
       title: "deal.updated.v1"
@@ -4574,6 +4635,8 @@ components:
                       - "offer_retired"
                       - "offer_expired"
                       - "demand_exited"
+                      - "demand_expired"
+                      - "demand_paused"
                       - "demand_closed"
                       - "deal_closed"
                       - "superseded"

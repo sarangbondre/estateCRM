@@ -64,6 +64,10 @@ describe('journeys reactions', () => {
     expect((await h.call('GET', `/v1/people/${demand.personId}`, mgr)).body['flags']).toEqual(['invalid']);
     const md = await h.call('GET', '/v1/market-data?source=lost_competing', mgr);
     expect(md.body.items?.[0]).toMatchObject({ source: 'lost_competing', rentMonthlyInr: 55_000, dealType: 'Lease', voided: false });
+    // CR-012: lost-to-competing-terms points are announced too (terms text stays private)
+    const [recorded] = await h.events(t, 'market_data.recorded.v1');
+    expect(recorded?.data).toMatchObject({ kind: 'lost_competing', priceInr: 55_000, dealType: 'Lease' });
+    expect(JSON.stringify(recorded?.data)).not.toContain('1 month free');
     await h.deliver({ eventType: 'demand.reactivated.v1', tenantId: t, aggregateVersion: 6, data: { demandId: demand.id } });
     const back = await h.appCtx.uow.run({ tenantId: t, correlationId: 't' }, (tx) => tx.store.get('demands', demand.id));
     expect(back?.exit_state).toBeNull();

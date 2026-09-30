@@ -1,7 +1,7 @@
 // Ingestion of rows.classified.v1 (REC-05, records LLD §4.2–§4.8, US-01/US-07a, CR-006 Z-3/Z-4/Z-5/Z-8).
 // Per batch: migration map first, rows fetched from intake with a service token (R-2), sub-transactions of 100 rows,
 // idempotent upserts by external ref + content hash, staff edits win (§4.3), route by record_scope + side.
-import { possessionDateStart } from '../domain/property.js';
+import { parseFloor, possessionDateStart } from '../domain/property.js';
 import { LOCATION_UNCLEAR_REASON, launchAreaVerdict } from '../domain/launch-area.js';
 import { routeRow, splitOfferPrices } from '../domain/routing.js';
 import type { Route } from '../domain/routing.js';
@@ -98,6 +98,8 @@ const PROPERTY_FROM_ROW: [keyof IntakeRow, keyof PropertyRow][] = [
   ['segment', 'segment'],
   ['propertyTypes', 'property_types'],
   ['propertyDetail', 'property_detail'],
+  // CR-012: private (proposals only, never in events); drives the "same property" dedup branch (§4.4)
+  ['buildingName', 'building_name'],
   ['landUse', 'land_use'],
   ['locality', 'locality'],
   ['city', 'city'],
@@ -137,6 +139,12 @@ function propertyFacts(row: IntakeRow): Partial<PropertyRow> {
     if (v !== undefined) out[col] = Array.isArray(v) ? v : (v ?? null);
   }
   out['property_types'] ??= [];
+  // CR-012: floor text → floor_no (PII-sensitive) and total_floors; floor_band is derived from them
+  if (row.floor !== undefined) {
+    const f = parseFloor(row.floor);
+    out['floor_no'] = f.floorNo;
+    out['total_floors'] = f.totalFloors;
+  }
   return out as Partial<PropertyRow>;
 }
 
@@ -287,7 +295,15 @@ async function recordIngested(
   tx: Tx,
   row: IntakeRow,
   ctx: BatchCtx,
-  subject: { type: SubjectKind; id: string | null; propertyId?: string | null; deskItemId?: string | null; sourceAdId?: string | null },
+  subject: {
+    type: SubjectKind;
+    id: string | null;
+    propertyId?: string | null;
+    deskItemId?: string | null;
+    sourceAdId?: string | null;
+    /** Desk rows: the contact person, who receives an imported crm_notes note (CR-012). */
+    personId?: string | null;
+  },
 ): Promise<IngestedRecordRow> {
   const rec: IngestedRecordRow = {
     id: app.ids.next(),
@@ -316,7 +332,46 @@ async function recordIngested(
   if (subject.id && (subject.type === 'offer' || subject.type === 'demand')) {
     await openPendingFor(tx, row.externalRef, { type: subject.type, id: subject.id });
   }
+  await noteImported(app, tx, row, ctx, noteSubjectOf(subject));
   return rec;
+}
+
+type NoteSubject = { type: 'offer' | 'demand' | 'person' | 'property'; id: string };
+
+/** Where an imported crm_notes note belongs: the primary offer/demand/person, else the property (desk: the contact). */
+function noteSubjectOf(s: {
+  type: SubjectKind | null;
+  id: string | null;
+  propertyId?: string | null;
+  personId?: string | null;
+}): NoteSubject | null {
+  if (s.id && (s.type === 'offer' || s.type === 'demand' || s.type === 'person')) return { type: s.type, id: s.id };
+  if (s.personId) return { type: 'person', id: s.personId };
+  if (s.propertyId) return { type: 'property', id: s.propertyId };
+  return null;
+}
+
+/**
+ * CR-012: the row carried crm_notes → record.note_imported.v1 (ids only; journeys fetches the text from intake), in
+ * the ingest transaction and once per (upload, row) (note_imports ledger).
+ */
+async function noteImported(app: App, tx: Tx, row: IntakeRow, ctx: BatchCtx, subject: NoteSubject | null): Promise<void> {
+  if (!row.hasCrmNotes || !ctx.uploadId || !subject) return;
+  const id = app.ids.next();
+  const inserted = await tx.store.insertIgnore('note_imports', {
+    id,
+    upload_id: ctx.uploadId,
+    row_no: row.rowNo,
+    subject_type: subject.type,
+    subject_id: subject.id,
+  });
+  if (!inserted) return;
+  await tx.events.emit('record.note_imported.v1', agg('record', id, 1), {
+    subjectType: subject.type,
+    subjectId: subject.id,
+    uploadId: ctx.uploadId,
+    rowNo: row.rowNo,
+  });
 }
 
 /** possible_repeat_of (Z-4): a candidate between the two primary subjects, pending until the target arrives. */
@@ -798,7 +853,14 @@ async function createDeskFromRow(app: App, tx: Tx, row: IntakeRow, ctx: BatchCtx
     updated_at: tx.now,
     version: 1,
   };
-  const rec = await recordIngested(app, tx, row, ctx, { type: 'desk_item', id: item.id, deskItemId: item.id, propertyId: linkedPropertyId, sourceAdId: ad.id });
+  const rec = await recordIngested(app, tx, row, ctx, {
+    type: 'desk_item',
+    id: item.id,
+    deskItemId: item.id,
+    propertyId: linkedPropertyId,
+    sourceAdId: ad.id,
+    personId: person?.id ?? null,
+  });
   await tx.store.insert('desk_items', { ...item, ingested_record_id: rec.id });
   await sighting(app, tx, { type: 'desk_item', id: item.id }, row, ad, ctx);
   if (route.desk === 'watchlist') {
@@ -882,6 +944,19 @@ async function updateFromRow(app: App, tx: Tx, rec: IngestedRecordRow, row: Inta
     return;
   }
   await tx.store.update('ingested_records', rec.id, { content_hash: row.contentHash, last_upload_id: ctx.uploadId, last_row_id: row.rowId, record_scope: row.recordScope ?? null });
+  if (rec.primary_subject_type !== 'unrouted') {
+    const deskPerson =
+      rec.primary_subject_type === 'desk_item' && rec.primary_subject_id
+        ? ((await tx.store.get('desk_items', rec.primary_subject_id))?.person_id ?? null)
+        : null;
+    await noteImported(
+      app,
+      tx,
+      row,
+      ctx,
+      noteSubjectOf({ type: rec.primary_subject_type, id: rec.primary_subject_id, propertyId: rec.property_id, personId: deskPerson }),
+    );
+  }
   if (rec.primary_subject_type === 'offer' && rec.property_id) {
     const property = await tx.store.get('properties', rec.property_id, { lock: true });
     if (!property || property.status !== 'active') return;

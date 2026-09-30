@@ -38,9 +38,25 @@ export interface EventSink {
   ): Promise<void>;
 }
 
-export type WorkMessage =
-  | { kind: 'build_snapshot'; tenantId: string; proposalId: string; correlationId: string }
-  | { kind: 'render_pdf'; tenantId: string; proposalId: string; correlationId: string };
+export interface ProposalWorkMessage {
+  kind: 'build_snapshot' | 'render_pdf';
+  tenantId: string;
+  proposalId: string;
+  correlationId: string;
+}
+export type WorkMessage = ProposalWorkMessage | ImportNoteMessage;
+
+/** CR-012: fetch an upload row's crm_notes text from intake and store it as an imported note (record.note_imported.v1). */
+export interface ImportNoteMessage {
+  kind: 'import_note';
+  tenantId: string;
+  correlationId: string;
+  subjectType: 'offer' | 'demand' | 'person' | 'property';
+  subjectId: string;
+  uploadId: string;
+  rowNo: number;
+  uploadCode: string | null;
+}
 
 export interface WorkQueue {
   /** Sent in the current transaction (pgmq is transactional). */
@@ -91,6 +107,12 @@ export interface PublicationSettingsPort {
   mahareraAgentNumber(tenantId: string): Promise<string | null>;
 }
 
+/** intake GET /internal/v1/uploads/{uploadId}/rows/{rowNo}/note (R-2 service token, aud=intake). */
+export interface UploadNotesPort {
+  /** The row's note, or null when intake answers 404 (no note, or raw rows purged). Throws on other failures. */
+  rowNote(tenantId: string, uploadId: string, rowNo: number): Promise<{ note: string; uploadCode: string | null } | null>;
+}
+
 export interface FileStoragePort {
   put(path: string, body: Uint8Array, contentType: string): Promise<void>;
   /** Copies a remote file (e.g. a records photo signed URL) into the bucket. */
@@ -125,6 +147,7 @@ export interface TokenPort {
 export interface Integrations {
   content: ProposalContentPort;
   publication: PublicationSettingsPort;
+  uploadNotes: UploadNotesPort;
   storage: FileStoragePort;
   pdf: PdfRendererPort;
   tokens: TokenPort;

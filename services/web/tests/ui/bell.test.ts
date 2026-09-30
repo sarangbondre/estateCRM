@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeNotifications } from '@/ui/shell/NotificationBell';
+import { kindMeta, mergeNotifications } from '@/ui/shell/NotificationBell';
 
 describe('notification bell (R-6): web + journeys merged client-side', () => {
   it('sorts both lists newest first and keeps the source for mark-read', () => {
@@ -21,5 +21,19 @@ describe('notification bell (R-6): web + journeys merged client-side', () => {
     );
     expect(merged.map((m) => `${m.source}:${m.id}:${m.read}`)).toEqual(['journeys:j1:false', 'web:w1:false', 'journeys:j2:true']);
     expect(merged[1]?.code).toBe('UPL-1');
+  });
+
+  it('labels and icons per kind, incl. the CR-012 kinds; unknown kinds get a generic label', () => {
+    expect(kindMeta('journeys', 'queue_reassigned')).toEqual({ label: 'Queue reassigned', icon: 'queue' });
+    expect(kindMeta('journeys', 'proposal_failed')).toEqual({ label: 'Proposal failed', icon: 'close' });
+    expect(kindMeta('journeys', 'demand_touch')).toEqual({ label: 'Demand touch', icon: 'add' });
+    expect(kindMeta('web', 'upload_completed').label).toBe('Upload');
+    expect(kindMeta('web', 'demand_touch')).toEqual({ label: 'Notice', icon: 'bell' });
+    expect(kindMeta('journeys', 'something_new')).toEqual({ label: 'Notice', icon: 'bell' });
+    const [item] = mergeNotifications(
+      [],
+      [{ id: 'j3', kind: 'proposal_failed', title: 'PROP-0001: PDF could not be generated', createdAt: '2026-09-30T10:00:00Z', readAt: null }],
+    );
+    expect(item?.kind).toBe('proposal_failed');
   });
 });

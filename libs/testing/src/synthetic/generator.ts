@@ -1,5 +1,5 @@
 /**
- * Seeded, streaming generator of synthetic extractor rows (PRD Appendix C, 89 columns).
+ * Seeded, streaming generator of synthetic extractor rows (PRD Appendix C, 91 columns).
  *
  * - Deterministic: the same options give the same rows.
  * - Constant memory: rows are produced one at a time; only small ring buffers of earlier rows are
@@ -297,10 +297,20 @@ class DateTable {
   }
 }
 
+/** Synthetic crm_notes values (no personal data). */
+const SYNTHETIC_CRM_NOTES: readonly string[] = [
+  'Synthetic note: owner prefers calls after 6 pm',
+  'Synthetic note: keys with the society office',
+  'Synthetic note: revisit price next month',
+  'Synthetic note: broker says flexible on deposit',
+];
+
 export class SyntheticGenerator {
   readonly options: SyntheticOptions;
   private readonly rng: Rng;
   private readonly errorRng: Rng;
+  /** CR-012 columns (floor, crm_notes): a separate stream, so the other columns stay as they were per seed. */
+  private readonly extraRng: Rng;
   private readonly idKey: number;
   private readonly dates: DateTable;
   private idCounter = 0;
@@ -322,6 +332,7 @@ export class SyntheticGenerator {
     this.options = resolveOptions(input);
     this.rng = Rng.derive(this.options.seed, 'rows');
     this.errorRng = Rng.derive(this.options.seed, 'errors');
+    this.extraRng = Rng.derive(this.options.seed, 'cr012');
     this.idKey = Rng.derive(this.options.seed, 'ids').nextUint32() & 0xffffff;
     this.dates = new DateTable(this.options.dateFrom, this.options.dateTo);
     // Rows per draw: a repeat is 1 row; a new ad is 1 row, or meanSplit rows when split.
@@ -492,6 +503,7 @@ export class SyntheticGenerator {
       this.writeTags(row, tags, deadline);
       this.writeNonProperty(row, c, u);
       this.writeUnit(row, u, rng);
+      this.writePrivate(row, u);
       this.writeSource(row, source, timesSeen, lastSeen);
       row.needs_review = reasons.length > 0;
       row.review_reason = reasons.length > 0 ? reasons.join('; ') : null;
@@ -951,6 +963,16 @@ export class SyntheticGenerator {
       if (rng.chance(0.3)) u.yieldPct = Math.round(((u.currentRent * 12) / u.saleMin) * 1000) / 10;
     }
     if (u.priceText !== null && rng.chance(0.1)) u.priceText = `${u.priceText} negotiable`;
+  }
+
+  /** CR-012: building_name when the ad names one, sometimes a floor; a few rows carry synthetic crm_notes. */
+  private writePrivate(row: ExtractorRow, u: Unit): void {
+    const x = this.extraRng;
+    row.building_name = u.building;
+    if (u.building !== null && x.chance(0.4)) {
+      row.floor = x.chance(0.1) ? 'G' : x.chance(0.2) ? `${x.int(1, 20)} of 20` : String(x.int(1, 30));
+    }
+    if (x.chance(0.03)) row.crm_notes = x.pick(SYNTHETIC_CRM_NOTES);
   }
 
   private writeUnit(row: ExtractorRow, u: Unit, rng: Rng): void {

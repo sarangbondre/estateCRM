@@ -62,6 +62,11 @@ export interface NormalisedRow {
   reasons: Reason[];
   extractorNeedsReview: boolean;
   reviewReasonText: string | null;
+  /**
+   * The crm_notes text (CR-012): stored with the raw row, served only by the internal note endpoint, never sent to
+   * the model, never logged. PII.
+   */
+  crmNote: string | null;
   /** Text the classifier (rules, then model) reads: raw_text / free_text. PII. */
   classifierText: string | null;
   /** Mapping mode: scope, deal type or side still blank and there is text → model (§4.7 step 6). */
@@ -259,11 +264,15 @@ function checkRanges(fields: Record<string, unknown>, issues: RowIssue[], strict
   }
 }
 
+/** Longest crm_notes text kept (the note endpoint's contract limit). */
+export const CRM_NOTE_MAX = 4000;
+
+/** Returns the crm_notes text (CR-012); IntakeRow carries only the `hasCrmNotes` flag (plus the CR-006 crmNotes). */
 function finishCommon(
   fields: Record<string, unknown>,
   options: NormaliseOptions,
   get: (f: TargetField) => string | null,
-) {
+): string | null {
   if (options.locality && typeof fields['locality'] === 'string') {
     fields['locality'] = options.locality(fields['locality']) ?? fields['locality'];
   }
@@ -283,7 +292,10 @@ function finishCommon(
     fields['landAreaSqft'] =
       Math.round(fields['landAreaValue'] * (LAND_SQFT[fields['landAreaUnit']] ?? 0)) || null;
   }
-  fields['crmNotes'] = options.importCrmNotes ? cell.text(get('crm_notes')) : null;
+  const note = cell.text(get('crm_notes'))?.slice(0, CRM_NOTE_MAX) ?? null;
+  fields['crmNotes'] = options.importCrmNotes ? note : null;
+  fields['hasCrmNotes'] = note !== null;
+  return note;
 }
 
 const classificationOf = (f: Record<string, unknown>): Classification => ({
@@ -372,7 +384,7 @@ export function normaliseStrict(
     for (const i of result.issues) issues.push(issue(i.field, i.code, 'error', i.value, i.message));
   }
   checkRanges(fields, issues, true);
-  finishCommon(fields, options, get);
+  const crmNote = finishCommon(fields, options, get);
   fields['reviewReason'] = reviewText;
   const extractorNeedsReview = flag.ok && flag.value === true;
   if (extractorNeedsReview) {
@@ -390,6 +402,7 @@ export function normaliseStrict(
     reasons,
     extractorNeedsReview,
     reviewReasonText: reviewText,
+    crmNote,
     classifierText: cell.text(get('raw_text')),
     needsModel: false,
   };
@@ -495,7 +508,7 @@ export function normaliseMapping(
   setClassification(fields, c);
   if (!fields['rawText'] && text) fields['rawText'] = text;
   checkRanges(fields, issues, false);
-  finishCommon(fields, options, get);
+  const crmNote = finishCommon(fields, options, get);
   if (fields['routeTo'] === null && c.recordScope) fields['routeTo'] = routeFor(c.recordScope, c.side);
   const reviewText = cell.text(get('review_reason'));
   fields['reviewReason'] = reviewText;
@@ -529,6 +542,7 @@ export function normaliseMapping(
     reasons,
     extractorNeedsReview,
     reviewReasonText: reviewText,
+    crmNote,
     classifierText: text,
     needsModel: !isComplete(c) && text !== null,
   };

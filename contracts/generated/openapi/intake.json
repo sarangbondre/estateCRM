@@ -2002,6 +2002,113 @@
         ]
       }
     },
+    "/internal/v1/uploads/{uploadId}/rows/{rowNo}/note": {
+      "get": {
+        "operationId": "internalGetRowNote",
+        "summary": "The crm_notes text of one upload row (journeys note import, CR-012)",
+        "tags": [
+          "Internal"
+        ],
+        "description": "Service token minted by web (R-2) with aud=intake, sub=journeys. The note may contain PII; the response is never cached or logged. 404 not-found when the row has no note or raw rows were purged (retention).",
+        "security": [
+          {
+            "serviceToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "name": "uploadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "rowNo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Note text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "uploadId",
+                    "rowNo",
+                    "note"
+                  ],
+                  "properties": {
+                    "uploadId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "uploadCode": {
+                      "type": "string"
+                    },
+                    "rowNo": {
+                      "type": "integer"
+                    },
+                    "note": {
+                      "type": "string",
+                      "maxLength": 4000
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooMany"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "x-roles": [],
+        "x-rate-limit": "journeys drainers only; no user limit",
+        "x-timeout-ms": 2000,
+        "x-idempotency": "Safe, read-only.",
+        "x-emits": [],
+        "x-paginated": false,
+        "x-callers": [
+          "journeys"
+        ]
+      }
+    },
     "/internal/v1/uploads/{uploadId}/migration-map": {
       "get": {
         "operationId": "internalGetMigrationMap",
@@ -2855,6 +2962,9 @@
                 "segment",
                 "property_type",
                 "property_detail",
+                "building_name",
+                "floor",
+                "crm_notes",
                 "land_use",
                 "side",
                 "side_evidence",
@@ -3352,6 +3462,9 @@
                 "segment",
                 "property_type",
                 "property_detail",
+                "building_name",
+                "floor",
+                "crm_notes",
                 "land_use",
                 "side",
                 "side_evidence",
@@ -4065,6 +4178,26 @@
               "string",
               "null"
             ]
+          },
+          "buildingName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200,
+            "description": "Upload column building_name (CR-012). Private: dedup and proposals only, never public, redacted before any AI call."
+          },
+          "floor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40,
+            "description": "Upload column floor (CR-012). PII-sensitive (conventions §9): never public."
+          },
+          "hasCrmNotes": {
+            "type": "boolean",
+            "description": "The row carried a non-empty crm_notes value (CR-012). The text is served only by the note endpoint."
           },
           "landUse": {
             "type": [

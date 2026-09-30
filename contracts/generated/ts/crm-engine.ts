@@ -394,7 +394,7 @@ export interface components {
             flags: ("price_above_budget" | "reconfirm" | "area_basis_unknown" | "market_unknown")[];
             factors?: components["schemas"]["Factor"][];
             /** @enum {string|null} */
-            closedReason?: "leased_to_another_client" | "sold_to_another_client" | "offer_retired" | "demand_exited" | "merged" | "deal_closed" | "demand_closed" | "superseded" | "offer_expired" | "voided" | null;
+            closedReason?: "leased_to_another_client" | "sold_to_another_client" | "offer_retired" | "demand_exited" | "merged" | "deal_closed" | "demand_closed" | "superseded" | "offer_expired" | "voided" | "demand_expired" | "demand_paused" | null;
             /** @enum {string|null} */
             rejectedReason?: "too_expensive" | "wrong_location" | "too_small" | "too_large" | "timing" | "wrong_type" | "client_not_interested" | "already_seen" | "owner_unwilling" | "other" | null;
             /** @enum {string} */

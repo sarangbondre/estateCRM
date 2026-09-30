@@ -67,7 +67,7 @@ describe('split job', () => {
     const lines = decodeChunk(h.files.text(chunks[2]?.chunk_file_path ?? '') ?? '');
     expect(lines).toHaveLength(100);
     expect(lines[0]?.r).toBe(1001);
-    expect(lines[0]?.c).toHaveLength(89);
+    expect(lines[0]?.c).toHaveLength(91);
     const [started] = await h.events(t, 'upload.started.v1');
     expect(started).toMatchObject({ aggregateType: 'upload', aggregateId: u.id, aggregateVersion: 1 });
     expect(started?.data).toMatchObject({

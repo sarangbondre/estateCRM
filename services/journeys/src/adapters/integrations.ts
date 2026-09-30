@@ -1,5 +1,6 @@
-// Outbound adapters (LLD §2 adapters/records, listings, storage, pdf): records' existing GET endpoints and listings'
-// publication settings, both with a web-issued service token (R-2), behind timeouts, retries and circuit breakers.
+// Outbound adapters (LLD §2 adapters/records, listings, storage, pdf): records' existing GET endpoints, listings'
+// publication settings and intake's row-note endpoint (CR-012), all with a web-issued service token (R-2), behind
+// timeouts, retries and circuit breakers.
 import { createHash, randomBytes } from 'node:crypto';
 import { createServiceTokenClient } from '@11e/auth';
 import type { ServiceTokenClient } from '@11e/auth';
@@ -13,6 +14,7 @@ import type {
   ProposalContentPort,
   PublicationSettingsPort,
   TokenPort,
+  UploadNotesPort,
 } from '../application/ports.js';
 import type { Config } from '../config.js';
 import { createPdfRenderer } from './pdf.js';
@@ -89,6 +91,27 @@ export function createPublicationSettings(baseUrl: string, tokens: ServiceTokenC
   };
 }
 
+/**
+ * intake GET /internal/v1/uploads/{uploadId}/rows/{rowNo}/note (CR-012). The body may hold PII: it is returned to the
+ * caller only, never logged (the http client logs method, path, status and duration). 404 → null (no note or purged).
+ */
+export function createUploadNotes(baseUrl: string, tokens: ServiceTokenClient | null, obs: Observability): UploadNotesPort {
+  const clients = new Map<string, HttpClient>();
+  const make = client('intake', baseUrl, tokens, 'intake', obs);
+  return {
+    async rowNote(tenantId, uploadId, rowNo) {
+      let c = clients.get(tenantId);
+      if (!c) clients.set(tenantId, (c = make(tenantId)));
+      const r = await c.request<{ note?: string; uploadCode?: string }>(
+        `/internal/v1/uploads/${encodeURIComponent(uploadId)}/rows/${rowNo}/note`,
+      );
+      if (r.status === 404) return null;
+      if (r.status !== 200 || typeof r.body?.note !== 'string') throw new Error(`intake note: unexpected status ${r.status}`);
+      return { note: r.body.note, uploadCode: r.body.uploadCode ?? null };
+    },
+  };
+}
+
 export function createIntegrations(config: Config, obs: Observability): Integrations {
   const tokens = config.serviceCredential
     ? createServiceTokenClient({ webUrl: config.webUrl, credential: config.serviceCredential })
@@ -97,6 +120,7 @@ export function createIntegrations(config: Config, obs: Observability): Integrat
   return {
     content: createRecordsContent(config.recordsUrl, tokens, obs),
     publication: createPublicationSettings(config.listingsUrl, tokens, obs),
+    uploadNotes: createUploadNotes(config.intakeUrl, tokens, obs),
     storage,
     pdf: createPdfRenderer(),
     tokens: createTokens(config.ipHashSalt),

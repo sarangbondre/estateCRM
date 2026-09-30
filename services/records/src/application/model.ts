@@ -218,6 +218,8 @@ export interface OfferRow extends Versioned {
   review_reason_code: string | null;
   route_to_suggestion: string | null;
   sourced_for_demand_id: string | null;
+  /** The sourcing request (journeys) this offer was added for via add-supply (CR-012). */
+  sourcing_request_id: string | null;
   owner_user_id: string | null;
   ingested_record_id: string | null;
   source_ad_id: string | null;
@@ -369,6 +371,17 @@ export interface SourceAdRow extends Row {
   sender_phone_hash: string | null;
   split_count: number;
   purged_at: Date | null;
+}
+
+/** crm_notes of an upload row handed to journeys (CR-012): once per (upload, row); ids only, never the text. */
+export interface NoteImportRow {
+  id: string;
+  tenant_id: string;
+  upload_id: string;
+  row_no: number;
+  subject_type: 'offer' | 'demand' | 'person' | 'property';
+  subject_id: string;
+  created_at: Date;
 }
 
 export type SightingSubject = 'offer' | 'demand' | 'property' | 'person' | 'desk_item';
@@ -626,4 +639,5 @@ export interface Tables {
   upload_migrations: UploadMigrationRow;
   inbound_versions: InboundVersionRow;
   reveal_log: RevealLogRow;
+  note_imports: NoteImportRow;
 }
