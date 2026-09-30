@@ -2,6 +2,8 @@
 // queue-wrapper permissions, as the rules in data-hosting §2–3 require. Exit code 1 on any failure.
 // Local:  node infra/scripts/verify-platform.mjs
 // Pilot:  ADMIN_DATABASE_URL=... VERIFY_ROLE_URL_<SCHEMA>=... node infra/scripts/verify-platform.mjs
+// Admin connection only (e.g. the Deploy database workflow, before role passwords exist): VERIFY_ADMIN_ONLY=1 skips the
+// checks that log in as each service role.
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
@@ -85,8 +87,9 @@ try {
 }
 
 // Per-service isolation, run as the runtime role inside a rolled-back transaction.
+const ADMIN_ONLY = process.env['VERIFY_ADMIN_ONLY'] === '1';
 const probeMsg = JSON.stringify({ eventId: 'verify-platform', eventType: 'verify.probe.v1', data: {} });
-for (const svc of SERVICES) {
+for (const svc of ADMIN_ONLY ? [] : SERVICES) {
   const s = schemaOf(svc);
   const other = schemaOf(SERVICES.find((x) => x !== svc));
   let c;
@@ -135,7 +138,7 @@ for (const svc of SERVICES) {
 }
 
 // Migrator: DDL as <svc>_owner in its own schema only; new tables are granted to the runtime role by default privileges.
-for (const svc of SERVICES) {
+for (const svc of ADMIN_ONLY ? [] : SERVICES) {
   const s = schemaOf(svc);
   const other = schemaOf(SERVICES.find((x) => x !== svc));
   const url = process.env[`VERIFY_MIGRATOR_URL_${s.toUpperCase()}`] ?? localUrl(`${s}_migrator`);
@@ -179,12 +182,15 @@ try {
     if (rows[0].n < expected || !rows[0].active)
       throw new Error(`found ${rows[0].n} (expected ≥ ${expected}), active=${rows[0].active}`);
   });
-  await check('every service has a cron secret in Vault', async () => {
-    const { rows } = await sched.query("select name from vault.secrets where name like 'cron_secret_%'");
-    const names = new Set(rows.map((r) => r.name));
-    const missing = SERVICES.filter((s) => !names.has(`cron_secret_${schemaOf(s)}`));
-    if (missing.length) throw new Error(`missing: ${missing.join(', ')}`);
-  });
+  // Cron secrets are stored when the environment is configured (configure-environment.mjs), after the first deploy.
+  if (!ADMIN_ONLY) {
+    await check('every service has a cron secret in Vault', async () => {
+      const { rows } = await sched.query("select name from vault.secrets where name like 'cron_secret_%'");
+      const names = new Set(rows.map((r) => r.name));
+      const missing = SERVICES.filter((s) => !names.has(`cron_secret_${schemaOf(s)}`));
+      if (missing.length) throw new Error(`missing: ${missing.join(', ')}`);
+    });
+  }
   await check('service roles cannot touch the platform schema', async () => {
     const { rows } = await sched.query(
       "select r from unnest($1::text[]) r where has_schema_privilege(r, 'platform', 'usage')",
