@@ -8,12 +8,12 @@ import {
   linkExpiryDays,
   preparedForLabel,
 } from '../domain/proposals.js';
-import type { OfferContent, Snapshot, SnapshotPhoto } from '../domain/proposals.js';
+import type { FeedbackVerdict, OfferContent, Snapshot, SnapshotPhoto } from '../domain/proposals.js';
 import { rederiveDemand, rederiveOffer } from './derive.js';
 import { JourneyError, invalidTransition, notFoundErr, versionMismatchErr } from './errors.js';
 import type { ProposalLinkRow, ProposalOptionRow, ProposalRow } from './model.js';
 import { audit, notify } from './notify.js';
-import type { Integrations, Tx, TxRunner, WorkMessage } from './ports.js';
+import type { Integrations, ProposalWorkMessage, Tx, TxRunner } from './ports.js';
 import { closeItems, openItem, resolveAssignee } from './queue-ops.js';
 import { isUuid } from './views.js';
 
@@ -54,7 +54,7 @@ export async function proposalView(
       position: o.position,
       matchId: o.match_id,
       offerIds: o.offer_ids.slice(0, 3),
-      feedback: (o.feedback === 'maybe' ? null : (o.feedback as 'liked' | null)) ?? null,
+      feedback: (o.feedback as FeedbackVerdict | null) ?? null,
       feedbackNote: o.feedback_note,
     })),
     coverNote: p.cover_note,
@@ -104,7 +104,7 @@ async function validateOptions(
   return out.sort((a, b) => a.position - b.position);
 }
 
-const buildMsg = (tx: Tx, proposalId: string): WorkMessage => ({
+const buildMsg = (tx: Tx, proposalId: string): ProposalWorkMessage => ({
   kind: 'build_snapshot',
   tenantId: tx.tenantId,
   proposalId,
@@ -422,14 +422,14 @@ export interface WorkDeps {
   integrations: Integrations;
 }
 
-async function failProposal(deps: WorkDeps, msg: WorkMessage, what: 'snapshot' | 'pdf') {
+async function failProposal(deps: WorkDeps, msg: ProposalWorkMessage, what: 'snapshot' | 'pdf') {
   await deps.runner.run(msg.tenantId, { correlationId: msg.correlationId }, async (tx) => {
     const p = await tx.rows.get('proposals', msg.proposalId, { forUpdate: true });
     if (!p) return;
     if (what === 'snapshot') await tx.rows.update('proposals', p.id, { status: 'Failed' });
     else await tx.rows.update('proposals', p.id, { pdf_status: 'failed' });
     await notify(tx, p.created_by, {
-      kind: 'proposal_opened',
+      kind: 'proposal_failed',
       title: `${p.code}: ${what === 'snapshot' ? 'content could not be prepared' : 'PDF could not be generated'}`,
       subject: { type: 'proposal', id: p.id, code: p.code },
     });
@@ -441,7 +441,7 @@ async function failProposal(deps: WorkDeps, msg: WorkMessage, what: 'snapshot' |
  * copies up to 30 photos per option into the private bucket, and freezes an allow-listed snapshot → Ready. After 3
  * failed attempts → Failed with a notification (snapshot-failed).
  */
-export async function buildSnapshot(deps: WorkDeps, msg: WorkMessage, attempt: number): Promise<void> {
+export async function buildSnapshot(deps: WorkDeps, msg: ProposalWorkMessage, attempt: number): Promise<void> {
   const loaded = await deps.runner.run(msg.tenantId, { correlationId: msg.correlationId }, async (tx) => {
     const p = await tx.rows.get('proposals', msg.proposalId);
     if (!p || p.status !== 'Preparing') return null;
@@ -512,7 +512,7 @@ export async function buildSnapshot(deps: WorkDeps, msg: WorkMessage, attempt: n
 }
 
 /** render_pdf: renders the frozen snapshot and stores journeys-proposals/{tenant}/{proposalId}/{code}.pdf. */
-export async function renderPdf(deps: WorkDeps, msg: WorkMessage, attempt: number): Promise<void> {
+export async function renderPdf(deps: WorkDeps, msg: ProposalWorkMessage, attempt: number): Promise<void> {
   const p = await deps.runner.run(msg.tenantId, { correlationId: msg.correlationId }, (tx) =>
     tx.rows.get('proposals', msg.proposalId),
   );

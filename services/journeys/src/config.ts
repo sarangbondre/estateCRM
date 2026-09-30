@@ -3,7 +3,7 @@
 export const SERVICE = 'journeys';
 export const SCHEMA = 'journeys';
 /** Newest file in migrations/ (a test keeps them in step). /health/ready reports "behind" until it is applied. */
-export const EXPECTED_MIGRATION = '0005';
+export const EXPECTED_MIGRATION = '0006';
 
 export interface Config {
   port: number;
@@ -12,7 +12,7 @@ export interface Config {
   cronSecret: string;
   /** web's JWKS (service tokens, R-2). */
   jwksUrl: string;
-  /** This service's credential for web POST /internal/v1/service-tokens (records and listings reads). */
+  /** This service's credential for web POST /internal/v1/service-tokens (records, listings and intake reads). */
   serviceCredential: string | undefined;
   webUrl: string;
   environment: string;
@@ -20,6 +20,8 @@ export interface Config {
   recordsUrl: string;
   /** listings base URL (GET /v1/publication-settings). Local: the contract mock. */
   listingsUrl: string;
+  /** intake base URL (GET /internal/v1/uploads/{uploadId}/rows/{rowNo}/note, CR-012). Local: the contract mock. */
+  intakeUrl: string;
   /** Base of web's public proposal route: `${publicBaseUrl}/p/{token}`. */
   publicBaseUrl: string;
   /** Salt for proposal-link open IP hashes (secret; rotated monthly with the month mixed in). */
@@ -58,6 +60,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     environment,
     recordsUrl: get('RECORDS_URL') ?? 'http://127.0.0.1:4012',
     listingsUrl: get('LISTINGS_URL') ?? 'http://127.0.0.1:4015',
+    intakeUrl: get('INTAKE_URL') ?? 'http://127.0.0.1:4011',
     publicBaseUrl: get('PUBLIC_BASE_URL') ?? webUrl,
     ipHashSalt: salt ?? 'local-only-salt',
     supabaseUrl: get('SUPABASE_URL'),

@@ -2,7 +2,7 @@
 
 Work management for 11estates CRM (HLD S3): My queue and call ranking, the life curve of every live offer and
 demand, the Commercial axis and demand exits, sourcing requests, proposals (snapshot, PDF, share link), site visits,
-deals, lease renewals, work notifications and Watchlist tasks.
+deals, lease renewals, work notifications, Watchlist tasks and notes imported from upload rows (CR-012).
 
 Service owner: see CODEOWNERS. Design: [docs/04-lld/journeys.md](../../docs/04-lld/journeys.md). Contract:
 [contracts/openapi/journeys.yaml](../../contracts/openapi/journeys.yaml) (60 operations, all implemented). Events:
@@ -14,12 +14,12 @@ Service owner: see CODEOWNERS. Design: [docs/04-lld/journeys.md](../../docs/04-l
 pnpm db:start && pnpm db:env > .env.local     # once, from the repo root
 pnpm --filter @11e/journeys migrate            # needs MIGRATOR_DATABASE_URL (= JOURNEYS_MIGRATOR_DATABASE_URL)
 pnpm --filter @11e/journeys dev                # http://127.0.0.1:3003
-pnpm mock records listings                     # records (4012) and listings (4015) contract mocks for proposals
+pnpm mock records listings intake              # records (4012), listings (4015), intake (4011) contract mocks
 pnpm --filter @11e/journeys test               # unit + integration + contract tests on the local database
 ```
 
 Tests apply the migrations once (vitest globalSetup), use a fresh tenant per file, a controllable clock and fake
-records/listings/storage/PDF ports, deliver events straight to the application handlers (no dependency on the shared
+records/listings/intake/storage/PDF ports, deliver events straight to the application handlers (no dependency on the shared
 queues) and validate every response against the contract and every produced event against AsyncAPI. The `test`
 script also fails when any contract operation was not exercised with both a success and an error status.
 
@@ -33,9 +33,10 @@ Performance (opt-in): `PERF_SUBJECTS=1000000 pnpm --filter @11e/journeys exec vi
 | `DATABASE_URL` | `JOURNEYS_DATABASE_URL` from `pnpm db:env` | pooler URL with the `journeys_svc` role |
 | `CRON_SECRET` | `JOURNEYS_CRON_SECRET` | must equal Vault `cron_secret_journeys` |
 | `WEB_URL` / `JWKS_URL` | http://127.0.0.1:3000 | service tokens (R-2) |
-| `SERVICE_CREDENTIAL` | — | web `POST /internal/v1/service-tokens` credential (records and listings reads) |
+| `SERVICE_CREDENTIAL` | — | web `POST /internal/v1/service-tokens` credential (records, listings and intake reads) |
 | `RECORDS_URL` | http://127.0.0.1:4012 | proposal snapshot: `GET /v1/offers/{id}`, `/v1/properties/{id}[/photos]` |
 | `LISTINGS_URL` | http://127.0.0.1:4015 | `GET /v1/publication-settings` (MahaRERA number; "registration pending" when absent) |
+| `INTAKE_URL` | http://127.0.0.1:4011 | imported notes: `GET /internal/v1/uploads/{uploadId}/rows/{rowNo}/note` (CR-012) |
 | `PUBLIC_BASE_URL` | `WEB_URL` | share links are `${PUBLIC_BASE_URL}/p/{token}` (web's public route) |
 | `IP_HASH_SALT` | local-only value | required outside local/test; link-open IP hashes (month mixed in) |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | — | Storage REST (private bucket `STORAGE_BUCKET`, default `journeys-proposals`) |
@@ -45,25 +46,30 @@ Performance (opt-in): `PERF_SUBJECTS=1000000 pnpm --filter @11e/journeys exec vi
 
 ## Owned data
 
-Schema `journeys` (owner `journeys_owner`, runtime role `journeys_svc`), migrations `0001`–`0005`:
+Schema `journeys` (owner `journeys_owner`, runtime role `journeys_svc`), migrations `0001`–`0006`:
 
 - Projections built from events: `offer_view`, `demand_view`, `match_view` + `match_offers`, `person_state`,
   `subject_contacts`, `staff_users` (versions per kind of data; stale events ignored).
 - Work state: `life_curve`, `offer_journey`, `demand_journey`, `queue_items` + `queue_counters`, `capacities`, `calls`,
   `demand_gap`, `source_quality`, `sourcing_requests`, `proposals` (+ options, links, opens), `site_visits`, `deals` +
-  `deal_events`, `lease_renewals`, `notifications`, `watchlist_tasks`, `settings`.
+  `deal_events`, `lease_renewals`, `notifications`, `watchlist_tasks`, `subject_notes` (crm_notes imported from upload
+  rows, one per (upload, row), labelled "imported from upload <code>"; CR-012), `settings`.
 - Technical: `outbox`, `processed_events`, `idempotency_keys`, `job_leases`, `job_runs`, `aggregate_versions`
   (strictly increasing `aggregateVersion` per produced aggregate), `merge_log`, `code_sequences`.
 
 PII (never logged, never in events): `calls.notes`, free-text notes and reasons on SRQs, proposals, options, visits,
-deals, exits, qualification and Watchlist outcomes; `staff_users.display_name`. `retention-purge` nulls free text after
+deals, exits, qualification and Watchlist outcomes, `subject_notes.note` (imported crm_notes); `staff_users.display_name`. `retention-purge` nulls free text after
 24 months, deletes notifications and link opens after 90 days and proposal snapshots/PDFs after 24 months.
 
 ## Queues and events
 
-- Event queue `q_journeys`: consumes the 25 events routed to it (records offer/demand facts, merges, people flags,
-  Watchlist items, enquiries, price sheets; crm-engine matches and matching runs; listings publication; web users).
-- Work queue `q_journeys_work`: proposal snapshots and PDFs (off the request path, 3 attempts → Failed).
+- Event queue `q_journeys`: consumes the 26 events routed to it (records offer/demand facts, merges, people flags,
+  Watchlist items, enquiries, price sheets, imported notes; crm-engine matches and matching runs; listings publication; web users).
+- Work queue `q_journeys_work`: proposal snapshots and PDFs (off the request path, 3 attempts → Failed), and
+  imported-note fetches (CR-012): `record.note_imported.v1` carries ids only; the work item reads the text from intake
+  with a service token (404 = no note or purged → nothing recorded), stores it once per (upload, row) on the subject
+  (the survivor when journeys knows it was merged), and retries while an offer/demand is not yet known to journeys
+  (out of order; kept anyway from the 3rd attempt). Other intake failures retry with backoff, then dead-letter.
 - Publishes (transactional outbox): `offer.confirmed`, `demand.confirmed`, `lifecycle.stage_changed`,
   `offer.commercial_status_changed`, `offer.retired`, `demand.qualified`, `demand.status_changed`, `demand.exited`,
   `demand.reactivated`, `demand.sourcing_started`, `sourcing_request.created|updated`, `proposal.sent`,
@@ -72,6 +78,12 @@ deals, exits, qualification and Watchlist outcomes; `staff_users.display_name`. 
 - Scheduled jobs (infra/schedules.yaml): `life-curve-nightly` (only rows with `next_change_on ≤ today`; applies new
   thresholds), `demand-gap-refresh`, `rank-refresh`, `lease-renewal-scan`, `dormant-revisit`, `follow-up-reminders`,
   `queue-counts-flush` (≤ 1 `queue.counts_changed.v1` per user per minute), `retention-purge`.
+
+## Notifications
+
+Kinds follow the contract (`Notification.kind`). CR-012 replaced three stand-ins: `queue_reassigned` (a deactivated
+user's open items were reassigned; Managers), `proposal_failed` (snapshot or PDF failed after 3 attempts; creator),
+`demand_touch` (another touch on a demand; owner).
 
 ## Observability
 

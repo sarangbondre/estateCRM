@@ -373,6 +373,19 @@ export interface NotificationRow extends Common {
   read_at: Date | null;
 }
 
+/** CR-012: a crm_notes value imported from an upload row (one per upload row). `note` is PII possible. */
+export interface SubjectNoteRow extends Common {
+  subject_type: 'offer' | 'demand' | 'person' | 'property';
+  subject_id: string;
+  source: 'upload';
+  upload_id: string;
+  upload_code: string | null;
+  row_no: number;
+  label: string;
+  note: string | null;
+  imported_at: Date;
+}
+
 export interface WatchlistTaskRow extends Common, Versioned {
   watchlist_item_id: string;
   watchlist_code: string | null;
@@ -429,6 +442,7 @@ export interface Tables {
   lease_renewals: LeaseRenewalRow;
   notifications: NotificationRow;
   watchlist_tasks: WatchlistTaskRow;
+  subject_notes: SubjectNoteRow;
   settings: SettingsRow;
   merge_log: MergeLogRow;
 }
@@ -492,4 +506,6 @@ type DefaultedOf<T extends TableName> = T extends 'offer_view'
                                                   ? 'budget_p10' | 'budget_p25' | 'budget_p75' | 'budget_p90'
                                                   : T extends 'proposal_link_opens'
                                                     ? 'ip_hash' | 'ua_family'
-                                                    : never;
+                                                    : T extends 'subject_notes'
+                                                      ? 'source' | 'upload_code' | 'note'
+                                                      : never;

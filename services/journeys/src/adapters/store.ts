@@ -868,6 +868,7 @@ function makeQueries(db: Db, t: string): Queries {
             ['site_visits', 'notes'],
             ['deal_events', 'note'],
             ['proposals', 'cover_note'],
+            ['subject_notes', 'note'],
           ] as const) {
             const r = await sql`update ${ident(table)} set ${ident(col)} = null where id in (select id from ${ident(table)}
               where tenant_id = ${t} and ${ident(col)} is not null and updated_at < ${before} limit ${limit})`.execute(db);
@@ -898,6 +899,23 @@ function makeQueries(db: Db, t: string): Queries {
       await sql`update life_curve set next_change_on = ${today} where tenant_id = ${t} and id = any(${uuidArray(rows.map((r) => r.id))})
         and stage <> 'Paused' and (next_change_on is null or next_change_on > ${today})`.execute(db);
       return rows.length < limit ? null : (rows.at(-1)?.id ?? null);
+    },
+
+    // -------------------------------------------------------------------------------------- imported notes (CR-012)
+    async noteOfUploadRow(uploadId, rowNo) {
+      return firstOf(
+        sql<Tables['subject_notes']>`select * from subject_notes where tenant_id = ${t} and upload_id = ${uploadId}
+          and row_no = ${rowNo}`,
+        db,
+      );
+    },
+    async insertSubjectNote(row) {
+      const r = await sql`insert into subject_notes (id, tenant_id, subject_type, subject_id, source, upload_id, upload_code,
+          row_no, label, note, imported_at)
+        values (${uuidv7()}, ${t}, ${row.subject_type}, ${row.subject_id}, ${row.source ?? 'upload'}, ${row.upload_id},
+          ${row.upload_code ?? null}, ${row.row_no}, ${row.label}, ${row.note ?? null}, ${row.imported_at})
+        on conflict (tenant_id, upload_id, row_no) do nothing`.execute(db);
+      return Number(r.numAffectedRows ?? 0) > 0;
     },
 
     // ------------------------------------------------------------------------------------------------ merges
