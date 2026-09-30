@@ -12,7 +12,11 @@ const ACTION = {
 export async function onProposalFeedback(
   store: Store,
   tenantId: string,
-  e: { proposalId: string; demandId: string; feedback: { matchId: string; verdict: keyof typeof ACTION }[] },
+  e: {
+    proposalId: string;
+    demandId: string;
+    feedback: { matchId: string; verdict: keyof typeof ACTION | 'maybe' }[];
+  },
   at: Date,
 ): Promise<number> {
   const verdicts = e.feedback.slice(0, 100);
@@ -26,6 +30,7 @@ export async function onProposalFeedback(
   );
   let written = 0;
   for (const f of verdicts) {
+    if (f.verdict === 'maybe') continue; // CR-012: "maybe" is neutral, so nothing to learn for the weights
     const m = matches.get(f.matchId);
     if (!m) continue; // unknown or purged match: nothing to learn from
     await store.feedback.insert(tenantId, {
