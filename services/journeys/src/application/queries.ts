@@ -24,8 +24,10 @@ import type {
   SourcingRequestRow,
   StaffUserRow,
   SubjectContactRow,
+  SubjectNoteRow,
   WatchlistTaskRow,
 } from './model.js';
+import type { NewRow } from './model.js';
 
 export interface CloseFilter {
   ids?: readonly string[];
@@ -187,6 +189,12 @@ export interface Queries {
 
   /** Sets next_change_on = today for live curves of the given categories (keyset by id); returns the last id seen. */
   rearmCurves(categoryKeys: readonly string[], afterId: string | null, today: IsoDate, limit: number): Promise<string | null>;
+
+  // imported notes (CR-012)
+  /** The note imported from an upload row, if any (unique index subject_notes_upload_row). */
+  noteOfUploadRow(uploadId: string, rowNo: number): Promise<SubjectNoteRow | undefined>;
+  /** Inserts unless the upload row already has a note; true when inserted. */
+  insertSubjectNote(row: NewRow<'subject_notes'>): Promise<boolean>;
 
   // merges
   repoint(mergeId: string, target: RepointTarget, from: string, to: string, limit: number): Promise<number>;

@@ -52,9 +52,9 @@ export function makeUser(p: Partial<User> = {}): User {
     status: 'active',
     invitedBy: null,
     invitedAt: null,
-    activatedAt: new Date('2026-09-01T00:00:00Z'),
+    activatedAt: new Date(Date.now() - 30 * 86_400_000),
     deactivatedAt: null,
-    lastSeenAt: new Date('2026-09-28T05:59:00Z'),
+    lastSeenAt: new Date(Date.now() - 60_000), // relative: harness() runs on the real clock (12 h idle window)
     version: 1,
     ...p,
   };

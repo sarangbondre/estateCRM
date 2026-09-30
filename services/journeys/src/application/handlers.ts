@@ -21,6 +21,7 @@ import { demandCells, demandFacts, isContacted, offerCell, offerFacts, sameCell,
 import type { GapCell } from './facts.js';
 import { applyMerge, undoMerge } from './merges.js';
 import type { DemandViewRow, OfferViewRow } from './model.js';
+import { noteImported } from './notes.js';
 import { notify } from './notify.js';
 import { SYSTEM_ACTOR } from './ports.js';
 import type { Tx } from './ports.js';
@@ -347,7 +348,7 @@ async function demandTouchAdded(tx: Tx, e: Incoming<'demand.touch_added.v1'>) {
   });
   if (!e.data.isFirstTouch) {
     await notify(tx, view.owner_user_id, {
-      kind: 'enquiry',
+      kind: 'demand_touch',
       title: `Another touch on ${view.code} via ${e.data.sourceType}`.slice(0, 200),
       subject: { type: 'demand', id: view.id, code: view.code },
     });
@@ -407,7 +408,7 @@ async function userChanged(tx: Tx, e: Incoming<'user.changed.v1'>) {
     }
     for (const m of await tx.q.activeStaffByRole(['Manager'], 20)) {
       await notify(tx, m.id, {
-        kind: 'watchlist_task',
+        kind: 'queue_reassigned',
         title: `${items.length} queue items reassigned from a deactivated user`,
         subject: null,
       });
@@ -730,4 +731,5 @@ export const handlers: HandlerMap = {
   'match.reopened.v1': matchReopened,
   'match.flagged.v1': matchFlagged,
   'demand.matching_completed.v1': demandMatchingCompleted,
+  'record.note_imported.v1': noteImported,
 };

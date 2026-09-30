@@ -16,7 +16,11 @@ export type NotificationKind =
   | 'proposal_opened'
   | 'visit_scheduled'
   | 'dormant_revisit'
-  | 'watchlist_task';
+  | 'watchlist_task'
+  // CR-012: dedicated kinds for situations that used stand-ins before (watchlist_task, proposal_opened, enquiry)
+  | 'queue_reassigned'
+  | 'proposal_failed'
+  | 'demand_touch';
 
 export interface NotifySpec {
   kind: NotificationKind;

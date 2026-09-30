@@ -2,7 +2,7 @@
 // C-13 Proposal card (PRD §5.4, US-23, D-11; journeys LLD §4.6). Pick options from the demand's confirmed matches →
 // preview → create (content snapshot is built off the request path: Preparing → Ready) → Generate PDF (queued, polled)
 // and/or a private share link (14 days, shown once) → Mark sent (logs date and channel; the system sends nothing) →
-// client feedback per option. "Maybe" (questionnaire C3) is shown but not recordable yet (LLD gap G-13).
+// client feedback per option, incl. the neutral "Maybe" (questionnaire C3, CR-012).
 // journeys: getDemandJourney, listProposals, createProposal, getProposal, generateProposalPdf, getProposalPdf,
 // createProposalShareLink, markProposalSent, recordProposalFeedback; crm-engine: listDemandMatches (Confirmed).
 import { useEffect, useState } from 'react';
@@ -14,7 +14,7 @@ import { date, relative } from '../../lib/format';
 import type { CardProps, ShellActions } from '../../shell/types';
 import { ActionButton, Card, Chip, Done, ErrorNote, Field, Loading, useAction } from '../Card';
 import { Checkbox, RecordLink, Select } from '../common';
-import { allowed, buildFeedback, buildProposal, FEEDBACK, ROLES, SENT_CHANNELS } from './logic';
+import { allowed, buildFeedback, buildProposal, FEEDBACK, feedbackLabel, ROLES, SENT_CHANNELS } from './logic';
 import type { FeedbackChoice } from './logic';
 import { JourneyChips, Note, Problems, TextArea, useDemandJourney } from './shared';
 
@@ -247,7 +247,6 @@ function FeedbackBox({
   const [choice, setChoice] = useState<Record<number, FeedbackChoice | null>>({});
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [errors, setErrors] = useState<string[]>([]);
-  const [skipped, setSkipped] = useState<number[]>([]);
   const entries = proposal.options.map((o) => ({
     position: o.position,
     feedback: choice[o.position] ?? null,
@@ -267,7 +266,7 @@ function FeedbackBox({
       {proposal.options.map((o) => (
         <div key={o.position} className="form-grid">
           <Select
-            label={`Option ${o.position}: ${optionLabel(o.matchId, o.offerIds, matches)}${o.feedback ? ` (recorded: ${o.feedback.replace('_', ' ')})` : ''}`}
+            label={`Option ${o.position}: ${optionLabel(o.matchId, o.offerIds, matches)}${o.feedback ? ` (recorded: ${feedbackLabel(o.feedback)})` : ''}`}
             value={choice[o.position] ?? null}
             options={FEEDBACK}
             onChange={(v) => setChoice({ ...choice, [o.position]: v as FeedbackChoice | null })}
@@ -281,9 +280,6 @@ function FeedbackBox({
         </div>
       ))}
       <Problems errors={errors} />
-      {skipped.length > 0 && (
-        <Note>Option(s) {skipped.join(', ')} marked Maybe were not recorded (the service accepts Liked / Rejected / Wants a visit).</Note>
-      )}
       {act.error !== undefined && <ErrorNote error={act.error} onRetry={() => void act.run()} />}
       <ActionButton
         pending={act.pending}
@@ -291,7 +287,6 @@ function FeedbackBox({
         onClick={() => {
           const built = buildFeedback(entries);
           setErrors('errors' in built ? built.errors : []);
-          setSkipped('errors' in built ? [] : built.skipped);
           if (!('errors' in built)) void act.run();
         }}
       >

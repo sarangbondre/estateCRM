@@ -17,6 +17,7 @@ const OFFER_TARGETS: RepointTarget[] = [
   { table: 'proposal_options', column: 'offer_ids', kind: 'array' },
   { table: 'sourcing_requests', column: 'offer_ids', kind: 'array' },
   { table: 'subject_contacts', column: 'subject_id', kind: 'scalar' },
+  { table: 'subject_notes', column: 'subject_id', kind: 'scalar' },
 ];
 const DEMAND_TARGETS: RepointTarget[] = [
   { table: 'calls', column: 'subject_id', kind: 'scalar' },
@@ -26,11 +27,15 @@ const DEMAND_TARGETS: RepointTarget[] = [
   { table: 'deals', column: 'demand_id', kind: 'scalar' },
   { table: 'match_view', column: 'demand_id', kind: 'scalar' },
   { table: 'subject_contacts', column: 'subject_id', kind: 'scalar' },
+  { table: 'subject_notes', column: 'subject_id', kind: 'scalar' },
 ];
 const PERSON_TARGETS: RepointTarget[] = [
   { table: 'calls', column: 'person_id', kind: 'scalar' },
   { table: 'subject_contacts', column: 'person_id', kind: 'scalar' },
+  { table: 'subject_notes', column: 'subject_id', kind: 'scalar' },
 ];
+/** Imported notes (CR-012) are the only journeys data keyed by a property. */
+const PROPERTY_TARGETS: RepointTarget[] = [{ table: 'subject_notes', column: 'subject_id', kind: 'scalar' }];
 
 async function mergeQueueItems(tx: Tx, mergeId: string, subjectType: 'offer' | 'demand', from: string, to: string) {
   // Duplicate open items collapse into the survivor's; the rest move over.
@@ -71,7 +76,10 @@ async function mergeCurves(tx: Tx, mergeId: string, subjectType: 'offer' | 'dema
 export async function applyMerge(tx: Tx, d: EventDataMap['records.merged.v1']): Promise<void> {
   const to = d.survivorId;
   const mergedIds = uuids(d.mergedIds).filter((id) => id !== to);
-  if (d.aggregateType === 'property') return;
+  if (d.aggregateType === 'property') {
+    for (const from of mergedIds) for (const t of PROPERTY_TARGETS) await tx.q.repoint(d.mergeId, t, from, to, 1000);
+    return;
+  }
   if (d.aggregateType === 'person') {
     const survivor = await tx.rows.get('person_state', to);
     for (const from of mergedIds) {
