@@ -56,5 +56,6 @@ Change requests:
 - CR-010: APPROVED 2026-09-28, auto-approved (technical): intake xlsx reader, sharp for renditions (pending), no btree_gin
 - CR-011: APPROVED 2026-09-30 (all accepted; BHK changed to ±1)
 - CR-012: APPROVED 2026-09-30 (building_name + floor, maybe, import crm_notes, six small additions). PRD v0.7 + contract delta written; implemented and merged 2026-09-30 (#79, with #80–#82). Follow-up: journeys GET /v1/notes + Notes panel section (imported notes stored, not yet shown). Awaiting re-approval of Stage 2 (PRD v0.7) and Stage 4 (contract delta)
+- CR-013: AWAITING `APPROVED: CR-013`: host as one Vercel project with Services (root vercel.json); choices confirmed 2026-09-30
 
 Open change requests: none

@@ -32,29 +32,29 @@ that session. You do every step that involves signing in, passwords or secrets. 
    - Redirect URLs: `http://localhost:3000/auth/callback`, `https://*-sarangbondre.vercel.app/auth/callback`,
      `https://crm.11estates.in/auth/callback`
 
-## 2. Vercel (personal account) (≈ 5 minutes)
+## 2. Vercel (personal account) (≈ 10 minutes). One project with Vercel Services (CR-013)
 1. Open **https://vercel.com/signup** → **Continue with GitHub** (the `sarangbondre` account) → *Hobby* plan.
-2. In your terminal: `npx vercel@60 login` → approve in the browser.
-3. **Account Settings → Tokens → Create:** name `terraform-11e-crm`, scope your personal account, expiry 90 days. Copy it
-   into your terminal only: `export VERCEL_API_TOKEN=…` (or 1Password). Don't send it in chat.
-4. Claude creates the 7 projects (`web`, `intake`, `records`, `journeys`, `crm-engine`, `listings`, `insight`) in region
-   `bom1` with Terraform and links them to the GitHub repo.
-   Project settings, verified with an offline `vercel build` of all 7 projects on 2026-09-28 (each service bundle was
-   also started and answered `/health/ready` 200):
+2. **Add New → Project → import `sarangbondre/estateCRM`**. Leave Root Directory at the repository root and the framework on
+   auto. The root `vercel.json` defines everything: 7 services (`web`, `intake`, `records`, `journeys`, `crm-engine`,
+   `listings`, `insight`), region `bom1`, pnpm 12, a 60 s limit, the bindings and the public routes. Enable Services (Beta) if
+   the dashboard asks.
+3. What is public (everything else is internal and reachable only through bindings):
 
-   | Setting | web | intake, records, journeys, crm-engine, listings, insight |
+   | Public path | Service | Used by |
    |---|---|---|
-   | Root Directory | `services/web` | `services/<service>` |
-   | Framework Preset | Next.js | Other (API-only; `vercel.json` sets an empty `public/` output) |
-   | Install Command | `pnpm install --frozen-lockfile` | same |
-   | Build Command | `pnpm turbo run build --filter=@11e/web...` | `pnpm turbo run build --filter=@11e/<service>...` |
-   | Node.js version | 24.x | 24.x |
-   | Region | `bom1` (from `vercel.json`) | `bom1`, functions 60 s (from `vercel.json`) |
+   | `/public/v1/{listings,projects,demand-posts,changes}…` | listings (`/public` stripped) | 11estates.in website, `X-Api-Key` |
+   | `/svc/<service>/internal/v1/{relay,drain/…,jobs/…}`, `/svc/<service>/health/…` | that service (`/svc/<service>` stripped) | Supabase pg_cron scheduler, `X-Cron-Secret` |
+   | everything else | web | staff app + gateway |
 
-   Enable "Include files outside the root directory" (the default for monorepos): the build uses `libs/` and `contracts/`.
-5. **Environment variables** that you enter yourself in each project's *Settings → Environment Variables*, when Claude
-   tells you which: the database passwords for each service role (Claude generates them into a local, git-ignored file,
-   and you paste them), and `HF_TOKEN` (section 4).
+4. **Environment variables** (Project → Settings → Environment Variables, Production and Preview). You type the secrets;
+   Claude gives you the list. Don't set the binding variables (`RECORDS_URL`, `INTAKE_URL`, `JOURNEYS_URL`, `LISTINGS_URL`,
+   `WEB_URL`, `SVC_<SERVICE>_URL`): Vercel injects them. Per-service values use the service prefix, e.g.
+   `RECORDS_DATABASE_URL`, `RECORDS_CRON_SECRET` (the services read `<SERVICE>_<NAME>` as well as the plain name).
+   **Variables are shared by all 7 services in one project: never set a plain `DATABASE_URL`, `CRON_SECRET`, `POOL_MAX` or
+   `SERVICE_CREDENTIAL`.** The plain name wins over the prefixed one, so one value would reach every service.
+5. Offline check: `vercel build` of the whole services project succeeds (2026-09-30). `vercel dev -L` (beta) couldn't start
+   all 7 services locally (its dependency installer crashes), so use `pnpm dev` locally. The first preview deployment is the
+   routing test.
 
 ## 3. Google sign-in (≈ 10 minutes)
 1. Open **https://console.cloud.google.com** → create a project `11 Estates CRM`.
@@ -89,7 +89,7 @@ ready for the session. **Don't paste it in chat**; you'll type it into the shell
 - Deploy all 7 services, then configure the scheduler and alarms. **You** type the secrets into your own shell; they
   are never written to a file:
   ```bash
-  ADMIN_DATABASE_URL=… ENVIRONMENT_NAME=pilot RECORDS_BASE_URL=https://… RECORDS_CRON_SECRET=… (one pair per service) \
+  ADMIN_DATABASE_URL=… ENVIRONMENT_NAME=pilot RECORDS_BASE_URL=https://<your-domain>/svc/records RECORDS_CRON_SECRET=… (one pair per service; base URL = https://<your-domain>/svc/<service>) \
   ALARM_WEBHOOK_URL=… SCHEDULES=on node infra/scripts/configure-environment.mjs
   ```
   Each `<SERVICE>_CRON_SECRET` is the same value as that Vercel project's `CRON_SECRET`. Generate each one with
