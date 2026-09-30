@@ -1,0 +1,54 @@
+# Deploy the database (Supabase, cloud): platform setup (schemas, roles, queues, schedules, alarms, buckets), then every
+# service's migrations, then the platform checks. Run it by hand: Actions → "deploy-database" → Run workflow.
+# Needs one repository secret, SUPABASE_DB_URL: Supabase → Connect → "Session pooler" connection string (port 5432) with
+# the database password filled in. Safe to re-run: every step is idempotent.
+name: deploy-database
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type "pilot" to deploy to the pilot database
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: deploy-database
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.event.inputs.confirm == 'pilot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: pilot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.118.0
+      - run: pnpm install --frozen-lockfile
+      - name: Build the migration runner
+        run: pnpm turbo run build --filter=@11e/db
+      - name: Connection string (TLS, no password in logs)
+        env:
+          RAW: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$RAW" ]; then echo "::error::Add the SUPABASE_DB_URL repository secret first"; exit 1; fi
+          case "$RAW" in *sslmode=*) URL="$RAW" ;; *\?*) URL="$RAW&sslmode=no-verify" ;; *) URL="$RAW?sslmode=no-verify" ;; esac
+          echo "::add-mask::$URL"
+          echo "DB_URL=$URL" >> "$GITHUB_ENV"
+      - name: Platform setup (infra/supabase/migrations)
+        run: supabase --workdir infra db push --db-url "$DB_URL" --include-all --yes
+      - name: Service migrations
+        run: |
+          for svc in web intake records journeys crm-engine listings insight; do
+            schema=$(echo "$svc" | tr - _)
+            echo "== $svc"
+            (cd "services/$svc" && MIGRATOR_DATABASE_URL="$DB_URL" node ../../libs/db/dist/cli/migrate.js --schema "$schema" --dir migrations)
+          done
+      - name: Platform checks
+        run: ADMIN_DATABASE_URL="$DB_URL" VERIFY_ADMIN_ONLY=1 VERIFY_SKIP_ACTIVE=1 node infra/scripts/verify-platform.mjs

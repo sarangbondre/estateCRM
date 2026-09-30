@@ -19,14 +19,16 @@ that session. You do every step that involves signing in, passwords or secrets. 
    not secret, so you can send it in chat.)
 5. **Database → Extensions:** search for and check that **pgmq**, **pg_cron** and **pg_net** are in the list (don't enable
    them; our migration does). If any is missing, tell Claude, because it triggers a CR (data-hosting §7).
-6. In your terminal, in the project folder:
-   ```bash
-   npx supabase@2 login
-   ```
-   A browser window opens. Approve it. The access token is stored on your Mac, not in the repo.
-7. Tell Claude the project ref. Claude then runs `npx supabase@2 link --project-ref <ref>`. **When the terminal asks for
-   the database password, you type it.** Claude then applies the bootstrap (schemas, roles, extensions, Data API
-   exposure off) and the migrations.
+6. **Nothing is installed on your Mac.** The database is set up by the GitHub Actions workflow **deploy-database**:
+   1. Supabase → **Connect** (top bar) → **Session pooler** (port 5432, IPv4). Copy the connection string and replace
+      `[YOUR-PASSWORD]` with the database password from step 3. If the password has special characters, URL-encode them.
+   2. GitHub → repo **Settings → Secrets and variables → Actions → New repository secret**: name `SUPABASE_DB_URL`, value =
+      that string. Don't send it in chat.
+   3. GitHub → **Actions → deploy-database → Run workflow**, type `pilot`, then Run. It applies the platform setup (schemas,
+      roles, extensions, queues, schedules, alarms, buckets), then every service's migrations, then the platform checks.
+      Re-run it for each release that changes the database.
+7. Service role passwords (one per service, for the Vercel `<SERVICE>_DATABASE_URL`): Claude gives you one SQL snippet
+   for **Supabase → SQL Editor** (`alter role records_svc password '…'` × 7); you type the passwords in the browser.
 8. Later, for sign-in (section 3): **Authentication → URL Configuration**:
    - Site URL: `https://crm.11estates.in`
    - Redirect URLs: `http://localhost:3000/auth/callback`, `https://*-sarangbondre.vercel.app/auth/callback`,
