@@ -276,6 +276,12 @@
         "q_journeys"
       ]
     },
+    "record.note_imported.v1": {
+      "producer": "records",
+      "queues": [
+        "q_journeys"
+      ]
+    },
     "offer.voided.v1": {
       "producer": "records",
       "queues": [

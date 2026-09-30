@@ -1001,3 +1001,8 @@ Still open:
 | Q-J4 | Watchlist task due date rule | — | JA-6 |
 | Q-J6 | Pilot DB budget: journeys projections could use 150–250 MB of the 500 MB free database at 200k records | Pilot storage | Capacity plan to set per-schema budgets |
 | Q-J7 | Supply agents on deals: follow-up notes only? | Permissions | Yes (PRD §2.3) |
+
+## Amendments: CR-011 and CR-012 (approved 2026-09-30)
+- Proposal feedback `maybe` (neutral). Notification kinds `queue_reassigned`, `proposal_failed`, `demand_touch` replace the stand-in kinds.
+- Consume `record.note_imported.v1`: fetch the text from intake's note endpoint (service token), store it as a note marked
+  "imported from upload <code>", deduped per (upload, row).

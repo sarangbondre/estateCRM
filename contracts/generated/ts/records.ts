@@ -1146,6 +1146,11 @@ export interface components {
             /** Format: uuid */
             id: string;
             code: string;
+            /**
+             * Format: uuid
+             * @description The sourcing request this offer was added for via add-supply (CR-012), if any.
+             */
+            sourcingRequestId?: string | null;
             /** Format: uuid */
             propertyId: string;
             propertyCode?: string;
@@ -2715,6 +2720,16 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description dependency-unavailable (e.g. object storage not configured or down); retry later */
+        ServiceUnavailable: {
+            headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
     };
     parameters: {
         CorrelationId: string;
@@ -2983,6 +2998,7 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             429: components["responses"]["TooMany"];
             500: components["responses"]["ServerError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     listProperties: {
@@ -3269,6 +3285,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             429: components["responses"]["TooMany"];
             500: components["responses"]["ServerError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     listPriceGaps: {
@@ -4841,6 +4858,7 @@ export interface operations {
             415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooMany"];
             500: components["responses"]["ServerError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     attachPhoto: {
@@ -4879,6 +4897,7 @@ export interface operations {
             415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooMany"];
             500: components["responses"]["ServerError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     deletePhoto: {
@@ -4906,6 +4925,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             429: components["responses"]["TooMany"];
             500: components["responses"]["ServerError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     internalGetScanTerms: {
@@ -4969,6 +4989,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             429: components["responses"]["TooMany"];
             500: components["responses"]["ServerError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     internalContactsBatch: {

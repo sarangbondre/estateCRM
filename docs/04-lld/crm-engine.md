@@ -548,3 +548,7 @@ Still open:
 | C-10 | Demand must-haves: DEMAND_FACTS has only `statedTags` (string map); parking/amenity must-haves need agreed keys | Keys `parking` (min count) and `amenity:<name>` inside `statedTags` |
 | Q-C3 | Should suggestions be produced before a demand is qualified? | Yes (JB-5) |
 | Q-C4 | Initial weights and `minScore` (M6 tuning) | §4.2 defaults; reviewed after the pilot with staff and proposal feedback |
+
+## Amendments: CR-011 and CR-012 (approved 2026-09-30)
+- CR-011: residential hard filter on BHK within ±1 of the demand's BHK (exact scores highest). The single-match area rule is confirmed.
+- Matches of Expired/Paused demands close with reason `demand_expired` / `demand_paused` (was `demand_exited`). A `maybe` proposal verdict is neutral.

@@ -28,6 +28,7 @@ Delivery: at least once; ordering per aggregate; dedupe on eventId. Source: `con
 | `project.created.v1` | records | listings, insight | A Project (Sale, Primary) exists. |
 | `project.updated.v1` | records | listings, insight | Project facts changed (full current facts). |
 | `price_sheet.applied.v1` | records | journeys, crm-engine, insight | A developer price sheet was applied to a project (life-curve basis for Sale, Primary). |
+| `record.note_imported.v1` | records | journeys | A crm_notes value from an upload row belongs to this record (CR-012). Carries no note text (it may hold PII): journeys fetches it from intake GET /internal/v1/uploads/{uploadId}/rows/{rowNo}/note with a service token and stores it as a note marked imported. |
 | `offer.voided.v1` | records | journeys, crm-engine, listings, insight | An offer was voided because review changed its side or scope (it was not supply). |
 | `demand.voided.v1` | records | journeys, crm-engine, listings, insight | A demand was voided because review changed its side or scope. |
 | `person.flag_removed.v1` | records | journeys, insight | A person flag was removed. |

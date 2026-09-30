@@ -1725,6 +1725,8 @@
               "superseded",
               "offer_expired",
               "voided",
+              "demand_expired",
+              "demand_paused",
               null
             ]
           },

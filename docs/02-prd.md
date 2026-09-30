@@ -3,10 +3,10 @@
 | | |
 |---|---|
 | Project | 11 Estates CRM (estateCRM) |
-| Version | 0.6 |
-| Date | 2026-09-24 |
+| Version | 0.7 |
+| Date | 2026-09-30 |
 | Based on | `docs/01-brd.md` v0.6 (approved 2026-09-24 via CR-003); worked scenarios from `docs/inputs/vinit-journeys-artifact.md` |
-| Status | APPROVED 2026-09-24, amended by CR-005 and CR-006 (frozen; changes via Change Request) |
+| Status | APPROVED 2026-09-24, amended by CR-005, CR-006 and CR-012 (frozen; changes via Change Request; v0.7 awaits re-approval of Stage 2) |
 
 ### Change log
 | Version | Change |
@@ -16,6 +16,7 @@
 | 0.5 | Updated for BRD v0.6 (CR-003): the standard deal vocabulary (record_scope → deal_type → market → segment → property_type → side), Land segment, deal tags, generated labels, party_type; non-property desks (Business, Capital, Archive, Network, Watchlist); two intake modes with row-level validation; review queue by review_reason; classification dashboards and side checks; read-only vocabulary; field dictionary (Appendix C). |
 | 0.5.1 | CR-005 (2026-09-24): new §8.4, the Phase 1a pilot on free plans with temporary NFR relaxations and a paid-plan gate. |
 | 0.6 | CR-006 (2026-09-24): aligned with Vinit's extractor master file. Appendix C is now the exact 89-column upload schema. Area is a range plus a basis. Source ads with split records. Extractor dedup trusted, with possible repeats sent to review. Idempotent master re-uploads with migration maps. Review reason codes. Outside-MMR flag. CRM working columns ignored. Pilot anonymise switch. Unknown market. |
+| 0.7 | CR-012 (2026-09-30): Appendix C gains optional `building_name` and `floor` (91 columns; strict mode accepts the 89-column files of older extractor versions too). `crm_notes` is imported as a note on the record instead of being ignored. Proposal feedback gains "maybe" (neutral). CR-011: residential matching allows ±1 BHK. |
 
 ### Decisions for this PRD
 | # | Decision | Source |
@@ -236,6 +237,8 @@ To contact, To qualify, Reconfirm due, In sourcing, Sourcing requests open, Open
   - deal tags the client stated must match (e.g. tenancy_status = Tenanted, sale_mode);
   - micromarket overlap (the hierarchy counts, e.g. Chakala is inside Andheri East);
   - possession_date within the demand's window, otherwise excluded with the reason;
+  - Residential: offer BHK within ±1 of the demand's BHK (4BHK → 3–5BHK; exact BHK scores highest) (CR-011);
+  - a single match needs the offer's area within tolerance; smaller commercial/industrial units appear only in bundles (CR-011);
   - offer not Expired, Closed or Inactive; demand not Stale and not exited.
 - **Unknowns (CR-006):** a blank `area_basis` is compared with a wider tolerance and shows an "area basis unknown" flag. A blank `market` on a supply Sale is compatible with any demand market and shows a "market unknown" flag.
 - **Scored:** micromarket proximity, price vs budget (the right price field for the deal_type), area like with like
@@ -432,7 +435,7 @@ that the life curve and status stay true (C-08, C-14).
 - AC1 Rows are **upserted by `record_id`**. Unchanged rows do nothing, and changed rows update facts and last seen.
 - AC2 If the workbook has a `migration_map` sheet, it is applied first: kept = re-key, merged = reversible merge into the target, split = re-point to the children. CRM work (calls, stages, matches, notes) follows the new ID.
 - AC3 A re-upload never deletes CRM records that are missing from the file.
-- AC4 `lead_status`, `follow_up_date` and `crm_notes` are ignored (the CRM owns them). `route_to` is kept as the extractor's suggestion (Z-8).
+- AC4 `lead_status` and `follow_up_date` are ignored (the CRM owns them). `crm_notes` becomes a note on the record (CR-012). `route_to` is kept as the extractor's suggestion (Z-8).
 - AC5 `review_reason` text is kept, and a **reason code** is derived for grouping: side_defaulted, deal_type_missing, side_unclear, property_type_missing, other (Z-6).
 
 **US-07** Supply dedup at property level (building, floor, area, locality). A phone number never decides alone. A
@@ -768,14 +771,14 @@ Each scenario must run end to end in the product, with the stated status axes, q
 
 ## Appendix C: Field dictionary (the upload schema, CR-006 Z-1)
 
-This is the exact column set of the extractor master file (89 columns). A file whose header matches this set uses **strict mode** (D-15). Column order does not matter. Extra sheets `run_log` (ignored) and `migration_map` (`old_ad_id`, `new_record_ids`, `action`; applied first, Z-5) are recognised. A PII-free profile of real values is in `docs/inputs/extractor-master-profile.md`.
+This is the exact column set of the extractor master file (91 columns since CR-012; the 89-column set of older extractor versions, i.e. without `building_name` and `floor`, is still accepted). A file whose header matches either set uses **strict mode** (D-15). Column order does not matter. Extra sheets `run_log` (ignored) and `migration_map` (`old_ad_id`, `new_record_ids`, `action`; applied first, Z-5) are recognised. A PII-free profile of real values is in `docs/inputs/extractor-master-profile.md`.
 
-### CRM working columns: ignored on import except route_to (Z-8)
+### CRM working columns: ignored on import except route_to (Z-8) and crm_notes (CR-012)
 | Column | Type / values |
 |---|---|
 | `lead_status` | text |
 | `follow_up_date` | date |
-| `crm_notes` | text |
+| `crm_notes` | text; imported as a note on the record, marked "imported from upload <code>" (CR-012). Never sent to AI or published |
 | `route_to` | enum: Supply Team, Demand Team, Business Desk, Capital Desk, Archive, Network, Watchlist |
 
 ### Review
@@ -800,6 +803,8 @@ This is the exact column set of the extractor master file (89 columns). A file w
 | `segment` | enum: Residential, Commercial, Industrial, Land |
 | `property_type` | enum, pipe-list, per segment |
 | `property_detail` | text |
+| `building_name` | text, optional (CR-012). Private: property-level dedup and proposals only; never public; redacted before any AI call |
+| `floor` | text, optional (CR-012), e.g. "12", "G", "12 of 20". PII-sensitive: never public |
 | `land_use` | enum: Residential, Commercial, Industrial, Agricultural, NA, Mixed |
 | `side` | enum: Supply, Demand, None |
 | `side_evidence` | text |

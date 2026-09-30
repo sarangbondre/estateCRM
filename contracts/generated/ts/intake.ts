@@ -398,6 +398,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/uploads/{uploadId}/rows/{rowNo}/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The crm_notes text of one upload row (journeys note import, CR-012)
+         * @description Service token minted by web (R-2) with aud=intake, sub=journeys. The note may contain PII; the response is never cached or logged. 404 not-found when the row has no note or raw rows were purged (retention).
+         */
+        get: operations["internalGetRowNote"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/uploads/{uploadId}/migration-map": {
         parameters: {
             query?: never;
@@ -887,6 +907,12 @@ export interface components {
             segment?: string | null;
             propertyTypes?: string[];
             propertyDetail?: string | null;
+            /** @description Upload column building_name (CR-012). Private: dedup and proposals only, never public, redacted before any AI call. */
+            buildingName?: string | null;
+            /** @description Upload column floor (CR-012). PII-sensitive (conventions §9): never public. */
+            floor?: string | null;
+            /** @description The row carried a non-empty crm_notes value (CR-012). The text is served only by the note endpoint. */
+            hasCrmNotes?: boolean;
             landUse?: string | null;
             side?: components["schemas"]["Side"];
             sideEvidence?: string | null;
@@ -1980,6 +2006,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IntakeRowBatch"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooMany"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    internalGetRowNote: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Correlation-Id"?: components["parameters"]["CorrelationId"];
+            };
+            path: {
+                uploadId: string;
+                rowNo: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Note text */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        uploadId: string;
+                        uploadCode?: string;
+                        rowNo: number;
+                        note: string;
+                    };
                 };
             };
             400: components["responses"]["BadRequest"];

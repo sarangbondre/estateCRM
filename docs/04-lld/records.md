@@ -1007,3 +1007,10 @@ G-R6 (`desk_item.*`), G-R10 (R-19), Q-R3 (R-9), Q-R4 (R-10).
 | Q-R5 | Migration-map `split`: CRM work follows the **first** child | as stated | confirm |
 | Q-R6 | Staff edits win over later extractor values (`staff_edited_fields`) | as stated | confirm |
 | Q-R7 | Extractor rows are not auto-deduped against records from the same extractor channel (only `possible_repeat_of` → review) | as stated (Z-4) | confirm |
+
+## Amendments: CR-011 and CR-012 (approved 2026-09-30)
+- Ingest stores `building_name` and `floor` on the property and uses the building for property-level dedup (the "same property" branch).
+- When a row has `hasCrmNotes`, emit `record.note_imported.v1` (ids only) for the created or updated subject.
+- `offers.sourcing_request_id` (nullable) is set by add-supply and exposed as `Offer.sourcingRequestId`.
+- Lost-to-competing-terms points emit `market_data.recorded.v1` kind `lost_competing`. Photo operations declare 503. An idempotent replay of
+  a duplicate-property 409 keeps its `candidates` extension.

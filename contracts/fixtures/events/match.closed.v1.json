@@ -12,6 +12,6 @@
   "data": {
     "matchId": "fd6033c1-087b-42f1-9020-de6d6129b52d",
     "demandId": "9fa8d79b-7363-44da-8dc1-88909a5b108d",
-    "reason": "demand_exited"
+    "reason": "demand_expired"
   }
 }

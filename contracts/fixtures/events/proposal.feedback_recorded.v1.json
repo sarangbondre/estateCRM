@@ -15,11 +15,11 @@
     "feedback": [
       {
         "matchId": "a132e697-28d1-4b99-9cab-38bef9aec658",
-        "verdict": "liked"
+        "verdict": "rejected"
       },
       {
         "matchId": "34de39ee-949e-4f3e-90f9-1cd9a98c34f1",
-        "verdict": "rejected"
+        "verdict": "visit_requested"
       }
     ]
   }

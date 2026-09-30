@@ -808,6 +808,9 @@
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         },
         "x-roles": [
@@ -1492,6 +1495,9 @@
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         },
         "x-roles": [
@@ -5345,6 +5351,9 @@
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         },
         "x-roles": [
@@ -5436,6 +5445,9 @@
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         },
         "x-roles": [
@@ -5501,6 +5513,9 @@
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         },
         "x-roles": [
@@ -5654,6 +5669,9 @@
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         },
         "x-roles": [],
@@ -6262,6 +6280,14 @@
           },
           "code": {
             "type": "string"
+          },
+          "sourcingRequestId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The sourcing request this offer was added for via add-supply (CR-012), if any."
           },
           "propertyId": {
             "type": "string",
@@ -12699,6 +12725,21 @@
       },
       "PreconditionFailed": {
         "description": "version-mismatch",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "dependency-unavailable (e.g. object storage not configured or down); retry later",
+        "headers": {
+          "Retry-After": {
+            "$ref": "#/components/headers/RetryAfter"
+          }
+        },
         "content": {
           "application/problem+json": {
             "schema": {

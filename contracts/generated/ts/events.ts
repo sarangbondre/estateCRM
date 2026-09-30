@@ -533,6 +533,16 @@ export interface components {
             sheetDate: string;
             changedOfferIds?: string[];
         };
+        RecordNoteImportedV1: {
+            /** @enum {string} */
+            subjectType: "offer" | "demand" | "person" | "property";
+            /** Format: uuid */
+            subjectId: string;
+            /** Format: uuid */
+            uploadId: string;
+            rowNo: number;
+            uploadCode?: string;
+        };
         OfferVoidedV1: {
             /** Format: uuid */
             offerId: string;
@@ -582,7 +592,7 @@ export interface components {
             /** Format: uuid */
             marketDataId: string;
             /** @enum {string} */
-            kind: "closed_by_us" | "closed_elsewhere" | "reported";
+            kind: "closed_by_us" | "closed_elsewhere" | "reported" | "lost_competing";
             segment?: string;
             dealType?: string;
             micromarket?: string;
@@ -790,8 +800,11 @@ export interface components {
             feedback: {
                 /** Format: uuid */
                 matchId: string;
-                /** @enum {string} */
-                verdict: "liked" | "rejected" | "visit_requested";
+                /**
+                 * @description maybe = neutral (CR-012)
+                 * @enum {string}
+                 */
+                verdict: "liked" | "rejected" | "visit_requested" | "maybe";
             }[];
         };
         DealUpdatedV1: {
@@ -843,7 +856,7 @@ export interface components {
             /** Format: uuid */
             demandId: string;
             /** @enum {string} */
-            reason: "leased_to_another_client" | "sold_to_another_client" | "offer_retired" | "offer_expired" | "demand_exited" | "demand_closed" | "deal_closed" | "superseded" | "merged" | "voided";
+            reason: "leased_to_another_client" | "sold_to_another_client" | "offer_retired" | "offer_expired" | "demand_exited" | "demand_expired" | "demand_paused" | "demand_closed" | "deal_closed" | "superseded" | "merged" | "voided";
         };
         MatchFlaggedV1: {
             /** Format: uuid */
@@ -959,6 +972,7 @@ export interface EventDataMap {
   'project.created.v1': components['schemas']['ProjectCreatedV1'];
   'project.updated.v1': components['schemas']['ProjectUpdatedV1'];
   'price_sheet.applied.v1': components['schemas']['PriceSheetAppliedV1'];
+  'record.note_imported.v1': components['schemas']['RecordNoteImportedV1'];
   'offer.voided.v1': components['schemas']['OfferVoidedV1'];
   'demand.voided.v1': components['schemas']['DemandVoidedV1'];
   'person.flag_removed.v1': components['schemas']['PersonFlagRemovedV1'];

@@ -11,7 +11,7 @@
   "aggregateVersion": 1,
   "data": {
     "marketDataId": "c36df40c-3c3e-4b17-9889-e43d55a1556b",
-    "kind": "closed_elsewhere",
+    "kind": "reported",
     "segment": "",
     "dealType": "0027jN2Q",
     "micromarket": "LsgFyFpPel",

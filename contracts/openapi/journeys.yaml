@@ -2746,7 +2746,7 @@ components:
           minItems: 1
         feedback:
           type: [string, 'null']
-          enum: [liked, rejected, visit_requested, null]
+          enum: [liked, rejected, visit_requested, maybe, null]
         feedbackNote:
           type: [string, 'null']
           maxLength: 500
@@ -2902,7 +2902,8 @@ components:
               position: {type: integer, minimum: 1}
               feedback:
                 type: string
-                enum: [liked, rejected, visit_requested]
+                enum: [liked, rejected, visit_requested, maybe]
+                description: maybe = neutral (CR-012)
               note:
                 type: [string, 'null']
                 maxLength: 500
@@ -3293,7 +3294,8 @@ components:
         kind:
           type: string
           enum: [match_suggested, match_confirmed, match_closed, match_flagged, srq_assigned, srq_fulfilled, enquiry, offer_closed,
-            demand_exited, deal_follow_up_overdue, proposal_opened, visit_scheduled, dormant_revisit, watchlist_task]
+            demand_exited, deal_follow_up_overdue, proposal_opened, visit_scheduled, dormant_revisit, watchlist_task,
+            queue_reassigned, proposal_failed, demand_touch]
         title: {type: string, maxLength: 200, description: 'Codes and labels only, never contact PII'}
         body:
           type: [string, 'null']
