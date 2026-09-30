@@ -4,9 +4,9 @@ State: IN PROGRESS (service tracks in parallel; local-first, cloud provisioning 
 | Stage | Status | Approved on | Artifacts |
 |---|---|---|---|
 | 1 — BRD | APPROVED (v0.6.1: v0.6 via CR-003 + CR-004) | 2026-09-24 | docs/01-brd.md, docs/01-brd.pdf |
-| 2 — PRD | APPROVED (v0.6 incl. CR-005, CR-006) | 2026-09-24 | docs/02-prd.md, docs/02-prd.pdf, docs/prototype/11estate-crm-prototype.html |
+| 2 — PRD | APPROVED (v0.7 incl. CR-005, CR-006, CR-012; re-approved) | 2026-09-30 | docs/02-prd.md, docs/02-prd.pdf, docs/prototype/11estate-crm-prototype.html |
 | 3 — HLD | APPROVED (v0.2) | 2026-09-24 | docs/03-hld.md, docs/03-hld.pdf, docs/adr/0001–0008 |
-| 4 — LLD | APPROVED (v0.1; Q4-1…Q4-4 defaults applied) | 2026-09-27 | contracts/openapi/*.yaml (240 ops), contracts/asyncapi/events.yaml (68 events), docs/04-lld/ (7 service LLDs, conventions, data-hosting, capacity-plan, stage4-summary.pdf) |
+| 4 — LLD | APPROVED (v0.1 + CR-012 delta; re-approved) | 2026-09-30 | contracts/openapi/*.yaml (241 ops), contracts/asyncapi/events.yaml (69 events), docs/04-lld/ (7 service LLDs, conventions, data-hosting, capacity-plan, stage4-summary.pdf) |
 | 5 — Task Breakdown | APPROVED (v0.1; execution mode decided in Stage 6) | 2026-09-27 | docs/05-tasks.md, docs/05-tasks.pdf (87 tasks) |
 | 6 — Implementation Rules | APPROVED (v0.1; dictated "approved stage six") | 2026-09-27 | docs/06-implementation-rules.md, docs/06-questionnaire.md, docs/runbooks/provisioning.md |
 | 7 — Execution | IN PROGRESS | — | tasks per docs/05-tasks.md |
@@ -55,7 +55,7 @@ Change requests:
 - CR-009: APPROVED 2026-09-28, auto-approved (technical): contract schema defects (listings settings, insight tiles, intake file-name pattern)
 - CR-010: APPROVED 2026-09-28, auto-approved (technical): intake xlsx reader, sharp for renditions (pending), no btree_gin
 - CR-011: APPROVED 2026-09-30 (all accepted; BHK changed to ±1)
-- CR-012: APPROVED 2026-09-30 (building_name + floor, maybe, import crm_notes, six small additions). PRD v0.7 + contract delta written; implemented and merged 2026-09-30 (#79, with #80–#82). Follow-up: journeys GET /v1/notes + Notes panel section (imported notes stored, not yet shown). Awaiting re-approval of Stage 2 (PRD v0.7) and Stage 4 (contract delta)
+- CR-012: APPROVED 2026-09-30 (building_name + floor, maybe, import crm_notes, six small additions). PRD v0.7 + contract delta written; implemented and merged 2026-09-30 (#79, with #80–#82). Follow-up: journeys GET /v1/notes + Notes panel section (imported notes stored, not yet shown). Stage 2 (PRD v0.7) and Stage 4 (contract delta) re-approved 2026-09-30
 - CR-013: AWAITING `APPROVED: CR-013`: host as one Vercel project with Services (root vercel.json); choices confirmed 2026-09-30
 
 Open change requests: none

@@ -6,7 +6,7 @@
 | Version | 0.7 |
 | Date | 2026-09-30 |
 | Based on | `docs/01-brd.md` v0.6 (approved 2026-09-24 via CR-003); worked scenarios from `docs/inputs/vinit-journeys-artifact.md` |
-| Status | APPROVED 2026-09-24, amended by CR-005, CR-006 and CR-012 (frozen; changes via Change Request; v0.7 awaits re-approval of Stage 2) |
+| Status | APPROVED 2026-09-24; v0.7 (CR-005, CR-006, CR-012) re-approved 2026-09-30 (frozen; changes via Change Request) |
 
 ### Change log
 | Version | Change |
