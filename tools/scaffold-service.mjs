@@ -97,30 +97,14 @@ for (const svc of services) {
   put(
     svc,
     'tsconfig.json',
-    `${JSON.stringify({ extends: '../../tsconfig.base.json', compilerOptions: { rootDir: '.', noEmit: true }, include: ['src', 'api', 'tests'] }, null, 2)}\n`,
+    `${JSON.stringify({ extends: '../../tsconfig.base.json', compilerOptions: { rootDir: '.', noEmit: true }, include: ['src', 'index.ts', 'tests'] }, null, 2)}\n`,
   );
   put(
     svc,
     'tsconfig.build.json',
-    `${JSON.stringify({ extends: './tsconfig.json', compilerOptions: { rootDir: '.', outDir: 'dist', noEmit: false }, include: ['src', 'api'] }, null, 2)}\n`,
+    `${JSON.stringify({ extends: './tsconfig.json', compilerOptions: { rootDir: '.', outDir: 'dist', noEmit: false }, include: ['src', 'index.ts'] }, null, 2)}\n`,
   );
-  put(
-    svc,
-    'vercel.json',
-    `${JSON.stringify(
-      {
-        $schema: 'https://openapi.vercel.sh/vercel.json',
-        regions: ['bom1'],
-        // API-only project: Vercel still wants a static output folder; it stays empty (never serve dist/).
-        outputDirectory: 'public',
-        functions: { 'api/index.ts': { maxDuration: 60 } },
-        rewrites: [{ source: '/(.*)', destination: '/api' }],
-      },
-      null,
-      2,
-    )}\n`,
-  );
-
+  // Vercel config lives in the root vercel.json (Vercel Services, CR-013): add the new service there.
   put(
     svc,
     'migrations/0001_technical_tables.sql',
@@ -374,7 +358,7 @@ export function compose(env: NodeJS.ProcessEnv = process.env) {
   put(
     svc,
     'src/server.ts',
-    `// Local server (\`pnpm dev\`). Vercel uses api/index.ts instead.
+    `// Local server (\`pnpm dev\`). Vercel uses index.ts instead.
 import { serve } from '@hono/node-server';
 import { compose } from './main.js';
 
@@ -390,13 +374,11 @@ process.on('SIGTERM', stop);
 
   put(
     svc,
-    'api/index.ts',
-    `// Vercel Node function entry (region bom1, 60 s): every path is rewritten here (vercel.json).
-import { getRequestListener } from '@hono/node-server';
-import { compose } from '../src/main.js';
+    'index.ts',
+    `// Vercel entry (Services, Hono preset): the composed app is the default export. Local dev uses src/server.ts.
+import { compose } from './src/main.js';
 
-const { app } = compose();
-export default getRequestListener(app.fetch);
+export default compose().app;
 `,
   );
 

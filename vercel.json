@@ -1,0 +1,362 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["bom1"],
+  "services": {
+    "web": {
+      "root": "services/web",
+      "framework": "nextjs",
+      "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/web...",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "intake",
+          "format": "url",
+          "env": "SVC_INTAKE_URL"
+        },
+        {
+          "type": "service",
+          "service": "records",
+          "format": "url",
+          "env": "SVC_RECORDS_URL"
+        },
+        {
+          "type": "service",
+          "service": "journeys",
+          "format": "url",
+          "env": "SVC_JOURNEYS_URL"
+        },
+        {
+          "type": "service",
+          "service": "crm-engine",
+          "format": "url",
+          "env": "SVC_CRM_ENGINE_URL"
+        },
+        {
+          "type": "service",
+          "service": "listings",
+          "format": "url",
+          "env": "SVC_LISTINGS_URL"
+        },
+        {
+          "type": "service",
+          "service": "insight",
+          "format": "url",
+          "env": "SVC_INSIGHT_URL"
+        }
+      ]
+    },
+    "intake": {
+      "root": "services/intake",
+      "entrypoint": "index.ts",
+      "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/intake...",
+      "functions": {
+        "index.ts": {
+          "maxDuration": 60
+        }
+      },
+      "bindings": [
+        {
+          "type": "service",
+          "service": "web",
+          "format": "url",
+          "env": "WEB_URL"
+        },
+        {
+          "type": "service",
+          "service": "records",
+          "format": "url",
+          "env": "RECORDS_URL"
+        }
+      ],
+      "routes": [
+        {
+          "src": "/svc/intake/(.*)",
+          "transforms": [
+            {
+              "type": "request.path",
+              "op": "set",
+              "args": "/$1"
+            }
+          ]
+        }
+      ],
+      "framework": "hono",
+      "devCommand": "npx -y pnpm@12.7.0 run dev"
+    },
+    "records": {
+      "root": "services/records",
+      "entrypoint": "index.ts",
+      "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/records...",
+      "functions": {
+        "index.ts": {
+          "maxDuration": 60
+        }
+      },
+      "bindings": [
+        {
+          "type": "service",
+          "service": "web",
+          "format": "url",
+          "env": "WEB_URL"
+        },
+        {
+          "type": "service",
+          "service": "intake",
+          "format": "url",
+          "env": "INTAKE_URL"
+        }
+      ],
+      "routes": [
+        {
+          "src": "/svc/records/(.*)",
+          "transforms": [
+            {
+              "type": "request.path",
+              "op": "set",
+              "args": "/$1"
+            }
+          ]
+        }
+      ],
+      "framework": "hono",
+      "devCommand": "npx -y pnpm@12.7.0 run dev"
+    },
+    "journeys": {
+      "root": "services/journeys",
+      "entrypoint": "index.ts",
+      "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/journeys...",
+      "functions": {
+        "index.ts": {
+          "maxDuration": 60
+        }
+      },
+      "bindings": [
+        {
+          "type": "service",
+          "service": "web",
+          "format": "url",
+          "env": "WEB_URL"
+        },
+        {
+          "type": "service",
+          "service": "records",
+          "format": "url",
+          "env": "RECORDS_URL"
+        },
+        {
+          "type": "service",
+          "service": "listings",
+          "format": "url",
+          "env": "LISTINGS_URL"
+        },
+        {
+          "type": "service",
+          "service": "intake",
+          "format": "url",
+          "env": "INTAKE_URL"
+        }
+      ],
+      "routes": [
+        {
+          "src": "/svc/journeys/(.*)",
+          "transforms": [
+            {
+              "type": "request.path",
+              "op": "set",
+              "args": "/$1"
+            }
+          ]
+        }
+      ],
+      "framework": "hono",
+      "devCommand": "npx -y pnpm@12.7.0 run dev"
+    },
+    "crm-engine": {
+      "root": "services/crm-engine",
+      "entrypoint": "index.ts",
+      "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/crm-engine...",
+      "functions": {
+        "index.ts": {
+          "maxDuration": 60
+        }
+      },
+      "bindings": [
+        {
+          "type": "service",
+          "service": "web",
+          "format": "url",
+          "env": "WEB_URL"
+        },
+        {
+          "type": "service",
+          "service": "records",
+          "format": "url",
+          "env": "RECORDS_URL"
+        },
+        {
+          "type": "service",
+          "service": "journeys",
+          "format": "url",
+          "env": "JOURNEYS_URL"
+        }
+      ],
+      "routes": [
+        {
+          "src": "/svc/crm-engine/(.*)",
+          "transforms": [
+            {
+              "type": "request.path",
+              "op": "set",
+              "args": "/$1"
+            }
+          ]
+        }
+      ],
+      "framework": "hono",
+      "devCommand": "npx -y pnpm@12.7.0 run dev"
+    },
+    "listings": {
+      "root": "services/listings",
+      "entrypoint": "index.ts",
+      "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/listings...",
+      "functions": {
+        "index.ts": {
+          "maxDuration": 60
+        }
+      },
+      "bindings": [
+        {
+          "type": "service",
+          "service": "web",
+          "format": "url",
+          "env": "WEB_URL"
+        },
+        {
+          "type": "service",
+          "service": "records",
+          "format": "url",
+          "env": "RECORDS_URL"
+        }
+      ],
+      "routes": [
+        {
+          "src": "/svc/listings/(.*)",
+          "transforms": [
+            {
+              "type": "request.path",
+              "op": "set",
+              "args": "/$1"
+            }
+          ]
+        },
+        {
+          "src": "/public/(.*)",
+          "transforms": [
+            {
+              "type": "request.path",
+              "op": "set",
+              "args": "/$1"
+            }
+          ]
+        }
+      ],
+      "framework": "hono",
+      "devCommand": "npx -y pnpm@12.7.0 run dev"
+    },
+    "insight": {
+      "root": "services/insight",
+      "entrypoint": "index.ts",
+      "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/insight...",
+      "functions": {
+        "index.ts": {
+          "maxDuration": 60
+        }
+      },
+      "bindings": [
+        {
+          "type": "service",
+          "service": "web",
+          "format": "url",
+          "env": "WEB_URL"
+        },
+        {
+          "type": "service",
+          "service": "records",
+          "format": "url",
+          "env": "RECORDS_URL"
+        }
+      ],
+      "routes": [
+        {
+          "src": "/svc/insight/(.*)",
+          "transforms": [
+            {
+              "type": "request.path",
+              "op": "set",
+              "args": "/$1"
+            }
+          ]
+        }
+      ],
+      "framework": "hono",
+      "devCommand": "npx -y pnpm@12.7.0 run dev"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/public/v1/(listings|projects|demand-posts|changes)(.*)",
+      "destination": {
+        "service": "listings"
+      }
+    },
+    {
+      "source": "/svc/intake/(internal/v1/(?:relay|drain/.*|jobs/.*)|health/(?:live|ready))",
+      "destination": {
+        "service": "intake"
+      }
+    },
+    {
+      "source": "/svc/records/(internal/v1/(?:relay|drain/.*|jobs/.*)|health/(?:live|ready))",
+      "destination": {
+        "service": "records"
+      }
+    },
+    {
+      "source": "/svc/journeys/(internal/v1/(?:relay|drain/.*|jobs/.*)|health/(?:live|ready))",
+      "destination": {
+        "service": "journeys"
+      }
+    },
+    {
+      "source": "/svc/crm-engine/(internal/v1/(?:relay|drain/.*|jobs/.*)|health/(?:live|ready))",
+      "destination": {
+        "service": "crm-engine"
+      }
+    },
+    {
+      "source": "/svc/listings/(internal/v1/(?:relay|drain/.*|jobs/.*)|health/(?:live|ready))",
+      "destination": {
+        "service": "listings"
+      }
+    },
+    {
+      "source": "/svc/insight/(internal/v1/(?:relay|drain/.*|jobs/.*)|health/(?:live|ready))",
+      "destination": {
+        "service": "insight"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "web"
+      }
+    }
+  ]
+}
