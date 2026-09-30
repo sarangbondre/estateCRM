@@ -466,34 +466,30 @@ export function buildProposal(
 
 export const SENT_CHANNELS = ['WhatsApp', 'Email', 'In person', 'Other'] as const;
 
-/** Client verdicts on an option. "maybe" is shown (questionnaire C3) but journeys cannot record it yet (LLD G-13). */
+/** Client verdicts on an option (questionnaire C3). "maybe" is neutral (CR-012). */
 export const FEEDBACK = [
   { value: 'liked', label: 'Liked' },
-  { value: 'maybe', label: 'Maybe (not recorded yet)' },
+  { value: 'maybe', label: 'Maybe' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'visit_requested', label: 'Wants a site visit' },
 ] as const;
 export type FeedbackChoice = (typeof FEEDBACK)[number]['value'];
 
+/** Label of a recorded verdict (ProposalOption.feedback). */
+export const feedbackLabel = (v: string): string => FEEDBACK.find((f) => f.value === v)?.label ?? v.replace('_', ' ');
+
 export function buildFeedback(
   entries: readonly { position: number; feedback: FeedbackChoice | null; note?: string | null }[],
-): { body: Body<operations['recordProposalFeedback']>; skipped: number[] } | { errors: string[] } {
-  const recordable = entries.filter((e) => e.feedback && e.feedback !== 'maybe');
-  const skipped = entries.filter((e) => e.feedback === 'maybe').map((e) => e.position);
-  if (!recordable.length)
-    return { errors: ['Give Liked, Rejected or Wants a site visit for at least one option ("Maybe" is not recorded yet).'] };
+): { body: Body<operations['recordProposalFeedback']> } | { errors: string[] } {
+  const given = entries.filter((e): e is typeof e & { feedback: FeedbackChoice } => e.feedback !== null);
+  if (!given.length) return { errors: ['Give a verdict for at least one option.'] };
   return {
     body: {
-      options: recordable.map((e) => {
+      options: given.map((e) => {
         const note = text(e.note);
-        return {
-          position: e.position,
-          feedback: e.feedback as 'liked' | 'rejected' | 'visit_requested',
-          ...(note ? { note: note.slice(0, 500) } : {}),
-        };
+        return { position: e.position, feedback: e.feedback, ...(note ? { note: note.slice(0, 500) } : {}) };
       }),
     },
-    skipped,
   };
 }
 
