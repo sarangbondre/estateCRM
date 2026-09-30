@@ -39,6 +39,7 @@ export async function addSupplyForDemand(
     const base: Partial<OfferRow> = {
       record_stage: 'Contacted',
       sourced_for_demand_id: demand.id,
+      sourcing_request_id: input.sourcingRequestId ?? null,
       source_type: input.sourceType ?? 'Direct',
       capture_mode: 'typed_in',
       owner_user_id: actor.role === 'Supply agent' ? actor.userId : null,

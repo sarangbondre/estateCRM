@@ -18,7 +18,7 @@ import { assertMergeAllowed, fillBlanks, planUndo, sameValue } from '../src/doma
 import { MicromarketIndex } from '../src/domain/micromarket-index.js';
 import { maskPhone, normaliseEmail, normalisePhone } from '../src/domain/phone.js';
 import { buildingTokens, imageSize, sniffImage, unitTokens } from '../src/domain/privacy.js';
-import { floorBand, possessionDateStart, priceGapPct } from '../src/domain/property.js';
+import { floorBand, parseFloor, possessionDateStart, priceGapPct } from '../src/domain/property.js';
 import { decideDemandStage, decideOfferStage, liftOfferStage } from '../src/domain/record-stage.js';
 import { routeRow, splitOfferPrices } from '../src/domain/routing.js';
 import { buildingNorm, initials, norm } from '../src/domain/text.js';
@@ -338,5 +338,25 @@ describe('micromarket index', () => {
     expect(idx.resolve('Andheri East')?.id).toBe('ae');
     expect(idx.resolve('Pune')).toBeUndefined();
     expect(idx.ancestors('ch')).toEqual(['ch', 'ae', 'z']);
+  });
+});
+
+describe('parseFloor (CR-012 upload floor text)', () => {
+  it('reads numbers, ordinals, ground, basements and "n of m"', () => {
+    expect(parseFloor('12')).toEqual({ floorNo: 12, totalFloors: null });
+    expect(parseFloor('12th')).toEqual({ floorNo: 12, totalFloors: null });
+    expect(parseFloor('12 of 20')).toEqual({ floorNo: 12, totalFloors: 20 });
+    expect(parseFloor('3/7')).toEqual({ floorNo: 3, totalFloors: 7 });
+    expect(parseFloor('G')).toEqual({ floorNo: 0, totalFloors: null });
+    expect(parseFloor('Ground of 4')).toEqual({ floorNo: 0, totalFloors: 4 });
+    expect(parseFloor('LG')).toEqual({ floorNo: -1, totalFloors: null });
+    expect(parseFloor('B2')).toEqual({ floorNo: -2, totalFloors: null });
+    expect(parseFloor('Floor no. 5')).toEqual({ floorNo: 5, totalFloors: null });
+  });
+
+  it('gives nulls for blank or unreadable text and ignores an impossible total', () => {
+    expect(parseFloor(null)).toEqual({ floorNo: null, totalFloors: null });
+    expect(parseFloor('higher floor')).toEqual({ floorNo: null, totalFloors: null });
+    expect(parseFloor('15 of 10')).toEqual({ floorNo: 15, totalFloors: null });
   });
 });

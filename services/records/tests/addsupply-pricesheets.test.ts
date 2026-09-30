@@ -26,7 +26,7 @@ describe('add supply (US-05)', () => {
     const r = await h.call('POST', `/v1/demands/${String(d.body['code'])}/add-supply`, dem, body);
     expect(r.status).toBe(201);
     const offer = (r.body['offers'] as Record<string, unknown>[])[0];
-    expect(offer).toMatchObject({ recordStage: 'Contacted', sourcedForDemandId: d.body['id'], sourcedForDemandCode: d.body['code'] });
+    expect(offer).toMatchObject({ recordStage: 'Contacted', sourcedForDemandId: d.body['id'], sourcedForDemandCode: d.body['code'], sourcingRequestId: null });
     const evs = (await h.events(t)).filter((e) => e.aggregateId === offer?.['id']).map((e) => e.eventType);
     expect(evs).toEqual(['offer.created.v1', 'offer.record_stage_changed.v1']);
     expect((await h.call('GET', `/v1/offers?sourcedForDemandId=${String(d.body['id'])}`, dem)).body.items).toHaveLength(1);
@@ -36,8 +36,17 @@ describe('add supply (US-05)', () => {
     const propertyId = (r.body['property'] as { id: string }).id;
     const clash = await h.call('POST', `/v1/demands/${String(d.body['id'])}/add-supply`, dem, { existingPropertyId: propertyId, offer: { dealType: 'Lease' } });
     expect(clash.body['code']).toBe('deal-type-exists');
-    const sale = await h.call('POST', `/v1/demands/${String(d.body['id'])}/add-supply`, dem, { existingPropertyId: propertyId, offer: { dealType: 'Sale', salePriceInrMin: 500_000_000 } });
+    // CR-012: the sourcing request the supply was added for is kept on the offer
+    const sourcingRequestId = crypto.randomUUID();
+    const sale = await h.call('POST', `/v1/demands/${String(d.body['id'])}/add-supply`, dem, {
+      sourcingRequestId,
+      existingPropertyId: propertyId,
+      offer: { dealType: 'Sale', salePriceInrMin: 500_000_000 },
+    });
     expect(sale.status).toBe(201);
+    const saleOffer = (sale.body['offers'] as Record<string, unknown>[])[0];
+    expect(saleOffer?.['sourcingRequestId']).toBe(sourcingRequestId);
+    expect((await h.call('GET', `/v1/offers/${String(saleOffer?.['code'])}`, dem)).body['sourcingRequestId']).toBe(sourcingRequestId);
     expect((await h.call('POST', `/v1/demands/${String(d.body['id'])}/add-supply`, dem, { offer: { dealType: 'Sale' } })).status).toBe(400);
   });
 });

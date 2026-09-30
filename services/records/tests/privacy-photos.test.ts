@@ -182,6 +182,12 @@ describe('photos (D-5, A-26)', () => {
         isReal: false,
       });
       expect(r.status).toBe(503);
+      expect(r.body['code']).toBe('dependency-unavailable');
+      // attach and the internal signed URL need storage too (503 declared on the photo operations, CR-012)
+      const attach = await h2.call('POST', `/v1/photos/${crypto.randomUUID()}/attach`, await h2.staff(t, 'Supply agent'), {});
+      expect([attach.status, attach.body['code']]).toEqual([503, 'dependency-unavailable']);
+      const signed = await h2.call('GET', `/internal/v1/photos/${crypto.randomUUID()}/signed-url`, await h2.service(t, 'listings'));
+      expect([signed.status, signed.body['code']]).toEqual([503, 'dependency-unavailable']);
     } finally {
       await h2.close();
     }

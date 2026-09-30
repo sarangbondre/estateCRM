@@ -9,6 +9,31 @@ export function floorBand(floorNo: number | null, totalFloors: number | null): '
   return 'High';
 }
 
+/**
+ * The upload's `floor` text (CR-012, e.g. "12", "12th", "G", "Ground", "LG", "B1", "12 of 20", "12/20") → floor_no and
+ * total_floors. Ground = 0, basements are negative. Unreadable text gives nulls (the exact floor is PII-sensitive and
+ * only ever stored as floor_no; floor_band is what leaves the service).
+ */
+export function parseFloor(text: string | null | undefined): { floorNo: number | null; totalFloors: number | null } {
+  const none = { floorNo: null, totalFloors: null };
+  const t = (text ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!t) return none;
+  const total = /(?:\bof\b|\/|\bout of\b)\s*(\d{1,3})\b/.exec(t);
+  const totalFloors = total ? Number(total[1]) : null;
+  const head = total ? t.slice(0, total.index) : t;
+  let floorNo: number | null = null;
+  if (/^(?:g|gf|grd|ground|ug|upper ground)\b/.test(head)) floorNo = 0;
+  else if (/^(?:lg|lower ground)\b/.test(head)) floorNo = -1;
+  else {
+    const basement = /^(?:b|basement\s*)(\d)\b/.exec(head);
+    const n = /^(?:floor\s*(?:no\.?\s*)?)?(\d{1,3})(?:st|nd|rd|th)?\b/.exec(head);
+    if (basement) floorNo = -Number(basement[1]);
+    else if (n) floorNo = Number(n[1]);
+  }
+  if (floorNo === null) return none;
+  return { floorNo, totalFloors: totalFloors !== null && totalFloors >= Math.max(floorNo, 1) ? totalFloors : null };
+}
+
 /** First day of a `YYYY` / `YYYY-MM` / `YYYY-MM-DD` possession date (sort/filter column). */
 export function possessionDateStart(value: string | null | undefined): string | null {
   if (!value) return null;

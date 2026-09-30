@@ -167,6 +167,78 @@ describe('rows.classified.v1', () => {
     expect(state[0]?.status).toBe('applied');
   });
 
+  it('CR-012: the same building/locality/unit shape from another channel is the same property (second source)', async () => {
+    const t = await readyTenant(h);
+    await ingest(t, [toIntakeRow(supplyRow({ record_id: 'bd1', building_name: 'Sea Breeze Tower', floor: '12 of 20' }))]);
+    await ingest(t, [
+      toIntakeRow(
+        supplyRow({
+          record_id: 'bd2',
+          building_name: 'SEA BREEZE TOWER',
+          floor: '12th',
+          area_sqft_min: 910,
+          source_channel: 'WhatsApp',
+          contact_name: 'Other Broker',
+          party_type: 'Broker',
+          phones: '+919000100020',
+        }),
+      ),
+    ]);
+    const props = await rows(t, (tx) => tx.store.find('properties', {}));
+    expect(props).toHaveLength(1);
+    expect(props[0]).toMatchObject({ building_name: 'Sea Breeze Tower', floor_no: 12, total_floors: 20, floor_band: 'Mid' });
+    const offers = await rows(t, (tx) => tx.store.find('offers', {}));
+    expect(offers).toHaveLength(1);
+    expect(offers[0]).toMatchObject({ second_source_count: 1, sighting_count: 2 });
+    expect(await rows(t, (tx) => tx.store.find('second_sources', {}))).toHaveLength(1);
+    // private: the building name and the exact floor never leave in events
+    const events = await h.events(t);
+    expect(events.filter((e) => e.eventType === 'offer.created.v1')).toHaveLength(1);
+    expect(JSON.stringify(events)).not.toMatch(/Sea Breeze|SEA BREEZE|floorNo/);
+  });
+
+  it('CR-012: without a matching floor the same building is only a merge candidate (uncertain)', async () => {
+    const t = await readyTenant(h);
+    await ingest(t, [toIntakeRow(supplyRow({ record_id: 'bu1', building_name: 'Palm Grove CHS' }))]);
+    await ingest(t, [
+      toIntakeRow(supplyRow({ record_id: 'bu2', building_name: 'Palm Grove', source_channel: 'WhatsApp', phones: '+919000100021' })),
+    ]);
+    expect(await rows(t, (tx) => tx.store.find('properties', {}))).toHaveLength(2);
+    const open = await h.call('GET', '/v1/merge-candidates?reason=property_match', await h.staff(t, 'Manager'));
+    expect(open.body.items).toHaveLength(1);
+    expect(open.body.items?.[0]).toMatchObject({ aggregateType: 'property', status: 'open' });
+  });
+
+  it('CR-012: rows with crm_notes emit record.note_imported.v1 (ids only), once per (upload, row)', async () => {
+    const t = await readyTenant(h);
+    const noted = toIntakeRow(supplyRow({ record_id: 'n1', crm_notes: 'keys with the watchman' }), 7);
+    const uploadId = await ingest(t, [noted, toIntakeRow(supplyRow({ record_id: 'n2', phones: '+919000100022', locality: 'Juhu' }), 8)]);
+    const [rec] = await rows(t, (tx) => tx.store.find('ingested_records', { external_ref: 'n1' }));
+    let notes = await h.events(t, 'record.note_imported.v1');
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.data).toEqual({ subjectType: 'offer', subjectId: rec?.primary_subject_id, uploadId, rowNo: 7 });
+    expect(JSON.stringify(notes)).not.toContain('watchman');
+    // the same (upload, row) applied again with changed content (another batch): no second event
+    const changed = toIntakeRow(supplyRow({ record_id: 'n1', crm_notes: 'keys with the watchman', sale_price_inr_min: 21_000_000 }), 7);
+    intake.add(uploadId, 2, [changed]);
+    await h.deliver({ eventType: 'rows.classified.v1', tenantId: t, data: { uploadId, batchNo: 2, rows: [] } });
+    expect(await h.events(t, 'record.note_imported.v1')).toHaveLength(1);
+    // a later upload that changes the row: a note for the updated subject; a demand row gets its own
+    const later = await ingest(t, [
+      toIntakeRow(supplyRow({ record_id: 'n1', crm_notes: 'keys with the watchman', sale_price_inr_min: 22_000_000 }), 3),
+      toIntakeRow(
+        supplyRow({ record_id: 'n3', side: 'Demand', deal_type: 'Lease', sale_price_inr_min: null, rent_monthly_inr_min: 90_000, phones: '+919000100023', crm_notes: 'wants sea view' }),
+        4,
+      ),
+    ]);
+    notes = await h.events(t, 'record.note_imported.v1');
+    expect(notes.map((e) => [e.data['subjectType'], e.data['uploadId'], e.data['rowNo']])).toEqual([
+      ['offer', uploadId, 7],
+      ['offer', later, 3],
+      ['demand', later, 4],
+    ]);
+  });
+
   it('a missing batch fails (retried, then dead-lettered by the drain)', async () => {
     const t = await readyTenant(h);
     await expect(h.deliver({ eventType: 'rows.classified.v1', tenantId: t, data: { uploadId: randomUUID(), batchNo: 9, rows: [] } })).rejects.toBeInstanceOf(BatchNotFoundError);
@@ -184,5 +256,11 @@ describe('rows.classified.v1', () => {
     expect(events.filter((e) => e.eventType === 'offer.created.v1').length).toBeGreaterThan(50);
     const text = JSON.stringify(events);
     for (const r of synthetic) for (const p of r.phones ?? []) expect(text).not.toContain(p.replace('+', ''));
+    // CR-012 private columns stay out of events; rows with crm_notes are announced (ids only)
+    for (const r of synthetic) if (r.buildingName) expect(text).not.toContain(r.buildingName);
+    const notedRows = new Set(synthetic.filter((r) => r.hasCrmNotes).map((r) => r.rowNo));
+    const noteEvents = events.filter((e) => e.eventType === 'record.note_imported.v1');
+    expect(noteEvents.length).toBeGreaterThan(0);
+    for (const e of noteEvents) expect(notedRows.has(e.data['rowNo'] as number)).toBe(true);
   });
 });

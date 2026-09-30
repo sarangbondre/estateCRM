@@ -108,6 +108,7 @@ export function offerDto(v: OfferView) {
     reviewReasonCode: reviewCode(o.review_reason_code),
     routeToSuggestion: o.route_to_suggestion,
     sourcedForDemandId: o.sourced_for_demand_id,
+    sourcingRequestId: o.sourcing_request_id,
     sourcedForDemandCode: v.sourcedForDemandCode,
     signals: {
       enquiryCount: o.enquiry_count,

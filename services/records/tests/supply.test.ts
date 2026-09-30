@@ -80,6 +80,20 @@ describe('properties and offers', () => {
     expect(confirmed.status).toBe(201);
   });
 
+  it('an idempotent replay of the duplicate 409 keeps its candidates (CR-012)', async () => {
+    const t = await readyTenant(h);
+    const sup = await h.staff(t, 'Supply agent');
+    expect((await h.call('POST', '/v1/properties', sup, flat())).status).toBe(201);
+    const keyed = { ...sup, 'idempotency-key': crypto.randomUUID() };
+    const first = await h.call('POST', '/v1/properties', keyed, flat({ areaSqftMin: 1020 }));
+    const replay = await h.call('POST', '/v1/properties', keyed, flat({ areaSqftMin: 1020 }));
+    expect([first.status, replay.status]).toEqual([409, 409]);
+    expect(replay.headers.get('idempotent-replayed')).toBe('true');
+    expect(replay.body['code']).toBe('duplicate-property-suspected');
+    expect(replay.body['candidates']).toEqual(first.body['candidates']);
+    expect((replay.body['candidates'] as unknown[]).length).toBeGreaterThan(0);
+  });
+
   it('validates vocabulary values and ranges', async () => {
     const t = await readyTenant(h);
     const sup = await h.staff(t, 'Supply agent');
