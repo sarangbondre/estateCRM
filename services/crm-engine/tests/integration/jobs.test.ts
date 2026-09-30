@@ -236,7 +236,7 @@ describe('projection-reconcile', () => {
 });
 
 describe('proposal feedback (M6)', () => {
-  it('records one feedback row per verdict with the score and weights version; the match stays as it is', async () => {
+  it('records one feedback row per verdict with the score and weights version; "maybe" is neutral (no row, CR-012); the match stays as it is', async () => {
     const d = await newDemand({
       micromarkets: ['Andheri East'],
       localities: ['Chakala'],
@@ -261,6 +261,9 @@ describe('proposal feedback (M6)', () => {
             { matchId: a?.id as string, verdict: 'liked' },
             { matchId: b?.id as string, verdict: 'rejected' },
             { matchId: randomUUID(), verdict: 'visit_requested' },
+            // CR-012: "maybe" is neutral — accepted, but nothing is learnt from it
+            { matchId: a?.id as string, verdict: 'maybe' },
+            { matchId: b?.id as string, verdict: 'maybe' },
           ],
         },
         'journeys',

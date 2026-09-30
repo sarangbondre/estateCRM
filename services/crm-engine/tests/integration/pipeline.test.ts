@@ -333,6 +333,39 @@ describe('life curve effects (NFR-9: applied by the event handler)', () => {
       reason: 'demand_reactivated',
     });
   });
+
+  it.each([
+    ['Expired', 'demand_expired'],
+    ['Paused', 'demand_paused'],
+  ] as const)(
+    'demand %s by its life curve → matches Closed %s (match.closed.v1, CR-012); Fresh again → reopened demand_reactivated',
+    async (to, reason) => {
+      const d = await newDemand({
+        micromarkets: ['Andheri West'],
+        localities: [],
+        areaSqftMin: 2500,
+        areaSqftMax: 3000,
+      });
+      await newOffer({ micromarket: 'Andheri West', locality: null, areaSqftMin: 2800, areaSqftMax: 2800 });
+      await settle(h);
+      await stage('demand', d, to);
+      const [m] = await matchesOf(h, d);
+      expect(m).toMatchObject({ status: 'Closed', closed_reason: reason });
+      expect((await outbox(h, 'match.closed.v1')).find((e) => e.aggregateId === m?.id)?.data).toEqual({
+        matchId: m?.id,
+        demandId: d,
+        reason,
+      });
+      await stage('demand', d, 'Fresh');
+      await settle(h);
+      expect((await matchesOf(h, d))[0]).toMatchObject({ status: 'Suggested', closed_reason: null });
+      expect((await outbox(h, 'match.reopened.v1')).find((e) => e.aggregateId === m?.id)?.data).toEqual({
+        matchId: m?.id,
+        demandId: d,
+        reason: 'demand_reactivated',
+      });
+    },
+  );
 });
 
 describe('close propagation and compensation (AS-S1, HLD §7)', () => {

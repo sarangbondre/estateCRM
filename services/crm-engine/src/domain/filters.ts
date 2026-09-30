@@ -78,6 +78,28 @@ function tagsEqual(tag: StatedDealTag, stated: string, offered: string): boolean
   return matchKey(stated) === matchKey(offered);
 }
 
+/** Residential BHK band (CR-011 item 3): an offer's BHK may differ from the demand's by at most this much. */
+export const BHK_BAND = 1;
+
+type BhkSides = Pick<OfferMx, 'bhkMin' | 'bhkMax'>;
+
+/**
+ * Distance in BHK between an offer's and a demand's BHK ranges (0 when they overlap). A range with one end blank is
+ * that single value; `null` when either side has no BHK (unknown BHK is never filtered, and the factor is not
+ * applicable). A demand for "2 or 3 BHK" is the range 2–3, so its band is 1–4.
+ */
+export function bhkGap(o: BhkSides, d: BhkSides): number | null {
+  const oMin = o.bhkMin ?? o.bhkMax;
+  const oMax = o.bhkMax ?? o.bhkMin;
+  const dMin = d.bhkMin ?? d.bhkMax;
+  const dMax = d.bhkMax ?? d.bhkMin;
+  if (oMin === null || oMax === null || dMin === null || dMax === null) return null;
+  return oMax < dMin ? dMin - oMax : oMin > dMax ? oMin - dMax : 0;
+}
+
+const bhkText = (min: number | null, max: number | null) =>
+  min !== null && max !== null && min !== max ? `${min}–${max}` : String(max ?? min);
+
 export interface FilterOptions {
   /** A new suggestion is being considered: a Stale demand accepts none (exclusion `demand_stale`). */
   requireAcceptsNew?: boolean;
@@ -154,6 +176,16 @@ export function evaluateHardFilters(o: OfferMx, d: DemandMx, options: FilterOpti
     !o.propertyTypes.some((t) => d.propertyTypes.includes(t))
   )
     return fail('property_type', `${o.propertyTypes.join(', ')} vs ${d.propertyTypes.join(', ')}`);
+  // Residential BHK within ±1 of the demand (CR-011 item 3). Reported under property_type: the contract's filter list
+  // has no BHK entry. Like a property type mismatch, it is a skip (never a candidate), not a recorded exclusion.
+  if (o.segment === 'Residential') {
+    const gap = bhkGap(o, d);
+    if (gap !== null && gap > BHK_BAND)
+      return fail(
+        'property_type',
+        `${bhkText(o.bhkMin, o.bhkMax)} BHK vs ${bhkText(d.bhkMin, d.bhkMax)} BHK (±${BHK_BAND} allowed)`,
+      );
+  }
   ok('property_type');
 
   // 7. stated deal tags
