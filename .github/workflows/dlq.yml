@@ -2,7 +2,7 @@
 # Supabase from a local machine. Run it by hand: Actions → "dlq" → Run workflow. Message bodies are never printed.
 #   list                 depth of every *_dlq
 #   show   <queue>       reason, attempts, event type/id
-#   replay <queue>       move them back to <queue> (dry run unless "yes" is ticked)
+#   replay <queue>       move them back to <queue> (dry run unless replay_for_real is ticked)
 name: dlq
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ on:
         description: Source queue for show/replay, e.g. q_intake (not the _dlq)
         required: false
         default: ''
-      yes:
+      replay_for_real:
         description: Replay for real (otherwise a dry run)
         type: boolean
         default: false
@@ -46,7 +46,7 @@ jobs:
           RAW: ${{ secrets.SUPABASE_DB_URL }}
           COMMAND: ${{ github.event.inputs.command }}
           QUEUE: ${{ github.event.inputs.queue }}
-          YES: ${{ github.event.inputs.yes }}
+          YES: ${{ github.event.inputs.replay_for_real }}
         run: |
           if [ -z "$RAW" ]; then echo "::error::Add the SUPABASE_DB_URL repository secret first"; exit 1; fi
           case "$COMMAND" in list|show|replay) ;; *) echo "::error::command must be list, show or replay"; exit 1 ;; esac
