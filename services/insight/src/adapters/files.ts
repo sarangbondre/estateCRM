@@ -12,7 +12,7 @@ import type { FileStore, SheetColumn, SpreadsheetWriter } from '../application/p
 const TIMEOUT = 10_000;
 
 export function supabaseFileStore(url: string, serviceKey: string, bucket: string): FileStore {
-  const base = `${url.replace(/\/$/, '')}/storage/v1`;
+  const base = `${url.replace(/\/$/, '').replace(/\/storage\/v1$/, '')}/storage/v1`;
   const auth = { authorization: `Bearer ${serviceKey}`, apikey: serviceKey };
   const enc = (p: string) => p.split('/').map(encodeURIComponent).join('/');
   return {

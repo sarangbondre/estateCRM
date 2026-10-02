@@ -11,7 +11,7 @@ import type { Config } from '../config.js';
 const TIMEOUT = 10_000;
 
 export function supabaseStorage(url: string, serviceKey: string, bucket: string): FileStoragePort {
-  const base = `${url.replace(/\/$/, '')}/storage/v1`;
+  const base = `${url.replace(/\/$/, '').replace(/\/storage\/v1$/, '')}/storage/v1`;
   const auth = { authorization: `Bearer ${serviceKey}`, apikey: serviceKey };
   const enc = (p: string) => p.split('/').map(encodeURIComponent).join('/');
   const put = async (path: string, body: Uint8Array, contentType: string) => {

@@ -129,8 +129,12 @@ describe('GET /v1/chat/plan-catalogue', () => {
 describe('vocabulary-refresh', () => {
   it('fetches the release and the hierarchy for pending tenants', async () => {
     await h.deliver('vocabulary.released.v1', { version: 'v0.7-test', checksum: 'c' });
-    const r = await h.cron('/internal/v1/jobs/vocabulary-refresh');
-    expect(r.status).toBe(200);
+    // The job takes 50 pending tenants per run, oldest first; a reused local database can hold tenants left pending by
+    // earlier runs, so run it until this tenant's turn comes.
+    for (let run = 0; run < 20 && !recordsCalls.includes(`vocabulary:${h.tenantId}`); run++) {
+      const r = await h.cron('/internal/v1/jobs/vocabulary-refresh');
+      expect(r.status).toBe(200);
+    }
     expect(recordsCalls).toContain(`vocabulary:${h.tenantId}`);
     const v = await h.rows<{ version: string }>(sql`select version from vocabulary_release where tenant_id = ${h.tenantId} and active`);
     expect(v[0]?.version).toBe('v0.7-test');
