@@ -58,8 +58,13 @@ that session. You do every step that involves signing in, passwords or secrets. 
    Outside `local`/`test`, records also needs `RECORDS_CONTACT_HASH_SECRET` and `RECORDS_SCAN_SALT`, and listings needs
    `LISTINGS_SCAN_SALT`. The two scan salts must be the **same value**: listings compares its hashes with the scan terms
    records hashes.
-   Each service function ships its own `package.json` (`includeFiles` in `vercel.json`). Without it Node reads the ESM
-   entry as CommonJS and the function exits with "Cannot use import statement outside a module".
+   Each backend service's `buildCommand` builds only its dependencies (`--filter=@11e/<svc>^...`), never the service
+   itself. If the service's own `dist/` exists, Vercel's Hono preset ships `dist/` as the function root, beside the
+   repository's CommonJS `package.json`, and every function exits with "Cannot use import statement outside a module".
+   Without `dist/`, Vercel compiles `index.ts` itself into `.mjs`. Journeys also needs `includeFiles` for pdfkit's
+   standard fonts: @react-pdf loads them with a runtime `require` that the file tracer misses.
+   Offline check that matches production: `vercel build`, then load each `.vercel/output/services/<svc>/functions/index.func`
+   with plain Node and call `/health/ready`.
 5. Offline check: `vercel build` of the whole services project succeeds (2026-09-30). `vercel dev -L` (beta) couldn't start
    all 7 services locally (its dependency installer crashes), so use `pnpm dev` locally. The first preview deployment is the
    routing test.

@@ -50,11 +50,10 @@
       "root": "services/intake",
       "entrypoint": "index.ts",
       "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
-      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/intake...",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/intake^...",
       "functions": {
         "index.ts": {
-          "maxDuration": 60,
-          "includeFiles": "package.json"
+          "maxDuration": 60
         }
       },
       "routes": [
@@ -76,11 +75,10 @@
       "root": "services/records",
       "entrypoint": "index.ts",
       "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
-      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/records...",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/records^...",
       "functions": {
         "index.ts": {
-          "maxDuration": 60,
-          "includeFiles": "package.json"
+          "maxDuration": 60
         }
       },
       "bindings": [
@@ -110,11 +108,11 @@
       "root": "services/journeys",
       "entrypoint": "index.ts",
       "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
-      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/journeys...",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/journeys^...",
       "functions": {
         "index.ts": {
           "maxDuration": 60,
-          "includeFiles": "package.json"
+          "includeFiles": "node_modules/.pnpm/pdfkit@*/node_modules/pdfkit/js/standard-fonts/**/*.cjs"
         }
       },
       "bindings": [
@@ -156,11 +154,10 @@
       "root": "services/crm-engine",
       "entrypoint": "index.ts",
       "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
-      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/crm-engine...",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/crm-engine^...",
       "functions": {
         "index.ts": {
-          "maxDuration": 60,
-          "includeFiles": "package.json"
+          "maxDuration": 60
         }
       },
       "bindings": [
@@ -196,11 +193,10 @@
       "root": "services/listings",
       "entrypoint": "index.ts",
       "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
-      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/listings...",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/listings^...",
       "functions": {
         "index.ts": {
-          "maxDuration": 60,
-          "includeFiles": "package.json"
+          "maxDuration": 60
         }
       },
       "bindings": [
@@ -240,11 +236,10 @@
       "root": "services/insight",
       "entrypoint": "index.ts",
       "installCommand": "npx -y pnpm@12.7.0 install --frozen-lockfile",
-      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/insight...",
+      "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/insight^...",
       "functions": {
         "index.ts": {
-          "maxDuration": 60,
-          "includeFiles": "package.json"
+          "maxDuration": 60
         }
       },
       "bindings": [
