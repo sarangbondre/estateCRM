@@ -46,11 +46,12 @@ that session. You do every step that involves signing in, passwords or secrets. 
    |---|---|---|
    | `/public/v1/{listings,projects,demand-posts,changes}…` | listings (`/public` stripped) | 11estates.in website, `X-Api-Key` |
    | `/svc/<service>/internal/v1/{relay,drain/…,jobs/…}`, `/svc/<service>/health/…` | that service (`/svc/<service>` stripped) | Supabase pg_cron scheduler, `X-Cron-Secret` |
+   | `/svc/records/v1/{vocabulary,micromarkets}` | records (`/svc/records` stripped) | intake (service token), since bindings can't form cycles |
    | everything else | web | staff app + gateway |
 
 4. **Environment variables** (Project → Settings → Environment Variables, Production and Preview). You type the secrets;
-   Claude gives you the list. Don't set the binding variables (`RECORDS_URL`, `INTAKE_URL`, `JOURNEYS_URL`, `LISTINGS_URL`,
-   `WEB_URL`, `SVC_<SERVICE>_URL`): Vercel injects them. Per-service values use the service prefix, e.g.
+   Claude gives you the list. Don't set `RECORDS_URL`, `INTAKE_URL`, `JOURNEYS_URL`, `LISTINGS_URL`, `WEB_URL` or `SVC_<SERVICE>_URL`: bindings and
+   `VERCEL_PROJECT_PRODUCTION_URL` provide them. Per-service values use the service prefix, e.g.
    `RECORDS_DATABASE_URL`, `RECORDS_CRON_SECRET` (the services read `<SERVICE>_<NAME>` as well as the plain name).
    **Variables are shared by all 7 services in one project: never set a plain `DATABASE_URL`, `CRON_SECRET`, `POOL_MAX` or
    `SERVICE_CREDENTIAL`.** The plain name wins over the prefixed one, so one value would reach every service.
