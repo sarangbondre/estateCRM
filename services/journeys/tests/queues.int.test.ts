@@ -16,7 +16,11 @@ beforeAll(async () => {
     [other, 'Supply agent'],
     [manager, 'Manager'],
   ] as const) {
-    await h.deliver('user.changed.v1', { userId, role, active: true, displayName: 'Test user' }, { aggregateId: userId });
+    await h.deliver(
+      'user.changed.v1',
+      { userId, role, active: true, displayName: 'Test user' },
+      { aggregateId: userId },
+    );
   }
 });
 afterAll(() => h.close());
@@ -47,16 +51,35 @@ describe('My queue', () => {
 
   it('builds should_call items for captures and a must_call item per enquiry (due +24 h)', async () => {
     for (const o of offers) await h.deliver('offer.created.v1', o, { aggregateId: o.offerId });
-    await h.deliver('enquiry.received.v1', { enquiryId: ids(), code: 'ENQ-0311', offerId: offers[0]?.offerId as string, receivedAt: h.clock.now().toISOString() }, { aggregateId: ids() });
+    await h.deliver(
+      'enquiry.received.v1',
+      {
+        enquiryId: ids(),
+        code: 'ENQ-0311',
+        offerId: offers[0]?.offerId as string,
+        receivedAt: h.clock.now().toISOString(),
+      },
+      { aggregateId: ids() },
+    );
     const me = await h.as(agent, 'Supply agent');
     const r = await me.get('/v1/queues/me');
     expect(r.status).toBe(200);
-    const by = Object.fromEntries((r.body['sections'] as { section: string; count: number }[]).map((s) => [s.section, s.count]));
+    const by = Object.fromEntries(
+      (r.body['sections'] as { section: string; count: number }[]).map((s) => [s.section, s.count]),
+    );
     expect(by).toMatchObject({ must_call: 1, should_call: 4, sourcing_requests: 0, watchlist_tasks: 0 });
     expect(r.body).toMatchObject({ userId: agent, capacity: 40, callsLoggedToday: 0, plannedToday: 5 });
     const must = await me.get('/v1/queues/me/sections/must_call');
-    expect(must.body.items?.[0]).toMatchObject({ reason: 'enquiry', reasonRef: 'ENQ-0311', subjectCode: offers[0]?.code, overdue: false, plannedToday: true });
-    expect(new Date(must.body.items?.[0]?.['dueAt']).getTime() - h.clock.now().getTime()).toBe(24 * 3_600_000);
+    expect(must.body.items?.[0]).toMatchObject({
+      reason: 'enquiry',
+      reasonRef: 'ENQ-0311',
+      subjectCode: offers[0]?.code,
+      overdue: false,
+      plannedToday: true,
+    });
+    expect(new Date(must.body.items?.[0]?.['dueAt']).getTime() - h.clock.now().getTime()).toBe(
+      24 * 3_600_000,
+    );
   });
 
   it('should_call pages follow the rank (desc, id) and respect the daily plan', async () => {
@@ -93,26 +116,49 @@ describe('My queue', () => {
     const me = await h.as(agent, 'Supply agent');
     const items = (await me.get('/v1/queues/me/sections/should_call')).body.items ?? [];
     const key = ids();
-    const r = await mgr.post('/v1/queue-items/reassign', { queueItemIds: [items[0]?.['id'], ids()], assigneeUserId: other }, { 'idempotency-key': key });
+    const r = await mgr.post(
+      '/v1/queue-items/reassign',
+      { queueItemIds: [items[0]?.['id'], ids()], assigneeUserId: other },
+      { 'idempotency-key': key },
+    );
     expect(r.status).toBe(200);
     expect(r.body['reassigned']).toBe(1);
     expect(r.body['skipped']).toHaveLength(1);
-    const replay = await mgr.post('/v1/queue-items/reassign', { queueItemIds: [items[0]?.['id'], ids()], assigneeUserId: other }, { 'idempotency-key': key });
+    const replay = await mgr.post(
+      '/v1/queue-items/reassign',
+      { queueItemIds: [items[0]?.['id'], ids()], assigneeUserId: other },
+      { 'idempotency-key': key },
+    );
     expect(replay.status).toBe(409); // same key, different body
     const theirs = await (await h.as(other, 'Supply agent')).get('/v1/queues/me');
-    expect((theirs.body['sections'] as { section: string; count: number }[]).find((s) => s.section === 'should_call')?.count).toBe(1);
-    expect((await h.outbox('audit.recorded.v1')).some((e) => e.payload.data['action'] === 'queue_items.reassigned')).toBe(true);
+    expect(
+      (theirs.body['sections'] as { section: string; count: number }[]).find(
+        (s) => s.section === 'should_call',
+      )?.count,
+    ).toBe(1);
+    expect(
+      (await h.outbox('audit.recorded.v1')).some(
+        (e) => e.payload.data['action'] === 'queue_items.reassigned',
+      ),
+    ).toBe(true);
   });
 
   it('capacities: agents read only their own row; If-Match mismatch is 412; list by team', async () => {
     const me = await h.as(agent, 'Supply agent');
-    expect((await me.get(`/v1/capacities/${agent}`)).body).toMatchObject({ userId: agent, dailyCalls: 3, team: 'supply' });
+    expect((await me.get(`/v1/capacities/${agent}`)).body).toMatchObject({
+      userId: agent,
+      dailyCalls: 3,
+      team: 'supply',
+    });
     const forbidden = await me.get(`/v1/capacities/${other}`);
     expect(forbidden.status).toBe(403);
     expect(forbidden.body['code']).toBe('not-owner');
     const mgr = await h.as(manager, 'Manager');
     expect((await mgr.get(`/v1/capacities/${other}`)).body).toMatchObject({ dailyCalls: 40, version: 0 });
-    expect((await mgr.put(`/v1/capacities/${agent}`, { team: 'supply', dailyCalls: 50 }, { 'if-match': '99' })).status).toBe(412);
+    expect(
+      (await mgr.put(`/v1/capacities/${agent}`, { team: 'supply', dailyCalls: 50 }, { 'if-match': '99' }))
+        .status,
+    ).toBe(412);
     const list = await mgr.get('/v1/capacities?team=supply');
     expect(list.body.items?.map((i) => i['userId'])).toContain(agent);
   });
@@ -120,10 +166,13 @@ describe('My queue', () => {
   it('queue-counts-flush emits one queue.counts_changed.v1 per changed user, then nothing until counts change', async () => {
     await h.runJob('queue-counts-flush');
     const first = await h.outbox('queue.counts_changed.v1');
+    // The flush job covers every user, and test files run in parallel: another file's flush may already have published an
+    // earlier snapshot for this agent. Assert on the latest event, which must reflect the current counts.
     const mine = first.filter((e) => e.payload.data['userId'] === agent);
-    expect(mine).toHaveLength(1);
-    expect(mine[0]?.payload.data['counts']).toMatchObject({ must_call: 1, should_call: 3 });
-    expect(eventProblems(mine[0]?.payload)).toBeNull();
+    expect(mine.length).toBeGreaterThanOrEqual(1);
+    const latest = mine[mine.length - 1];
+    expect(latest?.payload.data['counts']).toMatchObject({ must_call: 1, should_call: 3 });
+    expect(eventProblems(latest?.payload)).toBeNull();
     await h.runJob('queue-counts-flush');
     expect((await h.outbox('queue.counts_changed.v1')).length).toBe(first.length);
   });
@@ -139,7 +188,15 @@ describe('My queue', () => {
       const demandId = ids();
       await h.deliver(
         'demand.created.v1',
-        { demandId, code: `DEM-9${i}`, dealTypes: ['Sale'], segment: 'Residential', micromarkets: ['Bandra West'], budgetInrMax: 23_000_000 + i * 1_000_000, ownerUserId: manager },
+        {
+          demandId,
+          code: `DEM-9${i}`,
+          dealTypes: ['Sale'],
+          segment: 'Residential',
+          micromarkets: ['Bandra West'],
+          budgetInrMax: 23_000_000 + i * 1_000_000,
+          ownerUserId: manager,
+        },
         { aggregateId: demandId },
       );
     }
