@@ -1,6 +1,7 @@
 # Deploy the database (Supabase, cloud): platform setup (schemas, roles, queues, schedules, alarms, buckets), then every
 # service's migrations, then the platform checks. Run it by hand: Actions → "deploy-database" → Run workflow.
-# Needs one repository secret, SUPABASE_DB_URL: Supabase → Connect → "Session pooler" connection string (port 5432) with
+# Needs one repository secret, SUPABASE_DB_URL: Supabase → Connect → "Session pooler" connection string (port 5432, not the
+# IPv6-only Direct connection) with
 # the database password filled in. Safe to re-run: every step is idempotent.
 name: deploy-database
 on:
@@ -33,16 +34,23 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build the migration runner
         run: pnpm turbo run build --filter=@11e/db
-      - name: Connection string (TLS, no password in logs)
+      - name: Connection strings (TLS, no password in logs)
         env:
           RAW: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           if [ -z "$RAW" ]; then echo "::error::Add the SUPABASE_DB_URL repository secret first"; exit 1; fi
-          case "$RAW" in *sslmode=*) URL="$RAW" ;; *\?*) URL="$RAW&sslmode=no-verify" ;; *) URL="$RAW?sslmode=no-verify" ;; esac
-          echo "::add-mask::$URL"
-          echo "DB_URL=$URL" >> "$GITHUB_ENV"
+          case "$RAW" in
+            *db.*.supabase.co*) echo "::error::SUPABASE_DB_URL is the Direct connection (IPv6 only; GitHub runners are IPv4). Use Supabase → Connect → Session pooler instead."; exit 1 ;;
+          esac
+          BASE="${RAW%%\?*}"
+          # Supabase CLI (Go/pgx) understands sslmode=require; node-postgres needs no-verify (Supabase's CA isn't in Node's store).
+          CLI_URL="$BASE?sslmode=require"
+          NODE_URL="$BASE?sslmode=no-verify"
+          echo "::add-mask::$CLI_URL"; echo "::add-mask::$NODE_URL"
+          echo "CLI_DB_URL=$CLI_URL" >> "$GITHUB_ENV"
+          echo "DB_URL=$NODE_URL" >> "$GITHUB_ENV"
       - name: Platform setup (infra/supabase/migrations)
-        run: supabase --workdir infra db push --db-url "$DB_URL" --include-all --yes
+        run: supabase --workdir infra db push --db-url "$CLI_DB_URL" --include-all --yes
       - name: Service migrations
         run: |
           for svc in web intake records journeys crm-engine listings insight; do
