@@ -53,7 +53,8 @@
       "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/intake...",
       "functions": {
         "index.ts": {
-          "maxDuration": 60
+          "maxDuration": 60,
+          "includeFiles": "package.json"
         }
       },
       "routes": [
@@ -78,7 +79,8 @@
       "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/records...",
       "functions": {
         "index.ts": {
-          "maxDuration": 60
+          "maxDuration": 60,
+          "includeFiles": "package.json"
         }
       },
       "bindings": [
@@ -111,7 +113,8 @@
       "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/journeys...",
       "functions": {
         "index.ts": {
-          "maxDuration": 60
+          "maxDuration": 60,
+          "includeFiles": "package.json"
         }
       },
       "bindings": [
@@ -156,7 +159,8 @@
       "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/crm-engine...",
       "functions": {
         "index.ts": {
-          "maxDuration": 60
+          "maxDuration": 60,
+          "includeFiles": "package.json"
         }
       },
       "bindings": [
@@ -195,7 +199,8 @@
       "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/listings...",
       "functions": {
         "index.ts": {
-          "maxDuration": 60
+          "maxDuration": 60,
+          "includeFiles": "package.json"
         }
       },
       "bindings": [
@@ -238,7 +243,8 @@
       "buildCommand": "npx -y pnpm@12.7.0 turbo run build --filter=@11e/insight...",
       "functions": {
         "index.ts": {
-          "maxDuration": 60
+          "maxDuration": 60,
+          "includeFiles": "package.json"
         }
       },
       "bindings": [

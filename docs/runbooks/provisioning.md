@@ -55,6 +55,11 @@ that session. You do every step that involves signing in, passwords or secrets. 
    `RECORDS_DATABASE_URL`, `RECORDS_CRON_SECRET` (the services read `<SERVICE>_<NAME>` as well as the plain name).
    **Variables are shared by all 7 services in one project: never set a plain `DATABASE_URL`, `CRON_SECRET`, `POOL_MAX` or
    `SERVICE_CREDENTIAL`.** The plain name wins over the prefixed one, so one value would reach every service.
+   Outside `local`/`test`, records also needs `RECORDS_CONTACT_HASH_SECRET` and `RECORDS_SCAN_SALT`, and listings needs
+   `LISTINGS_SCAN_SALT`. The two scan salts must be the **same value**: listings compares its hashes with the scan terms
+   records hashes.
+   Each service function ships its own `package.json` (`includeFiles` in `vercel.json`). Without it Node reads the ESM
+   entry as CommonJS and the function exits with "Cannot use import statement outside a module".
 5. Offline check: `vercel build` of the whole services project succeeds (2026-09-30). `vercel dev -L` (beta) couldn't start
    all 7 services locally (its dependency installer crashes), so use `pnpm dev` locally. The first preview deployment is the
    routing test.
