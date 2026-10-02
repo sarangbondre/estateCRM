@@ -38,7 +38,7 @@ function tokenExpiry(url: string, fallbackSec: number): Date {
 
 export function supabaseFileStore(o: SupabaseStorageOptions): FileStore {
   const doFetch = o.fetch ?? fetch;
-  const base = `${o.url.replace(/\/$/, '')}/storage/v1`;
+  const base = `${o.url.replace(/\/$/, '').replace(/\/storage\/v1$/, '')}/storage/v1`;
   const auth = { authorization: `Bearer ${o.serviceKey}`, apikey: o.serviceKey };
   const timeout = o.timeoutMs ?? 10_000;
   let buckets: Promise<void> | undefined;

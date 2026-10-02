@@ -13,7 +13,7 @@ export interface StorageOptions {
 
 export function supabasePhotoStore(o: StorageOptions): PhotoStore {
   const doFetch = o.fetch ?? fetch;
-  const base = `${o.url.replace(/\/$/, '')}/storage/v1`;
+  const base = `${o.url.replace(/\/$/, '').replace(/\/storage\/v1$/, '')}/storage/v1`;
   const headers = { authorization: `Bearer ${o.serviceKey}`, apikey: o.serviceKey };
   const enc = (path: string) => path.split('/').map(encodeURIComponent).join('/');
   const call = (path: string, init: RequestInit) =>
@@ -56,7 +56,7 @@ export function supabasePhotoStore(o: StorageOptions): PhotoStore {
 
 /** Public URL builder when storage isn't configured (local): same shape, never fetched. */
 export const publicUrlFor = (url: string | undefined, bucket: string) => (path: string) =>
-  `${(url ?? 'http://127.0.0.1:54321').replace(/\/$/, '')}/storage/v1/object/public/${bucket}/${path}`;
+  `${(url ?? 'http://127.0.0.1:54321').replace(/\/$/, '').replace(/\/storage\/v1$/, '')}/storage/v1/object/public/${bucket}/${path}`;
 
 // ---- metadata stripping ------------------------------------------------------------------------------------------
 
