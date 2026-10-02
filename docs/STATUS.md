@@ -14,7 +14,7 @@ State: IN PROGRESS (service tracks in parallel; local-first, cloud provisioning 
 Inputs: docs/inputs/extractor-master-profile.md (PII-free profile of crm_master.xlsx; file not stored), docs/inputs/CRM-01-brd-v0.5.pdf, docs/inputs/CRM-01-brd-v0.6.pdf (client BRDs by Vinit), docs/inputs/vinit-journeys-artifact.md
 
 Environments:
-- Supabase pilot project ref: `xzizchbnejzxkhemmpie` (Mumbai, Free). Linking, bootstrap and deploy happen in the provisioning session (docs/runbooks/provisioning.md).
+- Supabase pilot project ref: `uflcrwgxiwqunhjsixdw` (`11e-crm-pilot`, Mumbai ap-south-1, Free), created 2026-10-02. It replaces `xzizchbnejzxkhemmpie`, which turned out to be in Singapore (ap-southeast-1), against BRD A-10; nothing was stored there. The database is deployed by the GitHub workflow `deploy-database` (no local Supabase tooling).
 
 Stage 7 task progress:
 - [x] F-01 Monorepo scaffold (2026-09-27)
