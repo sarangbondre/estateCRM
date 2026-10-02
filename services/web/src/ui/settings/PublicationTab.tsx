@@ -4,7 +4,7 @@
 // set, the pilot shows "MahaRERA registration pending"; production needs it before any listing is served.
 // Contract: listings getPublicationSettings, putPublicationSettings (If-Match version → 412).
 import { useEffect, useState } from 'react';
-import { call, useResource } from '../lib/api';
+import { ApiError, call, useResource } from '../lib/api';
 import { date } from '../lib/format';
 import { ActionButton, Chip, Done, Loading, useAction } from '../cards/Card';
 import { Input } from '../cards/common';
@@ -14,9 +14,19 @@ import { reraPending, validateRera } from './logic';
 import type { PublicationSettings } from './logic';
 
 const DEFAULT_NOTE = 'Details subject to confirmation';
+// What the tab shows before the number is first saved (no version yet, so the first save sends no If-Match).
+const NOT_SET: PublicationSettings = {
+  mahareraAgentNumber: '',
+  subjectToConfirmationNote: DEFAULT_NOTE,
+  version: 0,
+  updatedAt: '',
+};
 
 export function PublicationTab({ editable, shell }: TabProps) {
   const res = useResource<PublicationSettings>('/v1/publication-settings');
+  // listings answers 404 until the number is first saved: that is "registration pending", not an error.
+  const notSet = res.error instanceof ApiError && res.error.status === 404;
+  const current = res.data ?? (notSet ? NOT_SET : undefined);
   const [rera, setRera] = useState('');
   const [note, setNote] = useState(DEFAULT_NOTE);
   const [tried, setTried] = useState(false);
@@ -33,7 +43,10 @@ export function PublicationTab({ editable, shell }: TabProps) {
   const save = useAction(
     () =>
       call<PublicationSettings>('PUT', '/v1/publication-settings', {
-        body: { mahareraAgentNumber: rera.trim().toUpperCase(), subjectToConfirmationNote: note.trim() || DEFAULT_NOTE },
+        body: {
+          mahareraAgentNumber: rera.trim().toUpperCase(),
+          subjectToConfirmationNote: note.trim() || DEFAULT_NOTE,
+        },
         ...(res.data ? { ifMatch: res.data.version } : {}),
       }),
     () => {
@@ -42,13 +55,19 @@ export function PublicationTab({ editable, shell }: TabProps) {
       res.reload();
     },
   );
-  const pending = reraPending(res.data);
+  const pending = reraPending(current);
 
   return (
     <Section
       title="MahaRERA registration"
       actions={
-        res.data ? pending ? <Chip tone="warn">Registration pending</Chip> : <Chip tone="good">Set</Chip> : undefined
+        current ? (
+          pending ? (
+            <Chip tone="warn">Registration pending</Chip>
+          ) : (
+            <Chip tone="good">Set</Chip>
+          )
+        ) : undefined
       }
       note={
         pending
@@ -58,9 +77,9 @@ export function PublicationTab({ editable, shell }: TabProps) {
           : 'Shown on every listing. A change refreshes every public item.'
       }
     >
-      {res.error !== undefined && !res.data ? (
+      {res.error !== undefined && !current ? (
         <SettingsError error={res.error} onReload={res.reload} />
-      ) : !res.data ? (
+      ) : !current ? (
         <Loading />
       ) : (
         <form
@@ -85,7 +104,8 @@ export function PublicationTab({ editable, shell }: TabProps) {
             </div>
           ) : (
             <p style={{ margin: 0 }}>
-              <span className="mono">{res.data.mahareraAgentNumber || 'Registration pending'}</span> · {res.data.subjectToConfirmationNote ?? DEFAULT_NOTE}
+              <span className="mono">{current.mahareraAgentNumber || 'Registration pending'}</span> ·{' '}
+              {current.subjectToConfirmationNote ?? DEFAULT_NOTE}
             </p>
           )}
           {(reraError || noteError) && (
@@ -102,7 +122,9 @@ export function PublicationTab({ editable, shell }: TabProps) {
             </div>
           )}
           {save.error !== undefined && <SettingsError error={save.error} onReload={res.reload} />}
-          {res.data.updatedAt && <span className="faint small">Last changed {date(res.data.updatedAt, true)}</span>}
+          {current.updatedAt && (
+            <span className="faint small">Last changed {date(current.updatedAt, true)}</span>
+          )}
         </form>
       )}
     </Section>
