@@ -1,4 +1,12 @@
-// Vercel entry (Services, Hono preset): the composed app is the default export. Local dev uses src/server.ts.
+// Vercel entry (Services, Hono preset). Local dev uses src/server.ts.
+// Public /svc/journeys/... requests (scheduler, health checks) still carry the prefix: Vercel doesn't apply the service
+// route's path transform in production. Calls from web via the binding arrive without it.
+import { Hono } from 'hono';
 import { compose } from './src/main.js';
 
-export default compose().app;
+const { app } = compose();
+const entry = new Hono();
+entry.mount('/svc/journeys', app.fetch);
+entry.mount('/', app.fetch);
+
+export default entry;
