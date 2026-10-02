@@ -63,7 +63,7 @@ equivalent: `docs/01-brd.md` (BRD v0.6.1). Requirements: `docs/02-prd.md` (PRD v
 
 | ID | Description | Severity |
 |----|-------------|----------|
-| B-1 | Cloud provisioning deferred by the product owner until after implementation (Supabase ref `xzizchbnejzxkhemmpie` exists). Blocks QA-02 (pilot deploy) only. | low |
+| B-1 | Cloud provisioning deferred by the product owner until after implementation (Supabase pilot ref `uflcrwgxiwqunhjsixdw`, Mumbai). Blocks QA-02 (pilot deploy) only. | low |
 
 ## Critical Items (P0)
 
