@@ -54,7 +54,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (!v) throw new ConfigError(`missing environment variable ${name} (or INTAKE_${name})`);
     return v;
   };
-  const webUrl = get('WEB_URL') ?? 'http://127.0.0.1:3000';
+  // On Vercel, web is reached on its public production address (bindings may not form cycles: web binds to every service).
+  const webUrl =
+    get('WEB_URL') ??
+    (env['VERCEL_PROJECT_PRODUCTION_URL'] ? `https://${env['VERCEL_PROJECT_PRODUCTION_URL']}` : undefined) ??
+    'http://127.0.0.1:3000';
   const pilotMode = bool(get('PILOT_MODE'), true);
   return {
     port: Number(get('PORT') ?? 3001),
@@ -70,7 +74,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     pilotMode,
     chunkSize: Number(get('CHUNK_SIZE') ?? (pilotMode ? 500 : 2000)),
     chunkConcurrency: Number(get('CHUNK_CONCURRENCY') ?? (pilotMode ? 5 : 12)),
-    recordsUrl: get('RECORDS_URL'),
+    // On Vercel, intake reaches records' vocabulary/micromarkets through the public /svc/records path (service token
+    // required): records already binds to intake, and bindings may not form cycles.
+    recordsUrl:
+      get('RECORDS_URL') ??
+      (env['VERCEL_PROJECT_PRODUCTION_URL']
+        ? `https://${env['VERCEL_PROJECT_PRODUCTION_URL']}/svc/records`
+        : undefined),
     anonymisationKey: anonymisationKey(
       get('ANONYMISATION_KEY'),
       get('ENVIRONMENT_NAME') ?? 'local',

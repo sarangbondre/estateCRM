@@ -46,7 +46,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const local = environment === 'local' || environment === 'test';
   /** Secrets have throwaway defaults only on a developer machine. */
   const secret = (name: string, localDefault: string) => get(name) ?? (local ? localDefault : need(name));
-  const webUrl = get('WEB_URL') ?? 'http://127.0.0.1:3000';
+  // On Vercel, web is reached on its public production address (bindings may not form cycles: web binds to every service).
+  const webUrl =
+    get('WEB_URL') ??
+    (env['VERCEL_PROJECT_PRODUCTION_URL'] ? `https://${env['VERCEL_PROJECT_PRODUCTION_URL']}` : undefined) ??
+    'http://127.0.0.1:3000';
   return {
     port: Number(get('PORT') ?? 3002),
     databaseUrl: need('DATABASE_URL'),

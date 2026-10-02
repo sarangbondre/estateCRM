@@ -44,7 +44,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (!v) throw new ConfigError(`missing environment variable ${name} (or JOURNEYS_${name})`);
     return v;
   };
-  const webUrl = get('WEB_URL') ?? 'http://127.0.0.1:3000';
+  // On Vercel, web is reached on its public production address (bindings may not form cycles: web binds to every service).
+  const webUrl =
+    get('WEB_URL') ??
+    (env['VERCEL_PROJECT_PRODUCTION_URL'] ? `https://${env['VERCEL_PROJECT_PRODUCTION_URL']}` : undefined) ??
+    'http://127.0.0.1:3000';
   const environment = get('ENVIRONMENT_NAME') ?? 'local';
   const salt = get('IP_HASH_SALT');
   if (!salt && environment !== 'local' && environment !== 'test')
