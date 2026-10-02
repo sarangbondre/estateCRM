@@ -1,0 +1,59 @@
+# Dead-letter queues on the pilot database (docs/runbooks/dlq-replay.md), from a GitHub runner so nothing touches
+# Supabase from a local machine. Run it by hand: Actions → "dlq" → Run workflow. Message bodies are never printed.
+#   list                 depth of every *_dlq
+#   show   <queue>       reason, attempts, event type/id
+#   replay <queue>       move them back to <queue> (dry run unless "yes" is ticked)
+name: dlq
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type "pilot" to use the pilot database
+        required: true
+      command:
+        description: list | show | replay
+        required: true
+        default: list
+      queue:
+        description: Source queue for show/replay, e.g. q_intake (not the _dlq)
+        required: false
+        default: ''
+      yes:
+        description: Replay for real (otherwise a dry run)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: deploy-database
+  cancel-in-progress: false
+jobs:
+  dlq:
+    if: github.event.inputs.confirm == 'pilot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pilot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run (no secrets or message bodies in logs)
+        env:
+          RAW: ${{ secrets.SUPABASE_DB_URL }}
+          COMMAND: ${{ github.event.inputs.command }}
+          QUEUE: ${{ github.event.inputs.queue }}
+          YES: ${{ github.event.inputs.yes }}
+        run: |
+          if [ -z "$RAW" ]; then echo "::error::Add the SUPABASE_DB_URL repository secret first"; exit 1; fi
+          case "$COMMAND" in list|show|replay) ;; *) echo "::error::command must be list, show or replay"; exit 1 ;; esac
+          case "$QUEUE" in ""|q_[a-z0-9_]*) ;; *) echo "::error::queue must look like q_intake"; exit 1 ;; esac
+          export ADMIN_DATABASE_URL="${RAW%%\?*}?sslmode=no-verify"
+          echo "::add-mask::$ADMIN_DATABASE_URL"
+          args=("$COMMAND")
+          [ -n "$QUEUE" ] && args+=("$QUEUE")
+          [ "$COMMAND" = replay ] && [ "$YES" = true ] && args+=(--yes)
+          node infra/scripts/dlq.mjs "${args[@]}"
