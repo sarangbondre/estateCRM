@@ -26,6 +26,8 @@ export interface Config {
   /** Local-only e-mail link sign-in (Supabase local Inbucket), for development without Google OAuth. */
   localEmailSignIn: boolean;
   serviceUrls: Record<Downstream, string>;
+  /** Extra wait for a backend function that is cold-starting (CR-014): on Vercel 6 s by default, locally 0. */
+  coldStartAllowanceMs: number;
 }
 
 export class ConfigError extends Error {
@@ -82,5 +84,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       (get('PILOT') ?? (environment === 'local' || environment === 'pilot' ? 'true' : 'false')) === 'true',
     localEmailSignIn: environment === 'local' && get('LOCAL_EMAIL_SIGNIN') !== 'false',
     serviceUrls,
+    coldStartAllowanceMs: Number(get('COLD_START_ALLOWANCE_MS') ?? (env['VERCEL'] ? 6000 : 0)),
   };
 }

@@ -99,6 +99,7 @@ export function createRuntime(env: NodeJS.ProcessEnv = process.env): Runtime {
     downstream,
     tokens,
     publicTenantId: config.tenantId,
+    coldStartAllowanceMs: config.coldStartAllowanceMs,
   });
   const staffAuth = { sessions, supabase, appOrigin: config.appOrigin };
   const onUserChanged = (userId: string) => {

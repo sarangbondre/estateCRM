@@ -97,7 +97,10 @@ interface Seen {
   body: string | null;
 }
 
-async function gatewayHarness(fetchImpl: (url: URL, init: RequestInit) => Promise<Response>) {
+async function gatewayHarness(
+  fetchImpl: (url: URL, init: RequestInit) => Promise<Response>,
+  coldStartAllowanceMs = 0,
+) {
   const seen: Seen[] = [];
   const leases = new MemLeases();
   const fakeFetch = (async (input: URL | RequestInfo, init?: RequestInit) => {
@@ -113,7 +116,7 @@ async function gatewayHarness(fetchImpl: (url: URL, init: RequestInit) => Promis
     jitter: () => 1,
   });
   const h = await harness((p) => {
-    const gateway = new Gateway({ routes, limiter: new MemLimiter(), leases, downstream, tokens: p.tokens, publicTenantId: TENANT });
+    const gateway = new Gateway({ routes, limiter: new MemLimiter(), leases, downstream, tokens: p.tokens, publicTenantId: TENANT, coldStartAllowanceMs });
     return {
       limiter: new MemLimiter(),
       readyChecks: () => downstream.states(),
@@ -258,6 +261,16 @@ describe('gateway proxy', () => {
     expect(calls).toBe(2);
     expect(Date.now() - started).toBeGreaterThanOrEqual(1900);
   });
+
+  it('a cold-starting service (first byte after 2.5 s) succeeds with the cold-start allowance (CR-014)', async () => {
+    const slow = async () => {
+      await new Promise((r) => setTimeout(r, 2500));
+      return json({ ok: true });
+    };
+    g = await gatewayHarness(slow, 1000);
+    user = g.memory.add(makeUser());
+    expect((await g.app.request('/v1/offers', g.as(user.id))).status).toBe(200);
+  }, 15_000);
 
   it('POST without Idempotency-Key is not retried', async () => {
     let calls = 0;

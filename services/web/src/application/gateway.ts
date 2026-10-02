@@ -32,6 +32,8 @@ export interface GatewayDeps {
   tokens: Tokens;
   /** Tenant for unauthenticated public routes (Phase 1: one tenant). */
   publicTenantId: string;
+  /** Added to the contract timeout so a cold-starting function isn't answered with 503 (CR-014). Default 0. */
+  coldStartAllowanceMs?: number;
 }
 
 /** Client headers passed through unchanged; everything else (cookies, X-User-*, X-Tenant-*, Authorization) is not. */
@@ -90,7 +92,10 @@ export class Gateway {
       headers['x-tenant-id'] = staff.tenantId;
     }
 
-    const { firstByteMs, totalMs } = timeoutsFor(req.method, req.path);
+    const base = timeoutsFor(req.method, req.path);
+    const allowance = this.d.coldStartAllowanceMs ?? 0;
+    const firstByteMs = base.firstByteMs + allowance;
+    const totalMs = base.totalMs + allowance;
     let res: Response;
     try {
       res = await this.d.downstream.send({
