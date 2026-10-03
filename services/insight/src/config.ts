@@ -59,7 +59,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     webUrl,
     recordsUrl: get('RECORDS_URL') ?? 'http://127.0.0.1:3002',
     hfBaseUrl: get('HF_BASE_URL'),
-    hfModel: get('HF_MODEL') ?? 'Qwen/Qwen2.5-7B-Instruct',
+    hfModel: get('HF_MODEL') ?? 'meta-llama/Llama-3.1-8B-Instruct',
     hfToken: get('HF_TOKEN'),
     hfConcurrency: Number(get('HF_CONCURRENCY') ?? 5),
     exportMaxRows: Number(get('EXPORT_MAX_ROWS') ?? 20_000),
