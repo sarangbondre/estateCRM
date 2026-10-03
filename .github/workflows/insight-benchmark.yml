@@ -1,0 +1,51 @@
+# M7 chat benchmark against the real Hugging Face model (INS-06; PRD Appendix A, 13 questions, target ≥ 85% correct).
+# Runs on a throwaway local Postgres with the synthetic seed: no pilot data is used, and the questions are the fixed
+# Appendix A ones. Run it by hand: Actions → "insight-benchmark" → Run workflow.
+# Needs the repository secret HF_TOKEN (the same key as Vercel's HF_TOKEN). Model and provider default to production's
+# (openai/gpt-oss-120b on groq) and can be overridden.
+name: insight-benchmark
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: HF_MODEL (blank = production default)
+        required: false
+        default: ''
+      provider:
+        description: HF_PROVIDER (blank = production default)
+        required: false
+        default: ''
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.118.0
+      - name: Local Postgres (platform bootstrap)
+        run: supabase --workdir infra db start && node infra/scripts/local-roles.mjs --env > /dev/null
+      - name: Build dependencies
+        run: pnpm turbo run build --filter "@11e/insight^..."
+      - name: Benchmark (live model)
+        working-directory: services/insight
+        env:
+          INSIGHT_BENCHMARK_LIVE: '1'
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_MODEL: ${{ github.event.inputs.model }}
+          HF_PROVIDER: ${{ github.event.inputs.provider }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then echo "::error::Add the HF_TOKEN repository secret first"; exit 1; fi
+          [ -z "$HF_MODEL" ] && unset HF_MODEL
+          [ -z "$HF_PROVIDER" ] && unset HF_PROVIDER
+          pnpm exec vitest run tests/benchmark.int.test.ts -t "live run" 2>&1 | tee benchmark.log
+          grep -A16 "M7 benchmark (live" benchmark.log >> "$GITHUB_STEP_SUMMARY" || true

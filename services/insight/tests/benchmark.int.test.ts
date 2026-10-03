@@ -5,7 +5,7 @@
 //   - "model" run: the intercepting HF mock returning the recorded replies (B5: no real calls, no token); every
 //     outbound request — including PII-laden variants of the questions — is asserted PII-free by the mock.
 //   - "fallback" run: no model (credits exhausted / unavailable) — the keyword parser alone.
-//   - INSIGHT_BENCHMARK_LIVE=1 with HF_TOKEN (and optionally HF_MODEL / HF_BASE_URL): the real model, for choosing it
+//   - INSIGHT_BENCHMARK_LIVE=1 with HF_TOKEN (optionally HF_MODEL / HF_PROVIDER / HF_BASE_URL): the real model, for choosing it
 //     (A-I6). Skipped otherwise; never in CI.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createHfClient, createHfPlanner } from '../src/adapters/hfPlanner.js';
@@ -136,11 +136,13 @@ describe('M7 chat benchmark (PRD Appendix A)', () => {
 
   it.skipIf(!live)('live run against the configured Hugging Face model (INSIGHT_BENCHMARK_LIVE=1)', async () => {
     const planner: Planner = createHfPlanner({
-      model: process.env['HF_MODEL'] ?? 'Qwen/Qwen2.5-7B-Instruct',
+      // the production defaults (src/config.ts, CR-016) unless overridden
+      model: process.env['HF_MODEL'] ?? 'openai/gpt-oss-120b',
+      provider: process.env['HF_PROVIDER'] ?? (process.env['HF_MODEL'] ? undefined : 'groq'),
       client: createHfClient(process.env['HF_TOKEN'], process.env['HF_BASE_URL']),
       endpointUrl: process.env['HF_BASE_URL'],
-      attemptTimeoutMs: 10_000,
-      budgetMs: 12_000,
+      attemptTimeoutMs: Number(process.env['HF_ATTEMPT_MS'] ?? 5_000),
+      budgetMs: Number(process.env['HF_BUDGET_MS'] ?? 6_500),
     });
     const h = harness({ clock, planner });
     try {
