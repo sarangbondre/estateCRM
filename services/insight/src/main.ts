@@ -2,6 +2,7 @@
 import { authenticate, createServiceTokenClient } from '@11e/auth';
 import { createDb } from '@11e/db';
 import { observe, setupTelemetry } from '@11e/observability';
+import { redact } from '@11e/redaction';
 import { buildApp } from './app.js';
 import { SCHEMA, SERVICE, loadConfig } from './config.js';
 import { configurePgTypes } from './adapters/db.js';
@@ -18,7 +19,8 @@ export function compose(env: NodeJS.ProcessEnv = process.env) {
     schema: SCHEMA,
     maxConnections: config.poolMax,
   });
-  const obs = observe(SERVICE);
+  // Error messages reach the logs only after PII redaction (e.g. a model provider's error text).
+  const obs = observe(SERVICE, { redactMessage: (text) => redact(text).text });
   const auth = authenticate({ service: SERVICE, jwksUrl: config.jwksUrl, cronSecret: config.cronSecret });
   const tokens = config.serviceCredential
     ? createServiceTokenClient({ webUrl: config.webUrl, credential: config.serviceCredential })
@@ -32,7 +34,11 @@ export function compose(env: NodeJS.ProcessEnv = process.env) {
     endpointUrl: config.hfBaseUrl,
     concurrency: config.hfConcurrency,
     onCall: obs.onCall,
-    onError: (info) => obs.logger.warn({ downstream: 'huggingface', model: config.hfModel, ...info }, 'model call failed'),
+    onError: ({ status, attempt, error }) =>
+      obs.logger.warn(
+        { downstream: 'huggingface', status, attempt, err: Object.assign(new Error(error), { name: 'ModelCallError' }) },
+        'model call failed',
+      ),
   });
   const svc = buildApp({ config, db: handle.db, obs, auth, clock: { now: () => new Date() }, records, planner, contacts });
   return {
