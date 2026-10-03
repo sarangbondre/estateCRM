@@ -143,6 +143,7 @@ describe('M7 chat benchmark (PRD Appendix A)', () => {
       endpointUrl: process.env['HF_BASE_URL'],
       attemptTimeoutMs: Number(process.env['HF_ATTEMPT_MS'] ?? 5_000),
       budgetMs: Number(process.env['HF_BUDGET_MS'] ?? 6_500),
+      onError: (e) => process.stdout.write(`  model call failed: ${e.reason} ${e.status ?? ''} ${e.error}\n`),
     });
     const h = harness({ clock, planner });
     try {
