@@ -17,7 +17,7 @@ export interface ChatCompletionClient {
       messages: { role: string; content: string }[];
       temperature: number;
       max_tokens: number;
-      response_format: { type: 'json_schema'; json_schema: { name: string; schema: object; strict?: boolean } };
+      response_format?: { type: 'json_schema'; json_schema: { name: string; schema: object; strict?: boolean } };
     },
     options?: { signal?: AbortSignal; retry_on_error?: boolean },
   ): Promise<{ choices: { message: { content?: string | null } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } }>;
@@ -60,11 +60,18 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
   const budgetMs = o.budgetMs ?? 2_500;
   const cap = o.concurrency ?? 5;
   let inFlight = 0;
+  // Structured output (json_schema) until a provider says it doesn't support it; then the prompt's "exactly one JSON
+  // object" rule and parsePlannerOutput's validation carry the format (providers differ per model).
+  let structured = true;
 
   const record = (status: number | 'error', started: number, n: number) =>
     o.onCall?.({ name: 'huggingface', method: 'POST', path: '/v1/chat/completions', status, durationMs: Date.now() - started, attempt: n });
 
-  async function attempt(req: PlannerRequest, timeoutMs: number, n = 1): Promise<PlannerResult & { fast?: boolean }> {
+  async function attempt(
+    req: PlannerRequest,
+    timeoutMs: number,
+    n = 1,
+  ): Promise<PlannerResult & { fast?: boolean; retryNow?: boolean }> {
     const client = o.client as ChatCompletionClient;
     const started = Date.now();
     try {
@@ -80,7 +87,9 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
           messages: req.messages,
           temperature: 0,
           max_tokens: 400,
-          response_format: { type: 'json_schema', json_schema: { name: 'plan', schema: PLANNER_JSON_SCHEMA } },
+          ...(structured
+            ? { response_format: { type: 'json_schema' as const, json_schema: { name: 'plan', schema: PLANNER_JSON_SCHEMA } } }
+            : {}),
         },
         { signal: AbortSignal.timeout(timeoutMs), retry_on_error: false },
       );
@@ -105,6 +114,12 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
         breaker.after(true);
         return { ok: false, reason: 'rate_limited' };
       }
+      if (structured && status !== undefined && [400, 405, 422].includes(status) && /response_format|json_schema/i.test(errorText(err))) {
+        structured = false;
+        breaker.after(true); // a capability answer, not an availability failure
+        o.onError?.({ status, reason: 'format_unsupported', error: errorText(err), attempt: n });
+        return { ok: false, reason: 'error', retryNow: true };
+      }
       breaker.after(false);
       const timeout = (err as Error)?.name === 'TimeoutError' || (err as Error)?.name === 'AbortError' || elapsed >= timeoutMs;
       o.onError?.({ status, reason: timeout ? 'timeout' : 'error', error: errorText(err), attempt: n });
@@ -121,7 +136,7 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
       const started = Date.now();
       try {
         const first = await attempt(req, attemptMs);
-        if (first.ok || !first.fast) return strip(first);
+        if (first.ok || !(first.fast || first.retryNow)) return strip(first);
         const left = budgetMs - (Date.now() - started);
         if (left < 300) return strip(first);
         return strip(await attempt(req, Math.min(attemptMs, left), 2));
@@ -132,7 +147,7 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
   };
 }
 
-function strip(r: PlannerResult & { fast?: boolean }): PlannerResult {
+function strip(r: PlannerResult & { fast?: boolean; retryNow?: boolean }): PlannerResult {
   if (r.ok) return r;
   return { ok: false, reason: r.reason };
 }
