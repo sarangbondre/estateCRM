@@ -23,6 +23,9 @@ export interface Config {
   hfToken: string | undefined;
   /** Concurrent model calls per instance: 5 pilot / 20 paid. */
   hfConcurrency: number;
+  /** Model time limits (CR-016): per attempt and for the whole planning phase. */
+  hfAttemptMs: number;
+  hfBudgetMs: number;
   /** Export row cap: 20,000 in the pilot, 100,000 in production (R-16). */
   exportMaxRows: number;
   /** Private export bucket (Supabase Storage); a local directory when the Supabase variables are absent. */
@@ -62,6 +65,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     hfModel: get('HF_MODEL') ?? 'meta-llama/Llama-3.1-8B-Instruct',
     hfToken: get('HF_TOKEN'),
     hfConcurrency: Number(get('HF_CONCURRENCY') ?? 5),
+    hfAttemptMs: Number(get('HF_ATTEMPT_MS') ?? 5_000),
+    hfBudgetMs: Number(get('HF_BUDGET_MS') ?? 6_500),
     exportMaxRows: Number(get('EXPORT_MAX_ROWS') ?? 20_000),
     supabaseUrl: get('SUPABASE_URL'),
     supabaseServiceKey: get('SUPABASE_SERVICE_ROLE_KEY'),

@@ -59,5 +59,6 @@ Change requests:
 - CR-013: APPROVED 2026-10-03: host as one Vercel project with Services (root vercel.json); live at https://estatecrm-nu.vercel.app
 - CR-014: APPROVED 2026-10-02, auto-approved (technical, B3): web gateway waits 2 s + a cold-start allowance (6 s on Vercel) so a cold function isn't answered with 503; contracts unchanged. For review
 - CR-015: APPROVED 2026-10-03, auto-approved (technical, B3): intake starts processing on the shipped vocabulary (v0.6) when no release is cached. For review
+- CR-016: APPROVED 2026-10-03, auto-approved (technical, B3): assistant model limits 5 s per attempt / 6.5 s phase (env-configurable), default model Llama-3.1-8B-Instruct, json_schema fallback. For review
 
 Open change requests: none

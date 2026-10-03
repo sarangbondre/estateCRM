@@ -1,6 +1,7 @@
 // Hugging Face planner (LLD §4.2, ADR-0004): OpenAI-compatible chat completion with a JSON-schema response format.
-// temperature 0, max_tokens 400; 2.0 s per attempt, one retry only when the first attempt failed in < 1 s (connection
-// reset / 5xx), 2.5 s for the whole model phase; circuit breaker 50% over 20 calls → open 30 s; per-instance
+// temperature 0, max_tokens 400; per-attempt and whole-phase limits from config (CR-016: 5 s / 6.5 s; 2.0 s / 2.5 s
+// here when not given), one retry only when the first attempt failed in < 1 s (connection reset / 5xx) or the provider
+// rejected json_schema; circuit breaker 50% over 20 calls → open 30 s; per-instance
 // concurrency cap. 402 / quota → credits; 429 → rate limited. The request carries only the redacted prompt.
 import { InferenceClient } from '@huggingface/inference';
 import { CircuitBreaker } from '@11e/http';
