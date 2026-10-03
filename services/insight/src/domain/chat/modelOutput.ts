@@ -47,6 +47,7 @@ export const PLANNER_JSON_SCHEMA = {
 const OPS: readonly Op[] = ['eq', 'in', 'gte', 'lte', 'between', 'is_null', 'not_null'];
 const FNS: readonly MetricFn[] = ['count', 'avg', 'median', 'min', 'max', 'sum'];
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const nonEmpty = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
 const str = (v: unknown, max = 200): string | undefined => (typeof v === 'string' && v.length <= max ? v : undefined);
 
 /** Parses the model's text (JSON) into a decision, or null when it is not a well-formed reply. */
@@ -118,14 +119,17 @@ export function parsePlannerOutput(text: string): PlannerDecision | null {
         plan.sort = sort;
       }
       if (isObj(params['period'])) {
+        // Models often echo the shape with empty values ("period":{} or "preset":""): no range means no period.
         const p = params['period'];
         const period: NonNullable<QueryPlan['period']> = {};
-        if (typeof p['preset'] === 'string') period.preset = p['preset'] as NonNullable<QueryPlan['period']>['preset'] & string;
-        if (typeof p['from'] === 'string') period.from = p['from'];
-        if (typeof p['to'] === 'string') period.to = p['to'];
-        if (typeof p['field'] === 'string') period.field = p['field'];
-        plan.period = period;
+        if (nonEmpty(p['preset'])) period.preset = p['preset'] as NonNullable<QueryPlan['period']>['preset'] & string;
+        if (nonEmpty(p['from'])) period.from = p['from'];
+        if (nonEmpty(p['to'])) period.to = p['to'];
+        if (nonEmpty(p['field'])) period.field = p['field'];
+        if (period.preset || period.from || period.to) plan.period = period;
       }
+      // Empty lists are the same as leaving them out.
+      for (const k of ['groupBy', 'metrics', 'sort'] as const) if (plan[k]?.length === 0) delete plan[k];
       if (params['me'] === true) plan.me = true;
       return { kind: 'plan', plan, exportRequested };
     }

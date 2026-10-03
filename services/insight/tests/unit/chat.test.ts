@@ -28,6 +28,16 @@ describe('model output', () => {
     expect(parsePlannerOutput('Here are the offers')).toBeNull();
     expect(parsePlannerOutput('{"kind":"sql","query":"select *"}')).toBeNull();
   });
+
+  it('drops the empty parts models echo from the shape (period {}, blank preset, empty lists)', () => {
+    const d = parsePlannerOutput(
+      '{"kind":"plan","planId":"supply_demand_gap","params":{"filters":[],"groupBy":[],"metrics":[],"sort":[],"period":{"preset":"","field":""},"me":false,"export":false}}',
+    );
+    expect(d).toEqual({ kind: 'plan', exportRequested: false, plan: { planId: 'supply_demand_gap', templateVersion: 1, filters: [] } });
+    expect(parsePlannerOutput('{"kind":"plan","planId":"count_offers","params":{"period":{"preset":"this_week"}}}')).toMatchObject({
+      plan: { period: { preset: 'this_week' } },
+    });
+  });
 });
 
 describe('keyword parser', () => {

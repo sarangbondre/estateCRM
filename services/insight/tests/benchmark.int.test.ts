@@ -98,7 +98,7 @@ function printReplies(client: ChatCompletionClient | null): ChatCompletionClient
   return {
     chatCompletion: async (args, options) => {
       const out = await client.chatCompletion(args, options);
-      process.stdout.write(`  model reply: ${JSON.stringify(out.choices[0]?.message.content ?? null).slice(0, 400)}\n`);
+      process.stdout.write(`  model reply: ${JSON.stringify(out.choices[0]?.message.content ?? null).slice(0, 1500)}\n`);
       return out;
     },
   };

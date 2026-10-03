@@ -46,6 +46,7 @@ export function buildPlannerMessages(input: PromptInput): ChatMessage[] {
     '{"kind":"plan","planId":"<catalogue id>","params":{"filters":[{"field","op","value"}],"groupBy":[],"metrics":[{"fn","field"}],"sort":[{"field","dir"}],"period":{"preset","field"},"me":false,"export":false}}',
     '| {"kind":"action","cardType":"C-xx","slots":{...}} | {"kind":"navigate","planId":"open_my_queue"|"open_record","params":{"code":"DEM-000127"}}',
     '| {"kind":"clarify","question":"..."} | {"kind":"refusal"} for anything not about 11 Estates data (general knowledge, news, rates, weather, legal advice).',
+    'Leave out every key you do not need (no empty "period", "sort", "groupBy" or "metrics"); a count plan needs no metrics.',
     'Rules: use only stored values from the vocabulary below (never labels like "For Rent"); prices in INR integers ("3 Cr" = 30000000, "8.5 L" = 850000);',
     'areas in sq ft; BHK in steps of 0.5 ("1 RK" = 0.5); locality names exactly as the user wrote them; placeholders like ⟨PHONE_1⟩ are never filter values.',
     '"export"/"Excel"/"download" → params.export = true on a list plan. Periods: today, this_week, this_month, this_quarter, last_month, last_30_days, next_60_days.',
