@@ -32,6 +32,7 @@ export function compose(env: NodeJS.ProcessEnv = process.env) {
     model: config.hfToken ? config.hfModel : null,
     client: createHfClient(config.hfToken, config.hfBaseUrl),
     endpointUrl: config.hfBaseUrl,
+    provider: config.hfProvider,
     concurrency: config.hfConcurrency,
     attemptTimeoutMs: config.hfAttemptMs,
     budgetMs: config.hfBudgetMs,

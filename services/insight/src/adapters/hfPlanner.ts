@@ -18,6 +18,7 @@ export interface ChatCompletionClient {
       messages: { role: string; content: string }[];
       temperature: number;
       max_tokens: number;
+      reasoning_effort?: 'low' | 'medium' | 'high';
       response_format?: { type: 'json_schema'; json_schema: { name: string; schema: object; strict?: boolean } };
     },
     options?: { signal?: AbortSignal; retry_on_error?: boolean },
@@ -28,6 +29,8 @@ export interface HfPlannerOptions {
   model: string | null;
   client: ChatCompletionClient | null;
   endpointUrl?: string | undefined;
+  /** Pinned inference provider (e.g. groq); undefined lets Hugging Face choose. */
+  provider?: string | undefined;
   attemptTimeoutMs?: number;
   budgetMs?: number;
   concurrency?: number;
@@ -64,6 +67,7 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
   // Structured output (json_schema) until a provider says it doesn't support it; then the prompt's "exactly one JSON
   // object" rule and parsePlannerOutput's validation carry the format (providers differ per model).
   let structured = true;
+  const reasoning = /gpt-oss/i.test(o.model ?? '');
 
   const record = (status: number | 'error', started: number, n: number) =>
     o.onCall?.({ name: 'huggingface', method: 'POST', path: '/v1/chat/completions', status, durationMs: Date.now() - started, attempt: n });
@@ -85,9 +89,11 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
         {
           ...(o.model ? { model: o.model } : {}),
           ...(o.endpointUrl ? { endpointUrl: o.endpointUrl } : {}),
+          ...(o.provider ? { provider: o.provider } : {}),
           messages: req.messages,
           temperature: 0,
-          max_tokens: 400,
+          // Reasoning models (gpt-oss) spend tokens thinking first: keep it short and leave room for the JSON.
+          ...(reasoning ? { reasoning_effort: 'low' as const, max_tokens: 1_000 } : { max_tokens: 400 }),
           ...(structured
             ? { response_format: { type: 'json_schema' as const, json_schema: { name: 'plan', schema: PLANNER_JSON_SCHEMA } } }
             : {}),

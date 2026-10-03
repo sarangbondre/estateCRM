@@ -20,6 +20,8 @@ export interface Config {
   /** Hugging Face planner (LLD §4.2): router or dedicated endpoint URL, model id, token (Vercel encrypted env). */
   hfBaseUrl: string | undefined;
   hfModel: string;
+  /** Inference provider to pin (CR-016): one that supports json_schema output; unset = Hugging Face picks. */
+  hfProvider: string | undefined;
   hfToken: string | undefined;
   /** Concurrent model calls per instance: 5 pilot / 20 paid. */
   hfConcurrency: number;
@@ -62,7 +64,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     webUrl,
     recordsUrl: get('RECORDS_URL') ?? 'http://127.0.0.1:3002',
     hfBaseUrl: get('HF_BASE_URL'),
-    hfModel: get('HF_MODEL') ?? 'meta-llama/Llama-3.1-8B-Instruct',
+    hfModel: get('HF_MODEL') ?? 'openai/gpt-oss-120b',
+    hfProvider: get('HF_PROVIDER') ?? (get('HF_MODEL') ? undefined : 'groq'),
     hfToken: get('HF_TOKEN'),
     hfConcurrency: Number(get('HF_CONCURRENCY') ?? 5),
     hfAttemptMs: Number(get('HF_ATTEMPT_MS') ?? 5_000),
