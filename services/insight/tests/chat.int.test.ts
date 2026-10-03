@@ -62,6 +62,10 @@ describe('conversations', () => {
   });
 });
 
+const Q1 = 'How many active 2BHK lease offers are there in Andheri West?';
+/** The same question phrased as a comparison: the keyword parser reads the same filters, but it goes to the model (CR-017). */
+const viaModel = (q: string) => `Compare: ${q}`;
+
 describe('POST messages (SSE)', () => {
   it('answers from the read model: plan → tokens → cards → done, and stores the exchange', async () => {
     const me = await h.as(seeded.me, 'Manager');
@@ -73,7 +77,7 @@ describe('POST messages (SSE)', () => {
     expect(q.answer).toBe('There are 3 For Rent 2 BHK offers in Andheri West that are active.');
     expect(q.plan).toMatchObject({ source: '11 Estates read model (insight)', fallbackUsed: false, rowCount: 3 });
     expect(q.cards[0]).toMatchObject({ kind: 'answer', cardType: 'C-02', figures: [{ label: 'Count', value: 3, unit: 'count' }] });
-    expect(q.done).toMatchObject({ outcome: 'answered', fallbackUsed: false, model: 'Qwen/Qwen2.5-7B-Instruct' });
+    expect(q.done).toMatchObject({ outcome: 'answered', fallbackUsed: false, model: null }); // keywords first (CR-017)
     const msgs = await me.get(`/v1/chat/conversations/${conv}/messages`);
     expect(msgs.body['items']?.map((m) => m['role'])).toEqual(['user', 'assistant']);
     expect(msgs.body['items']?.[1]).toMatchObject({ status: 'complete', fallbackUsed: false });
@@ -81,11 +85,24 @@ describe('POST messages (SSE)', () => {
     expect(c.body).toMatchObject({ messageCount: 2, title: 'How many active 2BHK lease offers are there in Andheri West?' });
   });
 
+  it('keywords first (CR-017): only questions the keyword parser can\'t express go to the model', async () => {
+    const me = await h.as(seeded.me, 'Manager');
+    const conv = await newChat(me);
+    const before = hf.requests.length;
+    await ask(me, conv, 'How many active 2BHK lease offers are there in Andheri West?');
+    expect(hf.requests.length).toBe(before);
+    hf.replies.set(viaModel(Q1), hf.replies.get(Q1)!);
+    const q = await ask(me, conv, viaModel(Q1));
+    expect(hf.requests.length).toBe(before + 1);
+    expect(q.answer).toBe('There are 3 For Rent 2 BHK offers in Andheri West that are active.');
+    expect(q.done).toMatchObject({ outcome: 'answered', fallbackUsed: false, model: 'Qwen/Qwen2.5-7B-Instruct' });
+  });
+
   it('never sends PII to the model and stores only redacted text', async () => {
     const me = await h.as(seeded.me, 'Manager');
     const conv = await newChat(me);
     const before = hf.requests.length;
-    const text = 'Call Sanjay Testkar on 90000 01234 or sanjay.test@example.com about Flat 1203 — how many lease offers in Powai?';
+    const text = 'Call Sanjay Testkar on 90000 01234 or sanjay.test@example.com about Flat 1203 — compare lease offers in Powai by BHK?';
     const q = await ask(me, conv, text);
     expect(q.r.status).toBe(200);
     expect(hf.requests.length).toBe(before + 1); // the interceptor threw on any PII; it didn't
@@ -118,7 +135,7 @@ describe('POST messages (SSE)', () => {
     const api = await noModel.as(seeded.me, 'Manager', h.tenantId);
     void off;
     const conv = await newChat(api);
-    const q = await ask(api, conv, 'How many active 2BHK lease offers are there in Andheri West?');
+    const q = await ask(api, conv, viaModel('How many active 2BHK lease offers are there in Andheri West?'));
     expect(q.answer).toBe('There are 3 For Rent 2 BHK offers in Andheri West that are active.');
     expect(q.cards.at(-1)).toMatchObject({ kind: 'notice', notice: 'model_unavailable_keyword_fallback' });
     expect(q.cards.at(-1)?.['text']).toMatch(/model is unavailable/);
@@ -127,21 +144,21 @@ describe('POST messages (SSE)', () => {
 
     const me = await h.as(seeded.me, 'Manager');
     const conv2 = await newChat(me);
-    hf.replies.set('Show demands in Sourcing for more than 7 days.', { fail: 'timeout' });
+    hf.replies.set(viaModel('Show demands in Sourcing for more than 7 days.'), { fail: 'timeout' });
     const t0 = Date.now();
-    const slow = await ask(me, conv2, 'Show demands in Sourcing for more than 7 days.');
+    const slow = await ask(me, conv2, viaModel('Show demands in Sourcing for more than 7 days.'));
     expect(Date.now() - t0).toBeLessThan(3000);
     expect(slow.done['fallbackUsed']).toBe(true);
     expect(slow.answer).toMatch(/^Here (is|are) the 1 demand/);
-    hf.replies.set('Which Public offers turned Stale this week?', { fail: 'garbage' });
-    const garbage = await ask(me, conv2, 'Which Public offers turned Stale this week?');
+    hf.replies.set(viaModel('Which Public offers turned Stale this week?'), { fail: 'garbage' });
+    const garbage = await ask(me, conv2, viaModel('Which Public offers turned Stale this week?'));
     expect(garbage.done['fallbackUsed']).toBe(true);
     // the model replied, just not with a usable plan: say so instead of "unavailable"
     expect(garbage.cards.find((c) => c['kind'] === 'notice' && c['notice'] === 'model_unavailable_keyword_fallback')?.['text']).toMatch(/couldn't turn that into a report/);
     expect((garbage.cards.find((c) => c['kind'] === 'table')?.['result'] as { rows: unknown[] }).rows).toHaveLength(1);
     // an invalid model plan is repaired by the keyword parser once
-    hf.replies.set('Show resale 3BHK offers in Powai under ₹3 Cr that are Fresh.', { kind: 'plan', planId: 'list_offers', params: { filters: [{ field: 'owner_phone', op: 'eq', value: 'x' }] } });
-    const repaired = await ask(me, conv2, 'Show resale 3BHK offers in Powai under ₹3 Cr that are Fresh.');
+    hf.replies.set(viaModel('Show resale 3BHK offers in Powai under ₹3 Cr that are Fresh.'), { kind: 'plan', planId: 'list_offers', params: { filters: [{ field: 'owner_phone', op: 'eq', value: 'x' }] } });
+    const repaired = await ask(me, conv2, viaModel('Show resale 3BHK offers in Powai under ₹3 Cr that are Fresh.'));
     expect(repaired.done['fallbackUsed']).toBe(true);
     expect(repaired.answer).toMatch(/^Here are the 2 /);
     hf.recordAppendixA();
@@ -150,11 +167,11 @@ describe('POST messages (SSE)', () => {
   it('marks credits exhausted on 402, skips the model until hf-credit-reset clears it', async () => {
     const me = await h.as(seeded.me, 'Manager');
     const conv = await newChat(me);
-    hf.replies.set('Which Upcoming offers become available in the next 60 days?', { fail: 402 });
-    const first = await ask(me, conv, 'Which Upcoming offers become available in the next 60 days?');
+    hf.replies.set(viaModel('Which Upcoming offers become available in the next 60 days?'), { fail: 402 });
+    const first = await ask(me, conv, viaModel('Which Upcoming offers become available in the next 60 days?'));
     expect(first.done['fallbackUsed']).toBe(true);
     const calls = hf.requests.length;
-    const second = await ask(me, conv, 'How many active 2BHK lease offers are there in Andheri West?');
+    const second = await ask(me, conv, viaModel('How many active 2BHK lease offers are there in Andheri West?'));
     expect(hf.requests.length).toBe(calls); // not called while credits are exhausted
     expect(second.done['fallbackUsed']).toBe(true);
     const ready = (await (await h.app.request('/health/ready')).json()) as { checks: Record<string, string> };
