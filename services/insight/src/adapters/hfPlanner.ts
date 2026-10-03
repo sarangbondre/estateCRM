@@ -115,10 +115,12 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
       record(status ?? 'error', started, n);
       if (status === 402 || /quota|credit|exceeded your monthly/i.test(String((err as Error)?.message ?? ''))) {
         breaker.after(true); // not an availability failure
+        o.onError?.({ status, reason: 'credits', error: errorText(err), attempt: n });
         return { ok: false, reason: 'credits' };
       }
       if (status === 429) {
         breaker.after(true);
+        o.onError?.({ status, reason: 'rate_limited', error: errorText(err), attempt: n });
         return { ok: false, reason: 'rate_limited' };
       }
       if (structured && status !== undefined && [400, 405, 422].includes(status) && /response_format|json_schema/i.test(errorText(err))) {
