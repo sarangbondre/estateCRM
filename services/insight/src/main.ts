@@ -32,6 +32,7 @@ export function compose(env: NodeJS.ProcessEnv = process.env) {
     endpointUrl: config.hfBaseUrl,
     concurrency: config.hfConcurrency,
     onCall: obs.onCall,
+    onError: (info) => obs.logger.warn({ downstream: 'huggingface', model: config.hfModel, ...info }, 'model call failed'),
   });
   const svc = buildApp({ config, db: handle.db, obs, auth, clock: { now: () => new Date() }, records, planner, contacts });
   return {

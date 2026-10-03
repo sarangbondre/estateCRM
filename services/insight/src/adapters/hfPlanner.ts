@@ -32,6 +32,8 @@ export interface HfPlannerOptions {
   concurrency?: number;
   /** RED metrics per downstream (libs/observability `obs.onCall`, name "huggingface"). */
   onCall?: (info: { name: string; method: string; path: string; status: number | 'error'; durationMs: number; attempt: number }) => void;
+  /** A failed model call: HTTP status and the provider's error text (truncated; the prompt is never included). */
+  onError?: (info: { status: number | undefined; reason: string; error: string; attempt: number }) => void;
 }
 
 export function createHfClient(token: string | undefined, baseUrl: string | undefined): ChatCompletionClient | null {
@@ -97,6 +99,7 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
       }
       breaker.after(false);
       const timeout = (err as Error)?.name === 'TimeoutError' || (err as Error)?.name === 'AbortError' || elapsed >= timeoutMs;
+      o.onError?.({ status, reason: timeout ? 'timeout' : 'error', error: String((err as Error)?.message ?? err).slice(0, 300), attempt: n });
       return { ok: false, reason: timeout ? 'timeout' : 'error', fast: !timeout && elapsed < 1_000 && (status === undefined || status >= 500) };
     }
   }
