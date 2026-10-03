@@ -44,4 +44,22 @@ describe('createHfPlanner', () => {
     expect(await planner.plan(req)).toEqual({ ok: false, reason: 'error' });
     expect(calls).toBe(1);
   });
+
+  it('waits for a short rate-limit hint and retries once', async () => {
+    let calls = 0;
+    const client: ChatCompletionClient = {
+      chatCompletion: async () => {
+        calls++;
+        if (calls === 1)
+          throw Object.assign(new Error('rate'), {
+            httpResponse: { status: 429, body: { error: { message: 'Rate limit reached ... Please try again in 134.48ms.' } } },
+          });
+        return { choices: [{ message: { content: '{"kind":"refusal"}' } }] };
+      },
+    };
+    const started = Date.now();
+    expect(await createHfPlanner({ model: 'm', client }).plan(req)).toMatchObject({ ok: true });
+    expect(calls).toBe(2);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(130);
+  });
 });
