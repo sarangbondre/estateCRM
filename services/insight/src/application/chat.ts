@@ -10,7 +10,7 @@ import type { PlannerDecision } from '../domain/chat/modelOutput.js';
 import { CHAT_ALLOW_TERMS } from '../domain/chat/allowTerms.js';
 import { buildPlannerMessages } from '../domain/chat/prompt.js';
 import { istDay } from '../domain/dates.js';
-import { parseKeywords } from '../domain/plans/keywordParser.js';
+import { keywordsSuffice, parseKeywords } from '../domain/plans/keywordParser.js';
 import type { QueryPlan } from '../domain/plans/types.js';
 import type { ValidatedPlan } from '../domain/plans/validator.js';
 import type { Dashboard, DashboardDeps } from './dashboards.js';
@@ -142,6 +142,11 @@ export async function askQuestion(
     const quick = shortcut(red.text, red.counts);
     let decision: PlannerDecision | { kind: 'dashboard' } | { kind: 'review' } | null = quick;
     const keyword = () => parseKeywords(red.text, { now: now(), vocabulary: vocabulary.values, locations: [...locations.keys()] });
+    if (!decision) {
+      // Keywords first (CR-017): a question the keyword parser understands, with a plan that validates, needs no model.
+      const kw = keyword();
+      if (keywordsSuffice(red.text, kw) && (kw?.kind !== 'plan' || (await validateFor(deps.query, caller, kw.plan)).result.ok)) decision = kw;
+    }
     if (!decision) {
       const exhausted = await deps.usage.creditsExhausted(caller.tenantId, now());
       const result = exhausted

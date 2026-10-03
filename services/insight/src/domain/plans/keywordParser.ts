@@ -158,3 +158,17 @@ export function parseKeywords(redacted: string, ctx: KeywordContext): PlannerDec
     ...(mine ? { me: true } : {}),
   });
 }
+
+/**
+ * Keywords first (CR-017): the parser's decision is used without the model unless it fell back to a generic offer/demand
+ * list or count while the question asks for something those can't express: rankings, breakdowns, comparisons or trends
+ * ("which localities have the most…", "by BHK", "compare…"). Dedicated intents (gap, prices, sources, agents…) always win.
+ */
+const ANALYTIC = /\b(most|least|top|highest|lowest|best|worst|rank(ing)?|by|per|each|compare[ds]?|comparison|versus|vs\.?|trends?|breakdown|split|distribution|group(ed)?|which\s+(localit(y|ies)|micromarkets?|areas?|agents?|sources?|segments?|cities))\b/;
+const GENERIC = new Set(['list_offers', 'count_offers', 'list_demands', 'count_demands']);
+
+export function keywordsSuffice(redacted: string, decision: PlannerDecision | null): boolean {
+  if (!decision || decision.kind === 'refusal' || decision.kind === 'clarify') return false;
+  if (decision.kind !== 'plan' || !GENERIC.has(decision.plan.planId)) return true;
+  return !ANALYTIC.test(redacted.toLowerCase());
+}
