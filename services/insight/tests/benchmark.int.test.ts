@@ -9,6 +9,7 @@
 //     (A-I6). Skipped otherwise; never in CI.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createHfClient, createHfPlanner } from '../src/adapters/hfPlanner.js';
+import type { ChatCompletionClient } from '../src/adapters/hfPlanner.js';
 import type { Planner } from '../src/application/ports.js';
 import { APPENDIX_A } from './appendixA.js';
 import type { BenchmarkCase } from './appendixA.js';
@@ -91,6 +92,18 @@ async function runBenchmark(h: Harness, seeded: Seeded & { tenantId: string }, l
   return results;
 }
 
+/** Live run only: print each raw model reply (the Appendix A questions are synthetic, no PII) to diagnose misses. */
+function printReplies(client: ChatCompletionClient | null): ChatCompletionClient | null {
+  if (!client) return null;
+  return {
+    chatCompletion: async (args, options) => {
+      const out = await client.chatCompletion(args, options);
+      process.stdout.write(`  model reply: ${JSON.stringify(out.choices[0]?.message.content ?? null).slice(0, 400)}\n`);
+      return out;
+    },
+  };
+}
+
 let seeded: Seeded & { tenantId: string };
 const withModel = harness({ clock, planner: createHfPlanner({ model: 'Qwen/Qwen2.5-7B-Instruct', client: mock }) });
 const withoutModel = harness({ clock });
@@ -139,7 +152,7 @@ describe('M7 chat benchmark (PRD Appendix A)', () => {
       // the production defaults (src/config.ts, CR-016) unless overridden
       model: process.env['HF_MODEL'] ?? 'openai/gpt-oss-120b',
       provider: process.env['HF_PROVIDER'] ?? (process.env['HF_MODEL'] ? undefined : 'groq'),
-      client: createHfClient(process.env['HF_TOKEN'], process.env['HF_BASE_URL']),
+      client: printReplies(createHfClient(process.env['HF_TOKEN'], process.env['HF_BASE_URL'])),
       endpointUrl: process.env['HF_BASE_URL'],
       attemptTimeoutMs: Number(process.env['HF_ATTEMPT_MS'] ?? 5_000),
       budgetMs: Number(process.env['HF_BUDGET_MS'] ?? 6_500),
