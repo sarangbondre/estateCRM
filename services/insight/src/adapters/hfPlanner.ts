@@ -41,6 +41,14 @@ export function createHfClient(token: string | undefined, baseUrl: string | unde
   return new InferenceClient(token, baseUrl ? { endpointUrl: baseUrl } : {}) as unknown as ChatCompletionClient;
 }
 
+/** The provider's reason: the library's message is generic, the HTTP body says why (e.g. an unsupported schema). */
+const errorText = (err: unknown): string => {
+  const e = err as { message?: unknown; httpResponse?: { body?: unknown } };
+  const body = e.httpResponse?.body;
+  const detail = body === undefined ? '' : typeof body === 'string' ? body : JSON.stringify(body);
+  return `${String(e.message ?? err)}${detail ? ` | ${detail}` : ''}`.slice(0, 400);
+};
+
 const statusOf = (err: unknown): number | undefined => {
   const e = err as { httpResponse?: { status?: number }; status?: number; statusCode?: number };
   return e.httpResponse?.status ?? e.status ?? e.statusCode;
@@ -99,7 +107,7 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
       }
       breaker.after(false);
       const timeout = (err as Error)?.name === 'TimeoutError' || (err as Error)?.name === 'AbortError' || elapsed >= timeoutMs;
-      o.onError?.({ status, reason: timeout ? 'timeout' : 'error', error: String((err as Error)?.message ?? err).slice(0, 300), attempt: n });
+      o.onError?.({ status, reason: timeout ? 'timeout' : 'error', error: errorText(err), attempt: n });
       return { ok: false, reason: timeout ? 'timeout' : 'error', fast: !timeout && elapsed < 1_000 && (status === undefined || status >= 500) };
     }
   }
