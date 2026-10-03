@@ -53,6 +53,13 @@ const errorText = (err: unknown): string => {
   return `${String(e.message ?? err)}${detail ? ` | ${detail}` : ''}`.slice(0, 400);
 };
 
+/** "try again in 134.48ms" / "in 1.2s" → milliseconds. */
+const retryAfterMs = (text: string): number | undefined => {
+  const m = /try again in ([\d.]+)\s*(ms|s)\b/i.exec(text);
+  if (!m) return undefined;
+  return Math.ceil(Number(m[1]) * (m[2]?.toLowerCase() === 's' ? 1_000 : 1));
+};
+
 const statusOf = (err: unknown): number | undefined => {
   const e = err as { httpResponse?: { status?: number }; status?: number; statusCode?: number };
   return e.httpResponse?.status ?? e.status ?? e.statusCode;
@@ -76,7 +83,7 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
     req: PlannerRequest,
     timeoutMs: number,
     n = 1,
-  ): Promise<PlannerResult & { fast?: boolean; retryNow?: boolean }> {
+  ): Promise<PlannerResult & { fast?: boolean; retryNow?: boolean; waitMs?: number }> {
     const client = o.client as ChatCompletionClient;
     const started = Date.now();
     try {
@@ -121,6 +128,9 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
       if (status === 429) {
         breaker.after(true);
         o.onError?.({ status, reason: 'rate_limited', error: errorText(err), attempt: n });
+        // Shared provider limits often clear within a second ("try again in 134.48ms"): wait that long and retry once.
+        const waitMs = retryAfterMs(errorText(err));
+        if (n === 1 && waitMs !== undefined && waitMs <= 1_500) return { ok: false, reason: 'rate_limited', retryNow: true, waitMs };
         return { ok: false, reason: 'rate_limited' };
       }
       if (structured && status !== undefined && [400, 405, 422].includes(status) && /response_format|json_schema/i.test(errorText(err))) {
@@ -146,6 +156,7 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
       try {
         const first = await attempt(req, attemptMs);
         if (first.ok || !(first.fast || first.retryNow)) return strip(first);
+        if (first.waitMs) await new Promise((r) => setTimeout(r, first.waitMs));
         const left = budgetMs - (Date.now() - started);
         if (left < 300) return strip(first);
         return strip(await attempt(req, Math.min(attemptMs, left), 2));
@@ -156,7 +167,7 @@ export function createHfPlanner(o: HfPlannerOptions): Planner {
   };
 }
 
-function strip(r: PlannerResult & { fast?: boolean; retryNow?: boolean }): PlannerResult {
+function strip(r: PlannerResult & { fast?: boolean; retryNow?: boolean; waitMs?: number }): PlannerResult {
   if (r.ok) return r;
   return { ok: false, reason: r.reason };
 }

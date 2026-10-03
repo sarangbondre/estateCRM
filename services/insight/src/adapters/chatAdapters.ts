@@ -68,7 +68,7 @@ export function createUsageMeter(db: Kysely<InsightDb>): UsageMeter {
     async record(tenantId, now, result) {
       const day = istDay(now);
       const ok = result.ok;
-      const until = !ok && result.reason === 'credits' ? nextMonthIst(now) : !ok && result.reason === 'rate_limited' ? new Date(now.getTime() + 60_000) : null;
+      const until = !ok && result.reason === 'credits' ? nextMonthIst(now) : !ok && result.reason === 'rate_limited' ? new Date(now.getTime() + 10_000) : null; // CR-016: shared provider limits clear fast
       await sql`insert into hf_usage (tenant_id, day, calls, input_tokens, output_tokens, errors, timeouts, credits_exhausted_until)
         values (${tenantId}, ${day}, 1, ${ok ? result.inputTokens : 0}, ${ok ? result.outputTokens : 0},
                 ${!ok && result.reason !== 'timeout' ? 1 : 0}, ${!ok && result.reason === 'timeout' ? 1 : 0}, ${until})
