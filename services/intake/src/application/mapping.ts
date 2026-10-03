@@ -6,6 +6,7 @@ import type { MappingConstants } from '../domain/schema.js';
 import type { Template } from '../domain/template.js';
 import type { SourceType, Upload } from '../domain/upload.js';
 import type { App, StaffActor } from './context.js';
+import { activateShippedRelease } from './vocabulary.js';
 
 export interface MappingInput {
   sheetName?: string | undefined;
@@ -126,9 +127,9 @@ export async function startUpload(
     if (upload.mode === 'mapping' && !upload.columnMap) {
       throw new IntakeError('upload-not-ready', 'set the column mapping first');
     }
-    const vocabulary = await tx.repos.vocabulary.active(actor.tenantId);
-    if (!vocabulary)
-      throw new IntakeError('vocabulary-unavailable', 'no controlled-vocabulary release is cached yet');
+    const vocabulary =
+      (await tx.repos.vocabulary.active(actor.tenantId)) ??
+      (await activateShippedRelease(tx.repos, app.ids, actor.tenantId));
     const updated = (await tx.repos.uploads.update(actor.tenantId, upload.id, {
       status: 'queued',
       vocabularyVersion: vocabulary.version,

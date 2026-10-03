@@ -232,13 +232,10 @@ describe('PUT /mapping and POST /start', () => {
     expect(r.body['code']).toBe('mapping-not-allowed');
   });
 
-  it('starts: pins the active vocabulary, fixes the chunk size (500 pilot); 409 without a cached release', async () => {
+  it('starts: pins the active vocabulary, fixes the chunk size (500 pilot)', async () => {
     const t = newTenant();
     const u = await uploadFile(h, t, strictBytes);
     await inspect(h, t, u);
-    const none = await h.call('POST', `/v1/uploads/${u.id}/start`, u.headers, {});
-    expect(none.status).toBe(409);
-    expect(none.body['code']).toBe('vocabulary-unavailable');
     await seedVocabulary(h, t, 'v0.6');
     const reprocess = await h.call('POST', `/v1/uploads/${u.id}/start`, await h.staff(t, 'Data operator'), {
       reprocessUnchanged: true,
@@ -252,6 +249,15 @@ describe('PUT /mapping and POST /start', () => {
     expect(replay.status).toBe(202);
     const twice = await h.call('POST', `/v1/uploads/${u.id}/start`, u.headers, {});
     expect(twice.body['code']).toBe('upload-not-ready');
+  });
+
+  it('starts without a cached release on the release shipped with the build (records not reachable yet)', async () => {
+    const t = newTenant();
+    const u = await uploadFile(h, t, strictBytes);
+    await inspect(h, t, u);
+    const r = await h.call('POST', `/v1/uploads/${u.id}/start`, { ...u.headers, 'idempotency-key': randomUUID() }, {});
+    expect(r.status).toBe(202);
+    expect(r.body).toMatchObject({ status: 'queued', vocabularyVersion: 'v0.6' });
   });
 });
 
