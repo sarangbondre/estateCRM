@@ -121,6 +121,7 @@ describe('POST messages (SSE)', () => {
     const q = await ask(api, conv, 'How many active 2BHK lease offers are there in Andheri West?');
     expect(q.answer).toBe('There are 3 For Rent 2 BHK offers in Andheri West that are active.');
     expect(q.cards.at(-1)).toMatchObject({ kind: 'notice', notice: 'model_unavailable_keyword_fallback' });
+    expect(q.cards.at(-1)?.['text']).toMatch(/model is unavailable/);
     expect(q.done).toMatchObject({ fallbackUsed: true, model: null });
     expect(q.plan?.['fallbackUsed']).toBe(true);
 
@@ -135,6 +136,8 @@ describe('POST messages (SSE)', () => {
     hf.replies.set('Which Public offers turned Stale this week?', { fail: 'garbage' });
     const garbage = await ask(me, conv2, 'Which Public offers turned Stale this week?');
     expect(garbage.done['fallbackUsed']).toBe(true);
+    // the model replied, just not with a usable plan: say so instead of "unavailable"
+    expect(garbage.cards.find((c) => c['kind'] === 'notice' && c['notice'] === 'model_unavailable_keyword_fallback')?.['text']).toMatch(/couldn't turn that into a report/);
     expect((garbage.cards.find((c) => c['kind'] === 'table')?.['result'] as { rows: unknown[] }).rows).toHaveLength(1);
     // an invalid model plan is repaired by the keyword parser once
     hf.replies.set('Show resale 3BHK offers in Powai under ₹3 Cr that are Fresh.', { kind: 'plan', planId: 'list_offers', params: { filters: [{ field: 'owner_phone', op: 'eq', value: 'x' }] } });

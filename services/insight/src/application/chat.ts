@@ -62,6 +62,8 @@ export const EXAMPLE_QUESTIONS = [
   'Which Public offers turned Stale this week?',
 ];
 const FALLBACK_TEXT = 'The assistant model is unavailable right now, so this answer comes from keyword matching.';
+/** The model replied, but not with a plan that could run (unreadable, or failed validation). */
+const UNCLEAR_TEXT = "I couldn't turn that into a report, so this answer comes from keyword matching. Try asking more specifically.";
 
 export class StreamTimeout extends Error {
   override readonly name = 'StreamTimeout';
@@ -131,6 +133,7 @@ export async function askQuestion(
   const restore = (s: string) => deps.redactor.restore(s, red.mapping);
 
   let fallbackUsed = false;
+  let modelReplied = false;
   let model: string | null = null;
   let answer: Answer;
   try {
@@ -155,6 +158,7 @@ export async function askQuestion(
             }),
           });
       if (!exhausted) await deps.usage.record(caller.tenantId, now(), result);
+      modelReplied = result.ok;
       const parsed = result.ok ? parsePlannerOutput(result.text) : null;
       if (result.ok && parsed) {
         decision = parsed;
@@ -193,7 +197,7 @@ export async function askQuestion(
   timings.firstTokenMs = Date.now() - started;
   timings.queryMs = answer.queryMs;
   for (const piece of chunks(answer.text)) emit({ type: 'token', text: piece });
-  const fallbackCard = fallbackUsed ? [{ kind: 'notice', cardId: deps.ids.uuid(), notice: 'model_unavailable_keyword_fallback', text: FALLBACK_TEXT }] : [];
+  const fallbackCard = fallbackUsed ? [{ kind: 'notice', cardId: deps.ids.uuid(), notice: 'model_unavailable_keyword_fallback', text: modelReplied ? UNCLEAR_TEXT : FALLBACK_TEXT }] : [];
   for (const card of [...answer.streamCards, ...fallbackCard]) emit({ type: 'card', card });
   timings.totalMs = Date.now() - started;
 
