@@ -3,7 +3,9 @@
 // keys each app gets and where they come from. Only key names are printed, never values.
 // Usage (GitHub workflow aws-secrets, with AWS credentials): node infra/aws/sync-secrets.mjs <environment-name> [--dry-run]
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const envName = process.argv[2];
 const dryRun = process.argv.includes('--dry-run');
@@ -38,15 +40,21 @@ for (const [app, def] of Object.entries(apps)) {
   if (Object.keys(secret).length !== Object.keys(def.secrets).length) continue;
   const id = `estatecrm/${envName}/${app}`;
   if (!dryRun) {
-    // The value goes through stdin, never the command line (visible in the process list).
-    execFileSync(
-      'aws',
-      ['secretsmanager', 'put-secret-value', '--secret-id', id, '--secret-string', 'file:///dev/stdin'],
-      {
-        input: JSON.stringify(secret),
-        stdio: ['pipe', 'ignore', 'inherit'],
-      },
-    );
+    // The value goes through a private temp file (mode 600, deleted at once), never the command line.
+    const dir = mkdtempSync(join(tmpdir(), 'secret-'));
+    const file = join(dir, 'value.json');
+    try {
+      writeFileSync(file, JSON.stringify(secret), { mode: 0o600 });
+      execFileSync(
+        'aws',
+        ['secretsmanager', 'put-secret-value', '--secret-id', id, '--secret-string', `file://${file}`],
+        {
+          stdio: ['ignore', 'ignore', 'inherit'],
+        },
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }
   process.stdout.write(`${dryRun ? '[dry run] ' : ''}${id}: ${Object.keys(secret).join(', ')}\n`);
 }
