@@ -61,5 +61,6 @@ Change requests:
 - CR-015: APPROVED 2026-10-03, auto-approved (technical, B3): intake starts processing on the shipped vocabulary (v0.6) when no release is cached. For review
 - CR-016: APPROVED 2026-10-03, auto-approved (technical, B3): assistant model limits 5 s per attempt / 6.5 s phase (env-configurable), default model Llama-3.1-8B-Instruct, json_schema fallback. For review
 - CR-017: DECIDED by the product owner 2026-10-03 (option 1), implemented: assistant planner keywords first, model for questions the keyword parser can't express. Formal `APPROVED: CR-017` pending
+- CR-018: AWAITING `APPROVED: CR-018`: move compute to AWS ECS Fargate (Mumbai), Supabase stays (option A)
 
-Open change requests: none
+Open change requests: CR-017 (formal phrase), CR-018
