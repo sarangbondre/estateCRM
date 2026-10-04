@@ -1,0 +1,79 @@
+# One-time bootstrap for the AWS move (CR-018). Upload in the AWS console: CloudFormation → Create stack → "Upload a
+# template file", region ap-south-1. It creates the only things Terraform can't create for itself:
+#   - the S3 bucket for Terraform state (versioned, encrypted, private)
+#   - GitHub's OIDC identity provider (skip it if the account already has one)
+#   - the role GitHub Actions assumes to run Terraform and deploy. Only workflows of this repository that run in its
+#     "aws" environment can assume it, so no access keys exist anywhere.
+AWSTemplateFormatVersion: '2010-09-09'
+Description: estatecrm - Terraform state bucket and GitHub Actions deploy role (CR-018)
+
+Parameters:
+  GitHubRepo:
+    Type: String
+    Default: sarangbondre/estateCRM
+    Description: owner/repository allowed to assume the deploy role
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: false if this AWS account already has the token.actions.githubusercontent.com identity provider
+
+Conditions:
+  MakeOidc: !Equals [!Ref CreateOidcProvider, 'true']
+
+Resources:
+  StateBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub 'estatecrm-tfstate-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+  GitHubOidc:
+    Type: AWS::IAM::OIDCProvider
+    Condition: MakeOidc
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: estatecrm-github-deploy
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubRepo}:environment:aws'
+      # Terraform creates networks, load balancers, ECS, ECR, IAM roles, secrets and alarms, so the role is broad. It is
+      # bound to this repository's "aws" environment, where a required reviewer approves every run.
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+Outputs:
+  DeployRoleArn:
+    Description: Put this in the GitHub repository variable AWS_DEPLOY_ROLE_ARN
+    Value: !GetAtt DeployRole.Arn
+  StateBucket:
+    Description: Put this in the GitHub repository variable AWS_STATE_BUCKET
+    Value: !Ref StateBucket

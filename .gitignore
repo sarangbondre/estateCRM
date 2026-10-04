@@ -16,3 +16,7 @@ coverage/
 
 # Agent worktrees (local only)
 .claude/worktrees/
+
+# Terraform (infra/aws)
+infra/aws/.terraform/
+infra/aws/tfplan

@@ -1,0 +1,55 @@
+# AWS infrastructure (CR-018): terraform plan/apply of infra/aws. Run by hand: Actions → "aws-infra" → Run workflow.
+# Needs: the "aws" environment (with a required reviewer), repository variables AWS_DEPLOY_ROLE_ARN and AWS_STATE_BUCKET
+# (bootstrap stack outputs), AWS_DOMAIN (e.g. crm.11estates.in), SUPABASE_URL, and optionally ALARM_EMAIL.
+name: aws-infra
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: plan | apply
+        required: true
+        default: plan
+      launch:
+        description: Start the services (only after images are pushed, secrets written and the certificate DNS record added)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: aws-infra
+  cancel-in-progress: false
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment: aws
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: infra/aws
+    env:
+      TF_IN_AUTOMATION: '1'
+      TF_VAR_domain: ${{ vars.AWS_DOMAIN }}
+      TF_VAR_supabase_url: ${{ vars.SUPABASE_URL }}
+      TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
+      TF_VAR_launch: ${{ github.event.inputs.launch }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.4
+      - name: Check settings
+        run: |
+          [ -n "$TF_VAR_domain" ] || { echo "::error::Set the repository variable AWS_DOMAIN"; exit 1; }
+          [ -n "$TF_VAR_supabase_url" ] || { echo "::error::Set the repository variable SUPABASE_URL"; exit 1; }
+      - run: terraform init -input=false -backend-config="bucket=${{ vars.AWS_STATE_BUCKET }}" -backend-config="region=ap-south-1"
+      - run: terraform plan -input=false -out=tfplan
+      - if: github.event.inputs.action == 'apply'
+        run: terraform apply -input=false tfplan
+      - name: Outputs
+        if: github.event.inputs.action == 'apply'
+        run: terraform output | tee -a "$GITHUB_STEP_SUMMARY"
