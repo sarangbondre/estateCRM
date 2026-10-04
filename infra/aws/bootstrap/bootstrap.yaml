@@ -12,6 +12,10 @@ Parameters:
     Type: String
     Default: sarangbondre/estateCRM
     Description: owner/repository allowed to assume the deploy role
+  GitHubImmutableRepo:
+    Type: String
+    Default: sarangbondre@1721719/estateCRM@1383543460
+    Description: the same repository in GitHub's immutable OIDC subject format (owner@ownerId/repo@repoId); see `gh api repos/<owner>/<repo>/actions/oidc/customization/sub`
   CreateOidcProvider:
     Type: String
     AllowedValues: ['true', 'false']
@@ -64,7 +68,10 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubRepo}:environment:aws'
+                # GitHub sends either subject format depending on the repository's OIDC settings; accept both.
+                token.actions.githubusercontent.com:sub:
+                  - !Sub 'repo:${GitHubRepo}:environment:aws'
+                  - !Sub 'repo:${GitHubImmutableRepo}:environment:aws'
       # Terraform creates networks, load balancers, ECS, ECR, IAM roles, secrets and alarms, so the role is broad. It is
       # bound to this repository's "aws" environment, where a required reviewer approves every run.
       ManagedPolicyArns:
