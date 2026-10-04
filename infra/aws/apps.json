@@ -1,0 +1,132 @@
+{
+  "_comment": "CR-018 (AWS-A2): one entry per app. 'secrets' are the keys of the app's Secrets Manager JSON secret, injected as environment variables; 'from' maps each key to the variable name in the pilot settings file (sync-secrets.mjs). 'env' values are plain configuration; ${domain}, ${tenant_id}, ${supabase_url}, ${storage_url} are filled by Terraform. Service-to-service URLs use ECS Service Connect names.",
+  "web": {
+    "port": 3000,
+    "cpu": 512,
+    "memory": 1024,
+    "secrets": {
+      "DATABASE_URL": "WEB_DATABASE_URL",
+      "CRON_SECRET": "WEB_CRON_SECRET",
+      "KEK": "WEB_KEK",
+      "SUPABASE_ANON_KEY": "SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY": "SUPABASE_SERVICE_ROLE_KEY"
+    },
+    "env": {
+      "APP_ORIGIN": "https://${domain}",
+      "TENANT_ID": "${tenant_id}",
+      "SUPABASE_URL": "${supabase_url}",
+      "SVC_INTAKE_URL": "http://intake:3001",
+      "SVC_RECORDS_URL": "http://records:3002",
+      "SVC_JOURNEYS_URL": "http://journeys:3003",
+      "SVC_CRM_ENGINE_URL": "http://crm-engine:3004",
+      "SVC_LISTINGS_URL": "http://listings:3005",
+      "SVC_INSIGHT_URL": "http://insight:3006"
+    }
+  },
+  "intake": {
+    "port": 3001,
+    "cpu": 256,
+    "memory": 512,
+    "secrets": {
+      "DATABASE_URL": "INTAKE_DATABASE_URL",
+      "CRON_SECRET": "INTAKE_CRON_SECRET",
+      "SERVICE_CREDENTIAL": "INTAKE_SERVICE_CREDENTIAL",
+      "ANONYMISATION_KEY": "INTAKE_ANONYMISATION_KEY",
+      "STORAGE_SERVICE_KEY": "STORAGE_SERVICE_KEY",
+      "HF_TOKEN": "HF_TOKEN"
+    },
+    "env": {
+      "WEB_URL": "http://web:3000",
+      "RECORDS_URL": "http://records:3002",
+      "STORAGE_URL": "${storage_url}"
+    }
+  },
+  "records": {
+    "port": 3002,
+    "cpu": 256,
+    "memory": 512,
+    "secrets": {
+      "DATABASE_URL": "RECORDS_DATABASE_URL",
+      "CRON_SECRET": "RECORDS_CRON_SECRET",
+      "SERVICE_CREDENTIAL": "RECORDS_SERVICE_CREDENTIAL",
+      "CONTACT_HASH_SECRET": "RECORDS_CONTACT_HASH_SECRET",
+      "SCAN_SALT": "RECORDS_SCAN_SALT",
+      "STORAGE_SERVICE_KEY": "STORAGE_SERVICE_KEY"
+    },
+    "env": {
+      "WEB_URL": "http://web:3000",
+      "INTAKE_URL": "http://intake:3001",
+      "STORAGE_URL": "${storage_url}",
+      "TENANT_IDS": "${tenant_id}"
+    }
+  },
+  "journeys": {
+    "port": 3003,
+    "cpu": 256,
+    "memory": 1024,
+    "secrets": {
+      "DATABASE_URL": "JOURNEYS_DATABASE_URL",
+      "CRON_SECRET": "JOURNEYS_CRON_SECRET",
+      "SERVICE_CREDENTIAL": "JOURNEYS_SERVICE_CREDENTIAL",
+      "IP_HASH_SALT": "JOURNEYS_IP_HASH_SALT",
+      "SUPABASE_SERVICE_ROLE_KEY": "SUPABASE_SERVICE_ROLE_KEY"
+    },
+    "env": {
+      "WEB_URL": "http://web:3000",
+      "RECORDS_URL": "http://records:3002",
+      "LISTINGS_URL": "http://listings:3005",
+      "INTAKE_URL": "http://intake:3001",
+      "SUPABASE_URL": "${supabase_url}",
+      "PUBLIC_BASE_URL": "https://${domain}"
+    }
+  },
+  "crm-engine": {
+    "port": 3004,
+    "cpu": 256,
+    "memory": 512,
+    "secrets": {
+      "DATABASE_URL": "CRM_ENGINE_DATABASE_URL",
+      "CRON_SECRET": "CRM_ENGINE_CRON_SECRET",
+      "SERVICE_CREDENTIAL": "CRM_ENGINE_SERVICE_CREDENTIAL"
+    },
+    "env": {
+      "WEB_URL": "http://web:3000",
+      "RECORDS_URL": "http://records:3002",
+      "JOURNEYS_URL": "http://journeys:3003"
+    }
+  },
+  "listings": {
+    "port": 3005,
+    "cpu": 256,
+    "memory": 512,
+    "secrets": {
+      "DATABASE_URL": "LISTINGS_DATABASE_URL",
+      "CRON_SECRET": "LISTINGS_CRON_SECRET",
+      "SERVICE_CREDENTIAL": "LISTINGS_SERVICE_CREDENTIAL",
+      "SCAN_SALT": "LISTINGS_SCAN_SALT",
+      "STORAGE_SERVICE_KEY": "STORAGE_SERVICE_KEY"
+    },
+    "env": {
+      "WEB_URL": "http://web:3000",
+      "RECORDS_URL": "http://records:3002",
+      "STORAGE_URL": "${storage_url}"
+    }
+  },
+  "insight": {
+    "port": 3006,
+    "cpu": 256,
+    "memory": 512,
+    "secrets": {
+      "DATABASE_URL": "INSIGHT_DATABASE_URL",
+      "CRON_SECRET": "INSIGHT_CRON_SECRET",
+      "SERVICE_CREDENTIAL": "INSIGHT_SERVICE_CREDENTIAL",
+      "SUPABASE_SERVICE_ROLE_KEY": "SUPABASE_SERVICE_ROLE_KEY",
+      "HF_TOKEN": "HF_TOKEN"
+    },
+    "env": {
+      "WEB_URL": "http://web:3000",
+      "RECORDS_URL": "http://records:3002",
+      "SUPABASE_URL": "${supabase_url}"
+    }
+  }
+}

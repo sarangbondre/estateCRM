@@ -1,0 +1,84 @@
+# Build, push and deploy app images to AWS ECS (CR-018). Each app deploys on its own: pick one, or "all".
+# Run by hand (Actions → "aws-deploy"); after the cutover it also runs on every push to main when the repository
+# variable AWS_AUTO_DEPLOY is "on". Images are native ARM64 (Graviton) and tagged with the commit SHA.
+name: aws-deploy
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: all | web | intake | records | journeys | crm-engine | listings | insight
+        required: true
+        default: all
+  push:
+    branches: [main]
+    paths: ['services/**', 'libs/**', 'contracts/**', 'pnpm-lock.yaml']
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  plan:
+    if: github.event_name == 'workflow_dispatch' || vars.AWS_AUTO_DEPLOY == 'on'
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.pick.outputs.apps }}
+    steps:
+      - id: pick
+        env:
+          APP: ${{ github.event.inputs.app || 'all' }}
+        run: |
+          ALL='["web","intake","records","journeys","crm-engine","listings","insight"]'
+          case "$APP" in
+            all) echo "apps=$ALL" >> "$GITHUB_OUTPUT" ;;
+            web|intake|records|journeys|crm-engine|listings|insight) echo "apps=[\"$APP\"]" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::unknown app $APP"; exit 1 ;;
+          esac
+  deploy:
+    needs: plan
+    runs-on: ubuntu-24.04-arm
+    environment: aws
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.plan.outputs.apps) }}
+    concurrency:
+      group: aws-deploy-${{ matrix.app }}
+      cancel-in-progress: false
+    env:
+      APP: ${{ matrix.app }}
+      TAG: ${{ github.sha }}
+      ENV_NAME: pilot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push
+        env:
+          REPO: ${{ steps.ecr.outputs.registry }}/estatecrm/${{ matrix.app }}
+        run: |
+          if aws ecr describe-images --repository-name "estatecrm/$APP" --image-ids imageTag="$TAG" >/dev/null 2>&1; then
+            echo "image $TAG already pushed"
+          else
+            docker build -f "services/$APP/Dockerfile" -t "$REPO:$TAG" .
+            docker push "$REPO:$TAG"
+          fi
+          aws ssm put-parameter --name "/estatecrm/$ENV_NAME/image/$APP" --value "$TAG" --type String --overwrite >/dev/null
+      - name: Roll out (rolling, health-checked; ECS rolls back on failure)
+        env:
+          REPO: ${{ steps.ecr.outputs.registry }}/estatecrm/${{ matrix.app }}
+        run: |
+          CLUSTER="estatecrm-$ENV_NAME"
+          if [ "$(aws ecs describe-services --cluster "$CLUSTER" --services "$APP" --query 'services[?status==`ACTIVE`] | length(@)' --output text 2>/dev/null)" != "1" ]; then
+            echo "service $APP not launched yet: image recorded, the aws-infra launch apply will use it"; exit 0
+          fi
+          aws ecs describe-task-definition --task-definition "estatecrm-$APP" --query taskDefinition > td.json
+          jq --arg img "$REPO:$TAG" '.containerDefinitions[0].image = $img
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' td.json > td-new.json
+          ARN=$(aws ecs register-task-definition --cli-input-json file://td-new.json --query taskDefinition.taskDefinitionArn --output text)
+          aws ecs update-service --cluster "$CLUSTER" --service "$APP" --task-definition "$ARN" >/dev/null
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$APP"
+          echo "$APP running $TAG ($ARN)" | tee -a "$GITHUB_STEP_SUMMARY"
