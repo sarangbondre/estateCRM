@@ -358,12 +358,13 @@ export function compose(env: NodeJS.ProcessEnv = process.env) {
   put(
     svc,
     'src/server.ts',
-    `// Local server (\`pnpm dev\`). Vercel uses index.ts instead.
+    `// Node server: containers (AWS ECS, CR-018) and local dev (\`pnpm dev\`). Vercel uses index.ts instead.
 import { serve } from '@hono/node-server';
 import { compose } from './main.js';
+import { withPrefixes } from './entry.js';
 
 const { app, config, shutdown } = compose();
-const server = serve({ fetch: app.fetch, port: config.port, hostname: '0.0.0.0' }, (info) =>
+const server = serve({ fetch: withPrefixes(app.fetch).fetch, port: config.port, hostname: '0.0.0.0' }, (info) =>
   process.stdout.write(\`${svc} listening on http://127.0.0.1:\${info.port}\\n\`),
 );
 const stop = () => server.close(() => void shutdown().then(() => process.exit(0)));
@@ -375,18 +376,30 @@ process.on('SIGTERM', stop);
   put(
     svc,
     'index.ts',
-    `// Vercel entry (Services, Hono preset). Local dev uses src/server.ts.
-// Public /svc/${svc}/... requests (scheduler, health checks) still carry the prefix: Vercel doesn't apply the service
-// route's path transform in production. Calls from web via the binding arrive without it.
-import { Hono } from 'hono';
+    `// Vercel entry (Services, Hono preset). Containers (AWS ECS, CR-018) and local dev use src/server.ts.
 import { compose } from './src/main.js';
+import { withPrefixes } from './src/entry.js';
 
-const { app } = compose();
-const entry = new Hono();
-entry.mount('/svc/${svc}', app.fetch);
-entry.mount('/', app.fetch);
+export default withPrefixes(compose().app.fetch);
+`,
+  );
 
-export default entry;
+  put(
+    svc,
+    'src/entry.ts',
+    `// The paths this service answers under. The load balancer (AWS, CR-018) and Vercel both forward /svc/${svc}/...
+// unchanged (scheduler, health checks), so the app is mounted there as well as at /, where web's internal calls
+// arrive.
+import { Hono } from 'hono';
+
+type Fetch = Hono['fetch'];
+
+export function withPrefixes(fetch: Fetch): Hono {
+  const entry = new Hono();
+  entry.mount('/svc/${svc}', fetch);
+  entry.mount('/', fetch);
+  return entry;
+}
 `,
   );
 
