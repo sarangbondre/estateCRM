@@ -9,7 +9,14 @@ try {
   /* not present (CI, Vercel) */
 }
 
+// Container image (AWS ECS, CR-018): a self-contained server bundle traced from the monorepo root. Vercel builds
+// without it.
+const standalone = process.env['NEXT_OUTPUT'] === 'standalone';
+
 const config: NextConfig = {
+  ...(standalone
+    ? { output: 'standalone' as const, outputFileTracingRoot: new URL('../../', import.meta.url).pathname }
+    : {}),
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ['pg', 'pino', 'kysely', '@opentelemetry/api', '@opentelemetry/sdk-node'],

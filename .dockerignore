@@ -1,0 +1,17 @@
+# Docker build context = repository root (each services/<svc>/Dockerfile builds one app from the workspace).
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/.env*
+**/*.xlsx
+**/*.csv
+.git
+.vercel
+.momentum
+.agent
+.claude
+sample-data
+loadtests
+docs
+specs
