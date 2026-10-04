@@ -14,7 +14,9 @@ try {
 const standalone = process.env['NEXT_OUTPUT'] === 'standalone';
 
 const config: NextConfig = {
-  ...(standalone ? { output: 'standalone' as const, outputFileTracingRoot: new URL('../../', import.meta.url).pathname } : {}),
+  ...(standalone
+    ? { output: 'standalone' as const, outputFileTracingRoot: new URL('../../', import.meta.url).pathname }
+    : {}),
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ['pg', 'pino', 'kysely', '@opentelemetry/api', '@opentelemetry/sdk-node'],
