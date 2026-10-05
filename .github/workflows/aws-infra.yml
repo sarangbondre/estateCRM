@@ -13,6 +13,10 @@ on:
         description: Start the services (only after images are pushed, secrets written and the certificate DNS record added)
         type: boolean
         default: false
+      force_unlock:
+        description: Lock ID to release first (only after an interrupted run left the state locked)
+        required: false
+        default: ''
 permissions:
   contents: read
   id-token: write
@@ -23,7 +27,7 @@ jobs:
   terraform:
     runs-on: ubuntu-latest
     environment: aws
-    timeout-minutes: 60
+    timeout-minutes: 120 # the launch apply waits for the certificate's DNS validation
     defaults:
       run:
         working-directory: infra/aws
@@ -47,6 +51,13 @@ jobs:
           [ -n "$TF_VAR_domain" ] || { echo "::error::Set the repository variable AWS_DOMAIN"; exit 1; }
           [ -n "$TF_VAR_supabase_url" ] || { echo "::error::Set the repository variable SUPABASE_URL"; exit 1; }
       - run: terraform init -input=false -backend-config="bucket=${{ vars.AWS_STATE_BUCKET }}" -backend-config="region=ap-south-1"
+      - name: Release a stale state lock
+        if: github.event.inputs.force_unlock != ''
+        env:
+          LOCK_ID: ${{ github.event.inputs.force_unlock }}
+        run: |
+          [[ "$LOCK_ID" =~ ^[0-9a-f-]{36}$ ]] || { echo "::error::force_unlock must be a lock ID"; exit 1; }
+          terraform force-unlock -force "$LOCK_ID"
       - run: terraform plan -input=false -out=tfplan
       - if: github.event.inputs.action == 'apply'
         run: terraform apply -input=false tfplan
