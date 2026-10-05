@@ -51,6 +51,23 @@ jobs:
           [ -n "$TF_VAR_domain" ] || { echo "::error::Set the repository variable AWS_DOMAIN"; exit 1; }
           [ -n "$TF_VAR_supabase_url" ] || { echo "::error::Set the repository variable SUPABASE_URL"; exit 1; }
       - run: terraform init -input=false -backend-config="bucket=${{ vars.AWS_STATE_BUCKET }}" -backend-config="region=ap-south-1"
+      - name: Certificate issued? (launch only; otherwise show the DNS record ACM is waiting for)
+        if: github.event.inputs.launch == 'true'
+        run: |
+          ARN=$(aws acm list-certificates --certificate-statuses PENDING_VALIDATION ISSUED FAILED \
+            --query "CertificateSummaryList[?DomainName=='$TF_VAR_domain'].CertificateArn | [0]" --output text)
+          [ "$ARN" != "None" ] && [ -n "$ARN" ] || { echo "::error::No certificate for $TF_VAR_domain yet: run apply with launch off first"; exit 1; }
+          STATUS=$(aws acm describe-certificate --certificate-arn "$ARN" --query Certificate.Status --output text)
+          echo "Certificate for $TF_VAR_domain: $STATUS"
+          if [ "$STATUS" != "ISSUED" ]; then
+            {
+              echo "### Certificate not issued yet ($STATUS)"
+              echo "Add this record at the domain's DNS provider (name.com: Host = the name without \".${TF_VAR_domain#*.}.\")."
+              aws acm describe-certificate --certificate-arn "$ARN" \
+                --query 'Certificate.DomainValidationOptions[].ResourceRecord' --output table
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
       - name: Release a stale state lock
         if: github.event.inputs.force_unlock != ''
         env:
