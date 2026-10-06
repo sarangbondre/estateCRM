@@ -1,5 +1,5 @@
 {
-  "_comment": "CR-018 (AWS-A2): one entry per app. 'secrets' are the keys of the app's Secrets Manager JSON secret, injected as environment variables; 'from' maps each key to the variable name in the pilot settings file (sync-secrets.mjs). 'env' values are plain configuration; ${domain}, ${tenant_id}, ${supabase_url}, ${storage_url} are filled by Terraform. Service-to-service URLs use ECS Service Connect names.",
+  "_comment": "CR-018 (AWS-A2): one entry per app. 'secrets' are the keys of the app's Secrets Manager JSON secret, injected as environment variables; 'from' maps each key to the variable name in the pilot settings file (sync-secrets.mjs). 'env' values are plain configuration; ${domain}, ${tenant_id}, ${supabase_url}, ${storage_url} are filled by Terraform. Service-to-service URLs use ECS Service Connect names. web sets HOSTNAME=0.0.0.0 because Fargate sets HOSTNAME to the task's own name, which Next.js would bind to (container health checks call 127.0.0.1).",
   "web": {
     "port": 3000,
     "cpu": 512,
@@ -12,6 +12,7 @@
       "SUPABASE_SERVICE_ROLE_KEY": "SUPABASE_SERVICE_ROLE_KEY"
     },
     "env": {
+      "HOSTNAME": "0.0.0.0",
       "APP_ORIGIN": "https://${domain}",
       "TENANT_ID": "${tenant_id}",
       "SUPABASE_URL": "${supabase_url}",
