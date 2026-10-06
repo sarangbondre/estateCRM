@@ -106,6 +106,7 @@ export function queueItemView(i: SectionItem, now: Date, planned: boolean) {
         dealType: i.summary_offer.deal_type,
         propertyTypes: i.summary_offer.property_types ?? [],
         micromarket: i.summary_offer.micromarket,
+        locality: i.summary_offer.locality ?? null,
         areaSqftMin: i.summary_offer.area_sqft_min,
         salePriceInrMin: i.summary_offer.sale_price_inr_min,
         rentMonthlyInrMin: i.summary_offer.rent_monthly_inr_min,

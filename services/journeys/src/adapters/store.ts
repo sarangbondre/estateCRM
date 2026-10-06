@@ -245,7 +245,7 @@ function makeQueries(db: Db, t: string): Queries {
       return rowsOf(
         sql<SectionItem>`select qi.*, lc.stage as life_stage, lc.day_count as day_count,
             case when ov.id is null then null else json_build_object('deal_type', ov.deal_type, 'property_types', ov.property_types,
-              'micromarket', ov.micromarket, 'area_sqft_min', ov.area_sqft_min, 'sale_price_inr_min', ov.sale_price_inr_min,
+              'micromarket', ov.micromarket, 'locality', ov.locality, 'area_sqft_min', ov.area_sqft_min, 'sale_price_inr_min', ov.sale_price_inr_min,
               'rent_monthly_inr_min', ov.rent_monthly_inr_min) end as summary_offer,
             case when dv.id is null then null else json_build_object('deal_types', dv.deal_types, 'property_types', dv.property_types,
               'micromarkets', dv.micromarkets, 'budget_inr_max', dv.budget_inr_max, 'rent_monthly_inr_max', dv.rent_monthly_inr_max) end as summary_demand
