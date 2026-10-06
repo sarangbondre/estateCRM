@@ -73,10 +73,17 @@ export class Sessions {
     if (!accessToken) throw new WebError('unauthenticated');
     const verified = await this.deps.auth.verifyAccessToken(accessToken);
     if (!verified) throw new WebError('unauthenticated');
-    const user = await this.load(verified.userId);
+    let user = await this.load(verified.userId);
     assertCanUseApp(user);
     const now = this.deps.clock.now();
-    if (isIdleExpired(user, now)) throw new WebError('session-expired');
+    if (isIdleExpired(user, now)) {
+      // The cache is per instance: a sign-in handled by another instance refreshed last_seen_at in the database, so
+      // check there before ending the session (seen with 2+ web tasks on AWS, CR-018).
+      this.cache.delete(user.id);
+      user = await this.load(verified.userId);
+      assertCanUseApp(user);
+      if (isIdleExpired(user, now)) throw new WebError('session-expired');
+    }
     if (shouldTouchLastSeen(user.lastSeenAt, now)) {
       await this.deps.users.touchLastSeen(user.tenantId, user.id, now);
       this.cache.set(user.id, { user: { ...user, lastSeenAt: now }, at: now.getTime() });
