@@ -20,3 +20,6 @@ coverage/
 # Terraform (infra/aws)
 infra/aws/.terraform/
 infra/aws/tfplan
+
+# Client user guide (screenshots contain client data; never commit)
+client-guide/
