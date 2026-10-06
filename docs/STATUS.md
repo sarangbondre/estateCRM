@@ -61,6 +61,6 @@ Change requests:
 - CR-015: APPROVED 2026-10-03, auto-approved (technical, B3): intake starts processing on the shipped vocabulary (v0.6) when no release is cached. For review
 - CR-016: APPROVED 2026-10-03, auto-approved (technical, B3): assistant model limits 5 s per attempt / 6.5 s phase (env-configurable), default model Llama-3.1-8B-Instruct, json_schema fallback. For review
 - CR-017: DECIDED by the product owner 2026-10-03 (option 1), implemented: assistant planner keywords first, model for questions the keyword parser can't express. Formal `APPROVED: CR-017` pending
-- CR-018: APPROVED 2026-10-04: move compute to AWS ECS Fargate (Mumbai), Supabase stays (option A). AWS-A1 Dockerfiles done (#115); AWS-A2/A3 Terraform + workflows done (#116), not yet applied: waiting on the AWS account, bootstrap stack, domain (docs/runbooks/aws.md)
+- CR-018: APPROVED 2026-10-04: move compute to AWS ECS Fargate (Mumbai), Supabase stays (option A). **Live 2026-10-06 at https://crm.11estates.in** (AWS-A1..A6): 7 apps × 2 tasks healthy, scheduler re-pointed, auto-deploy on. Vercel (estatecrm-nu.vercel.app) kept as fallback until 2026-10-13, then removed
 
 Open change requests: CR-017 (formal phrase)

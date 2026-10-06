@@ -12,6 +12,12 @@ a short-lived role, so nobody needs AWS access keys.
 | Secrets from the pilot settings file | workflow **aws-secrets** (`infra/aws/sync-secrets.mjs`) |
 | Build + deploy one app or all | workflow **aws-deploy** (image per commit SHA, rolling, automatic rollback) |
 
+## Live
+- **2026-10-06:** cut over. `https://crm.11estates.in` → load balancer `estatecrm-pilot-241881598.ap-south-1.elb.amazonaws.com`
+  (name.com CNAME `crm`). The ACM validation CNAME `_58c84fe8….crm` must stay for renewals.
+- Status and diagnosis: workflow **aws-status** (tasks, ECS events, stop reasons, recent log errors).
+- **name.com Host field:** enter only the part before `.11estates.in` (e.g. `crm`), because name.com appends the domain.
+
 ## First-time setup (in this order)
 
 **Product owner (console and GitHub settings; nothing secret goes in chat)**
