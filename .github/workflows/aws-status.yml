@@ -1,0 +1,48 @@
+# Read-only status of the AWS apps (CR-018): running vs desired tasks, recent ECS events, why tasks stopped, and the
+# latest warnings/errors from each app's logs (logs carry no PII by design, CLAUDE.md §3.8). Run by hand.
+name: aws-status
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: all | web | intake | records | journeys | crm-engine | listings | insight
+        required: true
+        default: all
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    environment: aws
+    timeout-minutes: 10
+    env:
+      CLUSTER: estatecrm-pilot
+      APP: ${{ github.event.inputs.app }}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+      - name: Status
+        run: |
+          case "$APP" in
+            all) APPS="web intake records journeys crm-engine listings insight" ;;
+            web|intake|records|journeys|crm-engine|listings|insight) APPS="$APP" ;;
+            *) echo "::error::unknown app $APP"; exit 1 ;;
+          esac
+          for a in $APPS; do
+            echo "================ $a"
+            aws ecs describe-services --cluster "$CLUSTER" --services "$a" \
+              --query 'services[0].{running:runningCount,desired:desiredCount,pending:pendingCount,taskDefinition:taskDefinition}' --output table || true
+            echo "-- last ECS events"
+            aws ecs describe-services --cluster "$CLUSTER" --services "$a" --query 'services[0].events[0:6].[createdAt,message]' --output text || true
+            echo "-- stopped tasks"
+            for t in $(aws ecs list-tasks --cluster "$CLUSTER" --service-name "$a" --desired-status STOPPED --max-items 3 --query 'taskArns[]' --output text 2>/dev/null | grep -v None); do
+              aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$t" \
+                --query 'tasks[0].{stopped:stoppedReason,exit:containers[0].exitCode,reason:containers[0].reason,health:containers[0].healthStatus}' --output json || true
+            done
+            echo "-- recent warnings/errors in /estatecrm/pilot/$a"
+            aws logs filter-log-events --log-group-name "/estatecrm/pilot/$a" --start-time $(( ($(date +%s) - 3600) * 1000 )) \
+              --filter-pattern '?"level\":\"warn" ?"level\":\"error" ?Error ?error' --max-items 15 --query 'events[].message' --output text 2>/dev/null | tail -15 || true
+          done
