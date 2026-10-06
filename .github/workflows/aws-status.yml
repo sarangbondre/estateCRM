@@ -8,6 +8,10 @@ on:
         description: all | web | intake | records | journeys | crm-engine | listings | insight
         required: true
         default: all
+      filter:
+        description: Optional text to search the last hour of logs for (e.g. a correlation id); empty = latest warnings/errors
+        required: false
+        default: ''
 permissions:
   contents: read
   id-token: write
@@ -19,6 +23,7 @@ jobs:
     env:
       CLUSTER: estatecrm-pilot
       APP: ${{ github.event.inputs.app }}
+      FILTER: ${{ github.event.inputs.filter }}
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -42,7 +47,16 @@ jobs:
               aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$t" \
                 --query 'tasks[0].{stopped:stoppedReason,exit:containers[0].exitCode,reason:containers[0].reason,health:containers[0].healthStatus}' --output json || true
             done
-            echo "-- recent warnings/errors in /estatecrm/pilot/$a"
+            if [ -n "$FILTER" ]; then
+              echo "-- log lines in /estatecrm/pilot/$a matching the filter"
+              PATTERN="\"$(printf '%s' "$FILTER" | tr -d '"')\""
+              MAX=20
+            else
+              echo "-- recent warnings/errors in /estatecrm/pilot/$a"
+              PATTERN='?"level\":\"warn" ?"level\":\"error" ?Error ?error'
+              MAX=200
+            fi
+            # Newest last: fetch enough events, keep the tail.
             aws logs filter-log-events --log-group-name "/estatecrm/pilot/$a" --start-time $(( ($(date +%s) - 3600) * 1000 )) \
-              --filter-pattern '?"level\":\"warn" ?"level\":\"error" ?Error ?error' --max-items 15 --query 'events[].message' --output text 2>/dev/null | tail -15 || true
+              --filter-pattern "$PATTERN" --max-items "$MAX" --query 'events[].message' --output text 2>/dev/null | tail -15 || true
           done
