@@ -76,7 +76,7 @@ export interface Page<T> {
 export interface SectionItem extends QueueItemRow {
   life_stage: string | null;
   day_count: number | null;
-  summary_offer: Pick<OfferViewRow, 'deal_type' | 'property_types' | 'micromarket' | 'area_sqft_min' | 'sale_price_inr_min' | 'rent_monthly_inr_min'> | null;
+  summary_offer: Pick<OfferViewRow, 'deal_type' | 'property_types' | 'micromarket' | 'locality' | 'area_sqft_min' | 'sale_price_inr_min' | 'rent_monthly_inr_min'> | null;
   summary_demand: {
     deal_types: string[];
     property_types: string[];

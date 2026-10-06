@@ -194,15 +194,20 @@ const inr = (v: number) =>
   v >= 10_000_000 ? `₹${(v / 10_000_000).toFixed(2).replace(/\.?0+$/, '')} Cr` : v >= 100_000 ? `₹${(v / 100_000).toFixed(2).replace(/\.?0+$/, '')} L` : `₹${v}`;
 
 /** Queue summary line from stored fields only, never contact PII (QueueItem.summary). */
+/** Micromarkets reach journeys as ids (events carry no names): show them only when they are readable names. */
+const placeName = (v: string | null | undefined): string | null =>
+  v && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : null;
+
 export function offerSummary(o: {
   dealType: string;
   propertyTypes: readonly string[];
   micromarket: string | null;
+  locality?: string | null;
   areaSqftMin: number | null;
   salePriceInrMin: number | null;
   rentMonthlyInrMin: number | null;
 }): string {
-  const parts = [o.dealType, o.propertyTypes[0], o.micromarket];
+  const parts = [o.dealType, o.propertyTypes[0], placeName(o.locality) ?? placeName(o.micromarket)];
   if (o.areaSqftMin) parts.push(`${Math.round(o.areaSqftMin)} sq ft`);
   const price = o.dealType === 'Lease' ? o.rentMonthlyInrMin : o.salePriceInrMin;
   if (price) parts.push(o.dealType === 'Lease' ? `${inr(price)}/mo` : inr(price));
@@ -216,7 +221,8 @@ export function demandSummary(d: {
   budgetInrMax: number | null;
   rentMonthlyInrMax: number | null;
 }): string {
-  const parts = [d.dealTypes.join('/'), d.propertyTypes[0], d.micromarkets.slice(0, 2).join(', ')];
+  const places = d.micromarkets.map((m) => placeName(m)).filter((m): m is string => !!m);
+  const parts = [d.dealTypes.join('/'), d.propertyTypes[0], places.slice(0, 2).join(', ')];
   const budget = d.dealTypes.includes('Lease') ? d.rentMonthlyInrMax : d.budgetInrMax;
   if (budget) parts.push(`up to ${inr(budget)}`);
   return parts.filter(Boolean).join(' · ').slice(0, 200);
