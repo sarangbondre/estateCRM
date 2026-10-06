@@ -61,7 +61,7 @@ jobs:
     export-expire: '*/15 * * * *' # every 15 min
     conversation-purge: '45 22 * * *' # daily 04:15 IST
     rollup-reconcile: '0 23 * * *' # 04:30 IST
-    vocabulary-refresh: on-demand # after vocabulary.released.v1 / micromarkets.updated.v1
+    vocabulary-refresh: '*/5 * * * *' # every 5 min; a no-op unless vocabulary.released.v1 / micromarkets.updated.v1 marked it pending (nothing else starts it)
     idempotency-prune: '15 * * * *' # hourly
     hf-credit-reset: '30 18 1 * *' # monthly, 1st 00:00 IST
 
