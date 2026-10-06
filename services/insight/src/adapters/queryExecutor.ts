@@ -12,6 +12,8 @@ import { ACTIVE_OFFER_STATUSES, DEMAND_LABEL_INPUTS, OFFER_LABEL_INPUTS } from '
 import type { ResolvedFilter, ValidatedPlan } from '../domain/plans/validator.js';
 import type { InsightDb } from './db.js';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const COUNT_CAP = 10_000;
 const STATEMENT_TIMEOUT_MS = 1_500;
 const DAY_MS = 86_400_000;
@@ -177,6 +179,19 @@ export function createQueryExecutor(db: Kysely<InsightDb>): QueryExecutor {
       },
     );
 
+  /** Micromarkets are stored as hierarchy ids; answers and exports show their names (micromarket_ref). */
+  async function withMicromarketNames(trx: Kysely<InsightDb>, tenantId: string, rows: Record<string, unknown>[], key = 'micromarket') {
+    const ids = [...new Set(rows.map((r) => r[key]).filter((x): x is string => typeof x === 'string' && UUID.test(x)))];
+    if (!ids.length) return rows;
+    const r = await sql<{ id: string; name: string }>`select id::text as id, name from micromarket_ref
+      where tenant_id = ${tenantId} and id = any(${ids}::uuid[])`.execute(trx);
+    const names = new Map(r.rows.map((x) => [x.id, x.name]));
+    return rows.map((row) => {
+      const v = row[key];
+      return typeof v === 'string' && names.has(v) ? { ...row, [key]: names.get(v) } : row;
+    });
+  }
+
   async function cappedCount(trx: Kysely<InsightDb>, v: ValidatedPlan, tenantId: string, now: Date) {
     const r = await sql<{ n: number }>`select count(*)::int as n from (select 1 from ${fromClause(v, tenantId)}${and(
       whereParts(v, now),
@@ -189,7 +204,10 @@ export function createQueryExecutor(db: Kysely<InsightDb>): QueryExecutor {
       const now = opts.now;
       return run(async (trx) => {
         const kind = v.template.kind;
-        if (v.template.base === 'gap') return gap(trx, tenantId, v);
+        if (v.template.base === 'gap') {
+          const g = await gap(trx, tenantId, v);
+          return { ...g, rows: await withMicromarketNames(trx, tenantId, g.rows) };
+        }
         if (kind === 'count') {
           const n = await cappedCount(trx, v, tenantId, now);
           return { rows: [{ count: Math.min(n, COUNT_CAP) }], total: Math.min(n, COUNT_CAP), capped: n > COUNT_CAP, nextCursor: null };
@@ -211,7 +229,8 @@ export function createQueryExecutor(db: Kysely<InsightDb>): QueryExecutor {
             for (const m of v.metrics) out[metricKey(m.key)] = row[metricKey(m.key)] === null ? null : Number(row[metricKey(m.key)]);
             return out;
           });
-          return { rows, total: rows.length, capped: false, nextCursor: null };
+          const named = v.groupBy.some((g) => g.key === 'micromarket') ? await withMicromarketNames(trx, tenantId, rows) : rows;
+          return { rows: named, total: named.length, capped: false, nextCursor: null };
         }
         // list
         const limit = opts.pageSize ?? Math.min(opts.limit ?? 25, v.template.maxRows);
@@ -243,7 +262,7 @@ export function createQueryExecutor(db: Kysely<InsightDb>): QueryExecutor {
         const nextCursor = r.rows.length > limit && last ? encodeCursor({ s: toJson(last['_sort']) ?? null, id: last['_id'] }) : null;
         const total = opts.withTotal ? await cappedCount(trx, v, tenantId, now) : null;
         return {
-          rows: page.map((row) => clean(row)),
+          rows: await withMicromarketNames(trx, tenantId, page.map((row) => clean(row))),
           total: total === null ? null : Math.min(total, COUNT_CAP),
           capped: total !== null && total > COUNT_CAP,
           nextCursor,

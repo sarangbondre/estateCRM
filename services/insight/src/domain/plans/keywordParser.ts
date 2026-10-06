@@ -65,9 +65,19 @@ export function parseKeywords(redacted: string, ctx: KeywordContext): PlannerDec
   const area = /\b(?:(above|over|more than|at least|under|below|upto|up to|less than|of|around|about)\s+)?(\d[\d,]*)\s*(?:sq\.?\s*ft|sqft|square feet)\b/.exec(text);
   const lifeStage = ['fresh', 'ageing', 'stale', 'expired'].find((s) => has(text, new RegExp(`\\b${s}\\b`)));
   const publication = ['public', 'anonymous', 'private'].find((s) => has(text, new RegExp(`\\b${s}\\b`)));
+  // Longest names first; a shorter name inside text already matched by a longer one ("Andheri" in "Andheri West")
+  // isn't a second place.
+  const taken: [number, number][] = [];
   const locations = [...ctx.locations]
     .sort((a, b) => b.length - a.length)
-    .filter((l) => has(text, new RegExp(`\\b${esc(l.toLowerCase())}\\b`)));
+    .filter((l) => {
+      const m = new RegExp(`\\b${esc(l.toLowerCase())}\\b`).exec(text);
+      if (!m) return false;
+      const span: [number, number] = [m.index, m.index + m[0].length];
+      if (taken.some(([a, b]) => span[0] >= a && span[1] <= b)) return false;
+      taken.push(span);
+      return true;
+    });
   const location = locations[0];
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 

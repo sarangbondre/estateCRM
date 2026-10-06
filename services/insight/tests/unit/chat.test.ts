@@ -14,17 +14,29 @@ import { APPENDIX_A } from '../appendixA.js';
 
 const vocab = libraryVocabulary().values;
 const kw = (text: string) =>
-  parseKeywords(text, { now: new Date('2026-10-07T06:30:00.000Z'), vocabulary: vocab, locations: ['andheri west', 'powai', 'marol', 'bhiwandi', 'bkc'] });
+  parseKeywords(text, {
+    now: new Date('2026-10-07T06:30:00.000Z'),
+    vocabulary: vocab,
+    locations: ['andheri west', 'powai', 'marol', 'bhiwandi', 'bkc'],
+  });
 
 describe('model output', () => {
   it('accepts the five kinds and rejects anything else', () => {
     expect(parsePlannerOutput('{"kind":"refusal"}')).toEqual({ kind: 'refusal' });
-    expect(parsePlannerOutput('```json\n{"kind":"plan","planId":"count_offers","params":{"filters":[{"field":"bhk","op":"eq","value":2}]}}\n```')).toMatchObject({
+    expect(
+      parsePlannerOutput(
+        '```json\n{"kind":"plan","planId":"count_offers","params":{"filters":[{"field":"bhk","op":"eq","value":2}]}}\n```',
+      ),
+    ).toMatchObject({
       kind: 'plan',
       plan: { planId: 'count_offers', filters: [{ field: 'bhk', op: 'eq', value: 2 }] },
     });
-    expect(parsePlannerOutput('{"kind":"plan","planId":"export_list","params":{"listPlanId":"list_offers"}}')).toMatchObject({ exportRequested: true, plan: { planId: 'list_offers' } });
-    expect(parsePlannerOutput('{"kind":"plan","planId":"x","params":{"filters":[{"field":"a","op":"drop"}]}}')).toBeNull();
+    expect(
+      parsePlannerOutput('{"kind":"plan","planId":"export_list","params":{"listPlanId":"list_offers"}}'),
+    ).toMatchObject({ exportRequested: true, plan: { planId: 'list_offers' } });
+    expect(
+      parsePlannerOutput('{"kind":"plan","planId":"x","params":{"filters":[{"field":"a","op":"drop"}]}}'),
+    ).toBeNull();
     expect(parsePlannerOutput('Here are the offers')).toBeNull();
     expect(parsePlannerOutput('{"kind":"sql","query":"select *"}')).toBeNull();
   });
@@ -33,8 +45,16 @@ describe('model output', () => {
     const d = parsePlannerOutput(
       '{"kind":"plan","planId":"supply_demand_gap","params":{"filters":[],"groupBy":[],"metrics":[],"sort":[],"period":{"preset":"","field":""},"me":false,"export":false}}',
     );
-    expect(d).toEqual({ kind: 'plan', exportRequested: false, plan: { planId: 'supply_demand_gap', templateVersion: 1, filters: [] } });
-    expect(parsePlannerOutput('{"kind":"plan","planId":"count_offers","params":{"period":{"preset":"this_week"}}}')).toMatchObject({
+    expect(d).toEqual({
+      kind: 'plan',
+      exportRequested: false,
+      plan: { planId: 'supply_demand_gap', templateVersion: 1, filters: [] },
+    });
+    expect(
+      parsePlannerOutput(
+        '{"kind":"plan","planId":"count_offers","params":{"period":{"preset":"this_week"}}}',
+      ),
+    ).toMatchObject({
       plan: { period: { preset: 'this_week' } },
     });
   });
@@ -51,7 +71,8 @@ describe('keyword parser', () => {
         const got = d.plan.filters?.find((x) => x.field === f.field);
         expect(got, `${c.id} ${f.field}`).toBeDefined();
         expect(got?.op).toBe(f.op);
-        if (typeof f.value === 'string' && f.field === 'location') expect(String(got?.value).toLowerCase()).toBe(f.value.toLowerCase());
+        if (typeof f.value === 'string' && f.field === 'location')
+          expect(String(got?.value).toLowerCase()).toBe(f.value.toLowerCase());
         else expect(got?.value).toEqual(f.value);
       }
       expect(d.exportRequested).toBe(!!c.expected.exportRequested);
@@ -62,6 +83,18 @@ describe('keyword parser', () => {
     expect(kw('What is the RBI repo rate today?')).toBeNull();
     expect(kw('What is the weather in Powai?')).toBeNull();
     expect(kw('Tell me a joke')).toBeNull();
+  });
+  it('a place inside a longer place name is not a second place ("Andheri" in "Andheri West")', () => {
+    const d = parseKeywords('Show residential offers for sale in Andheri West', {
+      now: new Date(),
+      vocabulary: {},
+      locations: ['Andheri', 'Andheri West', 'Andheri East'],
+    });
+    expect(d?.kind === 'plan' && d.plan.filters?.find((f) => f.field === 'location')).toEqual({
+      field: 'location',
+      op: 'eq',
+      value: 'Andheri West',
+    });
   });
 });
 
@@ -98,18 +131,48 @@ describe('formatting and prompt', () => {
 });
 
 describe('action cards', () => {
-  const subjects = new Map([['DEM-000127', { kind: 'demand' as const, id: '11111111-1111-4111-8111-111111111111', code: 'DEM-000127', merged: false, version: 4 }]]);
-  const ctx = { role: 'Manager', cardId: '22222222-2222-4222-8222-222222222222', idempotencyKey: '33333333-3333-4333-8333-333333333333', now: new Date('2026-10-07T06:30:00.000Z') };
+  const subjects = new Map([
+    [
+      'DEM-000127',
+      {
+        kind: 'demand' as const,
+        id: '11111111-1111-4111-8111-111111111111',
+        code: 'DEM-000127',
+        merged: false,
+        version: 4,
+      },
+    ],
+  ]);
+  const ctx = {
+    role: 'Manager',
+    cardId: '22222222-2222-4222-8222-222222222222',
+    idempotencyKey: '33333333-3333-4333-8333-333333333333',
+    now: new Date('2026-10-07T06:30:00.000Z'),
+  };
   it('builds the owner operation with a 30-minute expiry', () => {
     const r = buildActionCard('C-16', { demandCode: 'dem-000127', exit: 'lost' }, subjects, ctx);
-    expect(r).toMatchObject({ ok: true, card: { path: '/v1/demands/DEM-000127/exit', payload: { exit: 'Lost' }, expiresAt: '2026-10-07T07:00:00.000Z' } });
+    expect(r).toMatchObject({
+      ok: true,
+      card: {
+        path: '/v1/demands/DEM-000127/exit',
+        payload: { exit: 'Lost' },
+        expiresAt: '2026-10-07T07:00:00.000Z',
+      },
+    });
   });
   it('refuses merged subjects, unknown codes, bad values and roles', () => {
-    expect(buildActionCard('C-09', { demandCode: 'DEM-000999' }, subjects, ctx)).toMatchObject({ ok: false, notice: 'clarify' });
+    expect(buildActionCard('C-09', { demandCode: 'DEM-000999' }, subjects, ctx)).toMatchObject({
+      ok: false,
+      notice: 'clarify',
+    });
     const merged = new Map([['DEM-000127', { ...subjects.get('DEM-000127')!, merged: true }]]);
     expect(buildActionCard('C-09', { demandCode: 'DEM-000127' }, merged, ctx)).toMatchObject({ ok: false });
-    expect(buildActionCard('C-16', { demandCode: 'DEM-000127', exit: 'Vanished' }, subjects, ctx)).toMatchObject({ ok: false });
-    expect(buildActionCard('C-09', { demandCode: 'DEM-000127' }, subjects, { ...ctx, role: 'Data operator' })).toMatchObject({ notice: 'not_allowed_for_role' });
+    expect(
+      buildActionCard('C-16', { demandCode: 'DEM-000127', exit: 'Vanished' }, subjects, ctx),
+    ).toMatchObject({ ok: false });
+    expect(
+      buildActionCard('C-09', { demandCode: 'DEM-000127' }, subjects, { ...ctx, role: 'Data operator' }),
+    ).toMatchObject({ notice: 'not_allowed_for_role' });
     expect(buildActionCard('C-99', {}, subjects, ctx)).toMatchObject({ ok: false });
   });
 });
@@ -138,7 +201,11 @@ describe('Hugging Face planner', () => {
       client: {
         chatCompletion: (_a, o) => {
           slowCalls++;
-          return new Promise((_, reject) => o?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('t'), { name: 'TimeoutError' }))));
+          return new Promise((_, reject) =>
+            o?.signal?.addEventListener('abort', () =>
+              reject(Object.assign(new Error('t'), { name: 'TimeoutError' })),
+            ),
+          );
         },
       },
     });
@@ -146,14 +213,30 @@ describe('Hugging Face planner', () => {
     expect(slowCalls).toBe(1);
   });
   it('maps 402 to credits, 429 to rate_limited, and opens the breaker after repeated failures', async () => {
-    const status = (s: number) => createHfPlanner({ model: 'm', client: { chatCompletion: async () => Promise.reject(Object.assign(new Error('x'), { httpResponse: { status: s } })) } });
+    const status = (s: number) =>
+      createHfPlanner({
+        model: 'm',
+        client: {
+          chatCompletion: async () =>
+            Promise.reject(Object.assign(new Error('x'), { httpResponse: { status: s } })),
+        },
+      });
     expect(await status(402).plan(req)).toEqual({ ok: false, reason: 'credits' });
     expect(await status(429).plan(req)).toEqual({ ok: false, reason: 'rate_limited' });
-    const failing = createHfPlanner({ model: 'm', client: { chatCompletion: async () => Promise.reject(Object.assign(new Error('x'), { httpResponse: { status: 400 } })) } });
+    const failing = createHfPlanner({
+      model: 'm',
+      client: {
+        chatCompletion: async () =>
+          Promise.reject(Object.assign(new Error('x'), { httpResponse: { status: 400 } })),
+      },
+    });
     const reasons = [];
     for (let i = 0; i < 25; i++) reasons.push((await failing.plan(req)) as { reason?: string });
     expect(reasons.some((r) => r.reason === 'circuit_open')).toBe(true);
-    expect(await createHfPlanner({ model: null, client: null }).plan(req)).toEqual({ ok: false, reason: 'not_configured' });
+    expect(await createHfPlanner({ model: null, client: null }).plan(req)).toEqual({
+      ok: false,
+      reason: 'not_configured',
+    });
   });
   it('credits reset on the 1st of next month, 00:00 IST', () => {
     expect(nextMonthIst(new Date('2026-10-07T06:30:00.000Z')).toISOString()).toBe('2026-10-31T18:30:00.000Z');
@@ -164,9 +247,9 @@ describe('redaction allow-list for questions', () => {
   it('keeps business words after contact cues but still masks names and phones', async () => {
     const { redactor } = await import('../../src/adapters/chatAdapters.js');
     const { CHAT_ALLOW_TERMS } = await import('../../src/domain/chat/allowTerms.js');
-    expect(redactor.redact('How many offers did each supply agent verify this week?', CHAT_ALLOW_TERMS).text).toBe(
-      'How many offers did each supply agent verify this week?',
-    );
+    expect(
+      redactor.redact('How many offers did each supply agent verify this week?', CHAT_ALLOW_TERMS).text,
+    ).toBe('How many offers did each supply agent verify this week?');
     const r = redactor.redact('Call Sanjay Testkar on 90000 01234 about lease offers', CHAT_ALLOW_TERMS);
     expect(r.text).toBe('Call ⟨NAME_1⟩ on ⟨PHONE_1⟩ about lease offers');
     expect(redactor.restore(r.text, r.mapping)).toBe('Call Sanjay Testkar on 90000 01234 about lease offers');
