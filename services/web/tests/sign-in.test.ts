@@ -5,7 +5,8 @@ import { createLocalJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TOKEN_TTL_SEC } from '../src/domain/service-tokens';
 import { NEXT_KEY_PUBLISH_MS } from '../src/application/tokens';
-import { TENANT, makeUser } from './fakes';
+import { Sessions } from '../src/application/sessions';
+import { MemoryUow, MemoryUsers, TENANT, makeUser } from './fakes';
 import { harness } from './harness';
 
 type H = Awaited<ReturnType<typeof harness>>;
@@ -74,6 +75,14 @@ describe('completeSignIn (web LLD §4.1 step 2)', () => {
     const u = h.memory.add(makeUser({ lastSeenAt: new Date(h.clock.now().getTime() - 13 * 3600_000) }));
     await h.sessions.completeSignIn(`token.${u.id}`, 'c');
     await expect(h.sessions.authenticate(`token.${u.id}`)).resolves.toMatchObject({ userId: u.id });
+  });
+  it('another instance with a stale cached user still accepts the fresh sign-in (2+ web tasks, CR-018)', async () => {
+    const u = h.memory.add(makeUser({ lastSeenAt: new Date(h.clock.now().getTime() - 13 * 3600_000) }));
+    const users = new MemoryUsers(h.memory);
+    const other = new Sessions({ auth: h.auth, users, uow: new MemoryUow(h.memory), clock: h.clock });
+    await expect(other.authenticate(`token.${u.id}`)).rejects.toThrow('session-expired'); // caches the idle user
+    await h.sessions.completeSignIn(`token.${u.id}`, 'c'); // handled by this instance
+    await expect(other.authenticate(`token.${u.id}`)).resolves.toMatchObject({ userId: u.id });
   });
 });
 
